@@ -27,9 +27,12 @@ export default function LoginPage() {
 
     if (isPlaceholder) {
       if (typeof window !== 'undefined') {
+        const inferredName = email.split('@')[0] || 'User';
         sessionStorage.setItem('pijar_user_email', email);
-        sessionStorage.setItem('pijar_user_name', email.split('@')[0] || 'User');
+        sessionStorage.setItem('pijar_user_name', inferredName);
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=${encodeURIComponent(inferredName)}; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
       }
       router.push('/dashboard');
       return;
@@ -42,7 +45,10 @@ export default function LoginPage() {
         setLoading(false);
       } else {
         if (typeof window !== 'undefined') {
+          const inferredName = email.split('@')[0] || 'User';
           sessionStorage.setItem('pijar_user_email', email);
+          document.cookie = `pijar_user_name=${encodeURIComponent(inferredName)}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
         }
         router.push('/dashboard');
         router.refresh();
@@ -50,9 +56,12 @@ export default function LoginPage() {
     } catch (networkErr: unknown) {
       console.warn('Supabase login network unreachable, continuing with local session:', networkErr);
       if (typeof window !== 'undefined') {
+        const inferredName = email.split('@')[0] || 'User';
         sessionStorage.setItem('pijar_user_email', email);
-        sessionStorage.setItem('pijar_user_name', email.split('@')[0] || 'User');
+        sessionStorage.setItem('pijar_user_name', inferredName);
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=${encodeURIComponent(inferredName)}; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
       }
       router.push('/dashboard');
     }
@@ -70,6 +79,8 @@ export default function LoginPage() {
         sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
         sessionStorage.setItem('pijar_user_name', 'Demo User');
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=Demo%20User; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
       }
       router.push('/dashboard');
       return;
@@ -95,12 +106,18 @@ export default function LoginPage() {
             sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
             sessionStorage.setItem('pijar_user_name', 'Demo User');
             sessionStorage.setItem('pijar_is_demo', 'true');
+            document.cookie = `pijar_user_name=Demo%20User; path=/; max-age=604800; SameSite=Lax`;
+            document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
           }
           router.push('/dashboard');
           return;
         }
       }
 
+      if (typeof window !== 'undefined') {
+        document.cookie = `pijar_user_name=Demo%20User; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
+      }
       router.push('/dashboard');
       router.refresh();
     } catch (err: unknown) {
@@ -109,6 +126,8 @@ export default function LoginPage() {
         sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
         sessionStorage.setItem('pijar_user_name', 'Demo User');
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=Demo%20User; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
       }
       router.push('/dashboard');
     }

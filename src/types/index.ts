@@ -26,17 +26,25 @@ export interface DiagnosticQuestion {
   question: string;
   options: string[];       // 4 opsi jawaban (A-D)
   concept_tested: string;  // Konsep yang diuji
+  correct_index?: number;  // Indeks opsi yang benar (0-3)
+  explanation?: string;    // Penjelasan rasional pedagogis
+  target_node_id?: string; // Canonical node ID pada Knowledge Graph
 }
 
 export interface DiagnosticAnswer {
   question_id: string;
+  question?: string;
+  options?: string[];
   selected_option: number; // index 0-3
-  is_correct: boolean;
+  correct_index?: number;  // index 0-3
+  is_correct?: boolean;
   concept_tested: string;
+  target_node_id?: string;
 }
 
 export interface KnowledgeGap {
   concept: string;
+  target_node_id?: string; // Canonical node ID
   severity: 'critical' | 'moderate' | 'minor';
   justification: string;   // Penjelasan mengapa konsep ini penting
   prerequisites: string[]; // Konsep-konsep yang harus dikuasai lebih dulu

@@ -10,6 +10,9 @@ interface UserAnswerPayload {
   options: string[];
   selected_option: number; // 0-3
   concept_tested: string;
+  correct_index?: number;
+  explanation?: string;
+  target_node_id?: string;
 }
 
 export async function POST(request: Request) {
@@ -25,76 +28,126 @@ export async function POST(request: Request) {
       );
     }
 
+    const total = answers.length;
+
+    // 1. Deterministic Evaluation
+    const hasKeys = answers.some(a => typeof a.correct_index === 'number');
+    let deterministicCorrectCount = 0;
+    const incorrectAnswers: UserAnswerPayload[] = [];
+    const correctAnswers: UserAnswerPayload[] = [];
+
+    if (hasKeys) {
+      for (const a of answers) {
+        if (typeof a.correct_index === 'number' && a.selected_option === a.correct_index) {
+          deterministicCorrectCount++;
+          correctAnswers.push(a);
+        } else {
+          incorrectAnswers.push(a);
+        }
+      }
+    } else {
+      // Legacy fallback if client provided no keys
+      deterministicCorrectCount = Math.max(1, Math.floor(total * 0.5));
+    }
+
     let diagnosticResult: DiagnosticResult | null = null;
 
-    // Format prompt for AI prerequisite and root gap detection
+    // 2. AI Qualitative Misconception & Narrative Synthesis
     try {
       const answersPromptText = answers.map((a, idx) => {
         const chosenText = a.options[a.selected_option] ?? 'Tidak dijawab';
+        const correctText = typeof a.correct_index === 'number' ? a.options[a.correct_index] : 'Tidak diketahui';
+        const isRight = typeof a.correct_index === 'number' ? a.selected_option === a.correct_index : 'Perlu evaluasi';
+
         return `Soal ${idx + 1}: "${a.question}"
-- Konsep yang diuji: ${a.concept_tested}
+- Konsep yang diuji: ${a.concept_tested} (ID: ${a.target_node_id || 'n/a'})
 - Opsi pilihan: ${JSON.stringify(a.options)}
-- Jawaban yang dipilih pengguna: Opsi index ${a.selected_option} ("${chosenText}")`;
+- Jawaban pengguna: Opsi index ${a.selected_option} ("${chosenText}")
+- Kunci jawaban sebenarnya: Opsi index ${a.correct_index ?? -1} ("${correctText}")
+- Status: ${isRight ? 'BENAR' : 'SALAH / PERLU PENINGKATAN'}`;
       }).join('\n\n');
 
-      const prompt = `Analisis hasil pre-test diagnostik pengguna untuk topik "${topic}".
-Berikut adalah detail soal dan jawaban pengguna:
+      const prompt = `Analisis hasil pre-test diagnostik siswa untuk topik "${topic}".
+Total Soal: ${total}
+Jumlah Jawaban Benar (Deterministik): ${deterministicCorrectCount}
 
+Berikut detail soal dan jawaban siswa:
 ${answersPromptText}
 
-TUGAS ANDA:
-1. Evaluasi kebenaran setiap jawaban.
-2. Identifikasi akar kesenjangan pemahaman (root knowledge gaps) terutama pada konsep-konsep prasyarat (prerequisites).
-3. Berikan tingkat urgensi (severity: "critical" | "moderate" | "minor").
-4. Jelaskan justifikasi pedagogis mengapa konsep tersebut sangat penting dipelajari sebelum melangkah ke konsep yang lebih tinggi.
-5. Sebutkan konsep prasyarat (prerequisites) yang harus diperbaiki.
-6. Berikan narasi rangkuman (summary_narrative) yang empatik, konstruktif, dan memotivasi pengguna.
+TUGAS AI:
+1. Identifikasi konsep-konsep prasyarat yang paling lemah berdasarkan soal-soal yang salah.
+2. Buat daftar "identified_gaps" dengan:
+   - "concept": Nama konsep prasyarat (singkat, jelas)
+   - "target_node_id": ID slug konsep jika tersedia dari soal
+   - "severity": "critical" | "moderate" | "minor"
+   - "justification": Penjelasan mengapa konsep ini fundamental untuk dipelajari
+   - "prerequisites": Daftar konsep dasar pendukungnya
+3. Buat "summary_narrative": Rangkuman pedagogis evaluatif yang empatik, konstruktif, dan memotivasi.
 
-Kembalikan respon DALAM FORMAT JSON BERIKUT:
+Kembalikan format JSON:
 {
   "topic": "${topic}",
-  "total_questions": ${answers.length},
-  "correct_count": <jumlah_jawaban_benar>,
+  "total_questions": ${total},
+  "correct_count": ${deterministicCorrectCount},
   "identified_gaps": [
     {
-      "concept": "Nama Konsep Prasyarat Yang Lemah",
-      "severity": "critical" | "moderate" | "minor",
-      "justification": "Penjelasan mengapa konsep ini fundamental...",
+      "concept": "Nama Konsep",
+      "target_node_id": "slug-node",
+      "severity": "critical",
+      "justification": "Alasan pedagogis...",
       "prerequisites": ["Konsep A", "Konsep B"]
     }
   ],
-  "summary_narrative": "Paragraf ringkasan evaluasi dan rekomendasi belajar..."
+  "summary_narrative": "Paragraf ringkasan evaluasi..."
 }`;
 
-      const systemInstruction = `Kamu adalah AI Diagnostic Engine Pijar yang mengkhususkan diri dalam deteksi Misconception & Root Knowledge Gap dalam ilmu komputer dan sains. Analisis dengan teliti logika berpikir siswa dan petakan konsep prasyarat yang hilang. Kembalikan HANYA JSON valid.`;
+      const systemInstruction = `Kamu adalah AI Diagnostic Engine Pijar yang mengkhususkan diri dalam deteksi Root Knowledge Gap dan Misconception. Berikan analisis pedagogis yang akurat dan empati. Kembalikan HANYA JSON valid.`;
 
       const aiResponse = await generateStructuredJSON<DiagnosticResult>(
         prompt,
         systemInstruction
       );
 
-      if (aiResponse && aiResponse.identified_gaps) {
+      if (aiResponse && Array.isArray(aiResponse.identified_gaps)) {
         diagnosticResult = {
           ...aiResponse,
           topic,
-          total_questions: answers.length,
+          total_questions: total,
+          correct_count: deterministicCorrectCount,
         };
       }
     } catch (aiErr) {
-      console.warn('AI diagnostic analysis failed, using fallback diagnostic engine:', aiErr);
+      console.warn('AI diagnostic qualitative analysis failed, using deterministic fallback synthesis:', aiErr);
     }
 
-    // Fallback if AI call failed
+    // 3. Robust Topic-Aware Fallback Synthesis if AI was unavailable
     if (!diagnosticResult) {
-      // Algorithmic evaluation fallback
-      const total = answers.length;
-      // Default assume roughly 2-3 correct for realistic gap feedback
+      const generatedGaps = incorrectAnswers.length > 0
+        ? incorrectAnswers.map(a => ({
+            concept: a.concept_tested,
+            target_node_id: a.target_node_id,
+            severity: 'critical' as const,
+            justification: a.explanation || `Konsep "${a.concept_tested}" merupakan prasyarat fundamental yang perlu diperkuat agar kamu dapat memahami topik lanjutan dengan lancar.`,
+            prerequisites: [a.concept_tested],
+          }))
+        : [
+            {
+              concept: `${topic} - Pemantapan Lanjutan`,
+              target_node_id: undefined,
+              severity: 'minor' as const,
+              justification: 'Kamu telah menjawab soal diagnostik dengan sangat baik. Jalur kurikulum siap untuk materi tingkat lanjut.',
+              prerequisites: [],
+            },
+          ];
+
       diagnosticResult = {
         topic,
         total_questions: total,
-        correct_count: Math.max(1, Math.floor(total * 0.4)),
-        identified_gaps: MOCK_DIAGNOSTIC_RESULT.identified_gaps,
-        summary_narrative: `Dari hasil pre-test diagnostik untuk topik "${topic}", Pijar mendeteksi beberapa konsep prasyarat fundamental yang perlu diperkuat terlebih dahulu sebelum kamu melangkah ke topik yang lebih kompleks. Kami telah menyusun jalur khusus untuk menutup kesenjangan ini.`,
+        correct_count: deterministicCorrectCount,
+        identified_gaps: generatedGaps,
+        summary_narrative: deterministicCorrectCount === total
+          ? `Luar biasa! Kamu berhasil menjawab seluruh ${total} soal diagnostik untuk topik "${topic}" dengan tepat. Kurikulum belajarmu telah disesuaikan untuk melangkah langsung ke konsep lanjutan.`
+          : `Dari hasil pre-test diagnostik topik "${topic}", kamu berhasil menjawab ${deterministicCorrectCount} dari ${total} soal. Pijar mendeteksi beberapa konsep prasyarat fundamental yang perlu diperkuat terlebih dahulu agar proses belajarmu lebih kokoh.`,
       };
     }
 

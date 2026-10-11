@@ -346,6 +346,7 @@ function CurriculumCanvasInner({
           onHighlightChain={handleHighlightChain}
           isChainHighlighted={Boolean(highlightedChain)}
           graphId={graphId}
+          topic={topicName}
         />
       )}
     </div>

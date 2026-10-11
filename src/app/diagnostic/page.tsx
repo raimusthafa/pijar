@@ -157,6 +157,9 @@ function DiagnosticContent() {
         options: q.options,
         selected_option: selectedAnswers[idx] ?? -1,
         concept_tested: q.concept_tested,
+        correct_index: q.correct_index,
+        explanation: q.explanation,
+        target_node_id: q.target_node_id,
       }));
 
       const res = await fetch('/api/diagnostic/analyze', {
@@ -173,6 +176,8 @@ function DiagnosticContent() {
         setAnalysisResult(data.result);
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('pijar_diagnostic_result', JSON.stringify(data.result));
+          document.cookie = `pijar_active_topic=${encodeURIComponent(topicName)}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `pijar_active_topic_key=${encodeURIComponent(topicKey)}; path=/; max-age=604800; SameSite=Lax`;
         }
         setStage('result');
       } else {

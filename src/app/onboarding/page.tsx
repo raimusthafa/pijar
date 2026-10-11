@@ -84,10 +84,13 @@ export default function OnboardingPage() {
       // In demo mode or offline dev, ignore supabase error
     }
 
-    // Store chosen topic in sessionStorage for diagnostic page
+    // Store chosen topic in sessionStorage and cookie for diagnostic & dashboard
     sessionStorage.setItem('pijar_topic', topic);
     sessionStorage.setItem('pijar_goal', goal);
     sessionStorage.setItem('pijar_style', style);
+    if (typeof document !== 'undefined') {
+      document.cookie = `pijar_active_topic_key=${encodeURIComponent(topic)}; path=/; max-age=604800; SameSite=Lax`;
+    }
     router.push('/diagnostic');
   }
 

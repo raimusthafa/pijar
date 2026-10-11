@@ -31,6 +31,7 @@ interface GraphInspectorProps {
   onHighlightChain: (nodeId: string) => void;
   isChainHighlighted: boolean;
   graphId?: string;
+  topic?: string;
 }
 
 export function GraphInspector({
@@ -43,6 +44,7 @@ export function GraphInspector({
   onHighlightChain,
   isChainHighlighted,
   graphId = 'demo-graph',
+  topic,
 }: GraphInspectorProps) {
   if (!selectedNode) return null;
 
@@ -286,7 +288,7 @@ export function GraphInspector({
 
         {/* Start / Learn Action */}
         <Link
-          href={`/learn/${graphId}/${selectedNode.id}`}
+          href={`/learn/${graphId}/${selectedNode.id}${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`}
           className="w-full py-3 rounded-xl font-bold text-sm text-white pijar-gradient shadow-md shadow-amber-500/20 hover:shadow-amber-500/35 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
         >
           <BookOpen className="w-4 h-4" />

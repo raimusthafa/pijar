@@ -21,6 +21,7 @@ import {
 import type { DiagnosticResult } from '@/types';
 import { adaptDiagnosticToGraph } from '@/lib/graph/adapter';
 import { computeGraphSummary, recommendNextConcept } from '@/lib/graph/engine';
+import { getMasteredNodes, saveActiveGraph } from '@/lib/graph/storage';
 import { CurriculumCanvas } from '@/components/graph/CurriculumCanvas';
 
 // Topic display names
@@ -62,6 +63,7 @@ function KnowledgeGraphContent() {
   // Resolved topic
   const [topicKey, setTopicKey] = useState<string>('dsa');
   const [diagnosticData, setDiagnosticData] = useState<DiagnosticResult | null>(null);
+  const [masteredNodes, setMasteredNodes] = useState<string[]>([]);
   const [isClientLoaded, setIsClientLoaded] = useState<boolean>(false);
 
   useEffect(() => {
@@ -81,16 +83,25 @@ function KnowledgeGraphContent() {
           // ignore parsing error
         }
       }
+      const mastered = getMasteredNodes(finalTopicKey);
+      setMasteredNodes(mastered);
     }
 
     setIsClientLoaded(true);
   }, [paramTopic]);
 
-  // Adapt graph data based on topic and diagnostic results
+  // Adapt graph data based on topic, diagnostic results, and mastered nodes
   const graphData = useMemo(() => {
     const rawTopic = TOPIC_NAMES[topicKey] || topicKey || 'Struktur Data & Algoritma';
-    return adaptDiagnosticToGraph(rawTopic, diagnosticData);
-  }, [topicKey, diagnosticData]);
+    return adaptDiagnosticToGraph(rawTopic, diagnosticData, masteredNodes);
+  }, [topicKey, diagnosticData, masteredNodes]);
+
+  // Synchronize graph state to local storage and active topic cookies
+  useEffect(() => {
+    if (graphData && isClientLoaded) {
+      saveActiveGraph(graphData.topicName, paramGraphId, graphData.nodes, graphData.edges);
+    }
+  }, [graphData, paramGraphId, isClientLoaded]);
 
   // Metrics summary
   const summaryMetrics = useMemo(() => {

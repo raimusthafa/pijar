@@ -43,6 +43,8 @@ export default function RegisterPage() {
         sessionStorage.setItem('pijar_user_name', name);
         sessionStorage.setItem('pijar_user_email', email);
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
       }
       setSuccess(true);
       setTimeout(() => router.push('/onboarding'), 1200);
@@ -66,6 +68,8 @@ export default function RegisterPage() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('pijar_user_name', name);
           sessionStorage.setItem('pijar_user_email', email);
+          document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
         }
         setSuccess(true);
         setTimeout(() => router.push('/onboarding'), 1500);
@@ -76,6 +80,8 @@ export default function RegisterPage() {
         sessionStorage.setItem('pijar_user_name', name);
         sessionStorage.setItem('pijar_user_email', email);
         sessionStorage.setItem('pijar_is_demo', 'true');
+        document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
       }
       setSuccess(true);
       setTimeout(() => router.push('/onboarding'), 1200);
@@ -87,6 +93,8 @@ export default function RegisterPage() {
       sessionStorage.setItem('pijar_user_name', 'Pelajar Pijar');
       sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
       sessionStorage.setItem('pijar_is_demo', 'true');
+      document.cookie = `pijar_user_name=Pelajar%20Pijar; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
     }
     setSuccess(true);
     setTimeout(() => router.push('/onboarding'), 600);
