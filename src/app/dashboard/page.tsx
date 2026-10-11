@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
+import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { Sparkles, ArrowRight, BookOpen, GitBranch, Loader2, LogOut } from 'lucide-react';
@@ -24,6 +25,7 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },
