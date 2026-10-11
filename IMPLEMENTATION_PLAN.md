@@ -7,10 +7,10 @@
 
 ## 📌 Status Saat Ini
 - **Nama Aplikasi:** `Pijar`
-- **Fase Aktif:** `Fase 2: Pre-test Adaptif & Prerequisite Detection` *(Selesai & Lolos Verifikasi)*
-- **Status:** ⏸️ *Berhenti Sejenak untuk Review & Evaluasi*
-- **Terakhir Diperbarui:** 2026-10-10
-- **Tahap Berikutnya:** `Fase 3: Dynamic Curriculum Knowledge Graph (F3)` — Graph generator, kanvas React Flow, custom nodes status gap.
+- **Fase Aktif:** `Fase 3: Dynamic Curriculum Knowledge Graph (F3)` *(Selesai, Lolos Typecheck & Production Build)*
+- **Status:** 🚀 *Fase 3 Berhasil Diimplementasikan & Tervalidasi*
+- **Terakhir Diperbarui:** 2026-10-11
+- **Tahap Berikutnya:** `Fase 4: Personalization Learning Journey (F4)` — Integrasi penuh materi belajar kuis mini & auto-unlock.
 
 ---
 
@@ -77,19 +77,20 @@ Saat memulai sesi baru dengan AI Assistant, cukup berikan prompt:
 
 ---
 
-### 🟦 Fase 3: Dynamic Curriculum Knowledge Graph (F3)
-*Status: 🔲 Belum Mulai*
+### 🟩 Fase 3: Dynamic Curriculum Knowledge Graph (F3)
+*Status: ✅ Selesai (Diverifikasi Algoritmik & Production Build Turbopack)*
 
-- [ ] **3.1 Graph Data Generator**
-  - [ ] Endpoint `/api/curriculum/generate` yang mengonversi hasil diagnosa F2 menjadi format Node & Edge.
-  - [ ] Atribut Node: `id`, `label`, `category`, `status` (`locked` | `prerequisite_gap` | `ready` | `completed`), `estimatedMinutes`.
-  - [ ] Hubungan ketergantungan antar-konsep lewat Edges.
-  - [ ] Persistensi graf ke Supabase (`learning_graphs`).
-- [ ] **3.2 UI Knowledge Graph Canvas**
-  - [ ] Komponen kanvas React Flow (`components/graph/CurriculumGraph.tsx`).
-  - [ ] Desain custom nodes dengan badge status visual yang menarik (warna pembeda untuk Gap Prasyarat, Siap Belajar, dan Selesai).
-  - [ ] Kontrol kanvas: Zoom, Pan, Fit View, Minimap, Legend.
-  - [ ] Interaksi klik node untuk membuka materi belajar.
+- [x] **3.1 Graph Data Generator & Domain Engine**
+  - [x] Engine graf murni (`src/lib/graph/engine.ts`) dengan validasi DAG Kahn's Algorithm & deteksi siklus.
+  - [x] Atribut Node lengkap (`src/lib/graph/types.ts` & `src/types/index.ts`): `id`, `label`, `category`, `status` (`locked` | `prerequisite_gap` | `ready` | `in_progress` | `completed`), `estimatedMinutes`, `is_gap`, `justification`.
+  - [x] Hierarchical topological DAG layout (`src/lib/graph/layout.ts`) dengan penempatan deterministik kiri-ke-kanan tanpa tumpang tindih.
+  - [x] Adapter multi-topik & hasil diagnostik pre-test (`src/lib/graph/adapter.ts`).
+- [x] **3.2 UI Knowledge Graph Canvas**
+  - [x] Komponen kanvas React Flow `@xyflow/react` (`src/components/graph/CurriculumCanvas.tsx`).
+  - [x] Desain custom nodes (`ConceptNodeComponent.tsx`) dengan status badges dan efek *restrained gap pulse glow* berbasis `prefers-reduced-motion`.
+  - [x] Kontrol kanvas: Zoom, Pan, Fit View, Recenter, Filter (Semua / Hanya Gap / Siap Belajar), Minimap, dan Legend (`GraphControlsBar.tsx`, `GraphLegend.tsx`).
+  - [x] Inspector panel (`GraphInspector.tsx`) dengan detail konsep, justifikasi gap, daftar prasyarat langsung, materi turunan, tombol fokus & sorot rantai ketergantungan.
+  - [x] Halaman utama `/graph` (`src/app/graph/page.tsx`), dynamic route `/graph/[id]`, serta fallback terhubung ke `/learn/[graphId]/[nodeId]`.
 
 ---
 

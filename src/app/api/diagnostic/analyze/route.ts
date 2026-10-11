@@ -106,9 +106,8 @@ Kembalikan respon DALAM FORMAT JSON BERIKUT:
         await supabase.from('diagnostic_logs').insert({
           user_id: user.id,
           topic,
-          score: diagnosticResult.correct_count,
-          total_questions: diagnosticResult.total_questions,
-          gaps_detected: diagnosticResult.identified_gaps,
+          answers_json: answers,
+          identified_gaps_json: diagnosticResult.identified_gaps,
         });
       }
     } catch (logErr) {

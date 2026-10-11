@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Eye, EyeOff, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2, ArrowRight, CheckCircle2, Zap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const BENEFITS = [
@@ -34,23 +34,62 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
-      },
-    });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const isPlaceholder = !supabaseUrl || supabaseUrl.includes('xyzxyz') || supabaseUrl.includes('placeholder');
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+    // In demo or placeholder mode, persist session locally without calling unresolved backend
+    if (isPlaceholder) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pijar_user_name', name);
+        sessionStorage.setItem('pijar_user_email', email);
+        sessionStorage.setItem('pijar_is_demo', 'true');
+      }
       setSuccess(true);
-      // If email confirmation is disabled in Supabase, redirect directly
-      setTimeout(() => router.push('/onboarding'), 1500);
+      setTimeout(() => router.push('/onboarding'), 1200);
+      return;
     }
+
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: name },
+          emailRedirectTo: `${window.location.origin}/onboarding`,
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+      } else {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pijar_user_name', name);
+          sessionStorage.setItem('pijar_user_email', email);
+        }
+        setSuccess(true);
+        setTimeout(() => router.push('/onboarding'), 1500);
+      }
+    } catch (networkErr: unknown) {
+      console.warn('Supabase auth network unreachable, falling back to local demo mode:', networkErr);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pijar_user_name', name);
+        sessionStorage.setItem('pijar_user_email', email);
+        sessionStorage.setItem('pijar_is_demo', 'true');
+      }
+      setSuccess(true);
+      setTimeout(() => router.push('/onboarding'), 1200);
+    }
+  }
+
+  function handleDirectDemo() {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pijar_user_name', 'Pelajar Pijar');
+      sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
+      sessionStorage.setItem('pijar_is_demo', 'true');
+    }
+    setSuccess(true);
+    setTimeout(() => router.push('/onboarding'), 600);
   }
 
   if (success) {
@@ -194,12 +233,31 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-3 bg-background text-xs text-muted-foreground">atau eksplorasi instan</span>
+            </div>
+          </div>
+
+          <button
+            id="register-demo"
+            type="button"
+            onClick={handleDirectDemo}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-background text-sm font-semibold hover:bg-accent transition-all text-foreground"
+          >
+            <Zap className="w-4 h-4 text-pijar-500" />
+            Coba Mode Demo Langsung
+          </button>
+
           <p className="text-center text-xs text-muted-foreground mt-4">
             Dengan mendaftar, kamu menyetujui{' '}
             <Link href="/terms" className="underline hover:text-foreground">Syarat & Ketentuan</Link>
           </p>
 
-          <p className="text-center text-sm text-muted-foreground mt-5">
+          <p className="text-center text-sm text-muted-foreground mt-4">
             Sudah punya akun?{' '}
             <Link href="/auth/login" className="font-semibold text-pijar-600 hover:underline">
               Masuk

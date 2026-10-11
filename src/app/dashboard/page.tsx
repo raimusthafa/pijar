@@ -1,14 +1,29 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, BookOpen, GitBranch } from 'lucide-react';
+import { Sparkles, ArrowRight, BookOpen, GitBranch, Loader2 } from 'lucide-react';
 
 export const metadata = {
   title: 'Dashboard — Pijar',
   description: 'Lihat progres belajar dan lanjutkan kurikulummu',
 };
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+async function DashboardContent() {
   const supabase = await createClient();
   let user = null;
   try {
@@ -112,7 +127,7 @@ export default async function DashboardPage() {
               {graphs.map((g) => (
                 <Link
                   key={g.id}
-                  href={`/graph/${g.id}`}
+                  href={`/graph?id=${g.id}`}
                   className="flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:border-pijar-300 hover:shadow-md transition-all group"
                 >
                   <div className="w-10 h-10 rounded-xl bg-pijar-100 text-pijar-600 flex items-center justify-center group-hover:scale-110 transition-transform">

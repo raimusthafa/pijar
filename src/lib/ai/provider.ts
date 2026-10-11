@@ -36,11 +36,21 @@ export async function generateStructuredJSON<T>(
   }
 
   if (AI_PROVIDER === 'gemini') {
-    return generateWithGemini<T>(prompt, systemInstruction);
+    try {
+      return await generateWithGemini<T>(prompt, systemInstruction);
+    } catch (geminiErr) {
+      if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('placeholder')) {
+        console.warn('Gemini temporary unavailable, seamless failover to OpenAI:', geminiErr);
+        return await generateWithOpenAI<T>(prompt, systemInstruction);
+      }
+      throw geminiErr;
+    }
   } else {
     return generateWithOpenAI<T>(prompt, systemInstruction);
   }
 }
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.8-flash';
 
 // ── Gemini Implementation ─────────────────────────────────────
 async function generateWithGemini<T>(
@@ -50,7 +60,7 @@ async function generateWithGemini<T>(
   const client = getGeminiClient();
 
   const response = await client.models.generateContent({
-    model: 'gemini-1.5-flash',
+    model: GEMINI_MODEL,
     contents: prompt,
     config: {
       systemInstruction: systemInstruction,
@@ -108,11 +118,16 @@ async function streamWithGemini(
   systemPrompt: string
 ): Promise<ReadableStream<string>> {
   const client = getGeminiClient();
-  const lastMessage = messages[messages.length - 1].content;
+
+  // Multi-turn contents mapping for Google GenAI SDK
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
 
   const response = await client.models.generateContentStream({
-    model: 'gemini-1.5-flash',
-    contents: lastMessage,
+    model: GEMINI_MODEL,
+    contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: '' }] }],
     config: { systemInstruction: systemPrompt },
   });
 
