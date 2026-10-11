@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { streamChatResponse } from '@/lib/ai/provider';
+import { createClient } from '@/lib/supabase/server';
 
 // ================================================================
 // PIJAR - AI Tutor Streaming Chat Route (F6)
@@ -7,6 +8,19 @@ import { streamChatResponse } from '@/lib/ai/provider';
 
 export async function POST(request: Request) {
   try {
+    // 1. Enforce Server-Side Authentication
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Sesi autentikasi diperlukan untuk mengakses AI Tutor.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       messages = [],

@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { Sparkles, ArrowRight, BookOpen, GitBranch, Loader2, LogOut } from 'lucide-react';
@@ -9,23 +8,6 @@ export const metadata = {
   title: 'Dashboard — Pijar',
   description: 'Lihat progres belajar dan lanjutkan kurikulummu',
 };
-
-const TOPIC_TITLES: Record<string, string> = {
-  dsa: 'Struktur Data & Algoritma',
-  ml: 'Machine Learning',
-  math: 'Matematika Diskrit',
-  db: 'Database & SQL',
-  web: 'Web Development',
-  stats: 'Statistik & Probabilitas',
-};
-
-interface ActiveCurriculumItem {
-  id: string;
-  topic: string;
-  status: string;
-  created_at: string;
-  topicKey?: string;
-}
 
 export default function DashboardPage() {
   return (
@@ -42,84 +24,38 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const cookieStore = await cookies();
-  const cookieName = cookieStore.get('pijar_user_name')?.value;
-  const cookieEmail = cookieStore.get('pijar_user_email')?.value;
-  const cookieTopic = cookieStore.get('pijar_active_topic')?.value;
-  const cookieTopicKey = cookieStore.get('pijar_active_topic_key')?.value;
-  const cookieGraphId = cookieStore.get('pijar_active_graph_id')?.value;
-
   const supabase = await createClient();
-  let user = null;
-  try {
-    const res = await supabase.auth.getUser();
-    user = res.data?.user;
-  } catch {
-    // offline or demo
-  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const isDemo =
-    process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xyzxyz') ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder') ||
-    !!cookieName ||
-    !!cookieEmail;
-
-  if (!user && !isDemo) {
+  // Strict server-side access control: unauthenticated users are rejected
+  if (!user) {
     redirect('/auth/login');
   }
 
-  const displayUser = user || {
-    id: 'demo-user',
-    email: cookieEmail ? decodeURIComponent(cookieEmail) : 'demo@pijar.app',
-  };
+  // Fetch authenticated user profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
 
-  let profile = null;
-  let graphs = null;
-
-  if (user) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    profile = prof;
-
-    const { data: gr } = await supabase
-      .from('learning_graphs')
-      .select('id, topic, status, created_at')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    graphs = gr;
-  }
+  // Fetch user's active curriculum learning graphs
+  const { data: graphs } = await supabase
+    .from('learning_graphs')
+    .select('id, topic, status, created_at')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(5);
 
   const rawName =
     profile?.name ??
-    user?.user_metadata?.full_name ??
-    (cookieName ? decodeURIComponent(cookieName) : displayUser.email);
+    user.user_metadata?.full_name ??
+    user.email?.split('@')[0] ??
+    'Pelajar';
   const firstName = rawName.split(' ')[0] ?? 'Pelajar';
-
-  // Resolve active curriculums (from Supabase or active cookie/session)
-  let activeCurriculums: ActiveCurriculumItem[] = [];
-  if (graphs && graphs.length > 0) {
-    activeCurriculums = graphs;
-  } else if (cookieTopicKey || cookieTopic) {
-    const rawTopic = cookieTopic
-      ? decodeURIComponent(cookieTopic)
-      : TOPIC_TITLES[cookieTopicKey || ''] || 'Struktur Data & Algoritma';
-    activeCurriculums = [
-      {
-        id: cookieGraphId ? decodeURIComponent(cookieGraphId) : 'active-curriculum',
-        topic: rawTopic,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        topicKey: cookieTopicKey ? decodeURIComponent(cookieTopicKey) : undefined,
-      },
-    ];
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -140,18 +76,20 @@ async function DashboardContent() {
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">
-              {rawName}
+              {profile?.name ?? user.email}
             </span>
             <div className="w-8 h-8 rounded-full pijar-gradient flex items-center justify-center text-white text-xs font-bold">
               {firstName[0]?.toUpperCase() || 'P'}
             </div>
-            <Link
-              href="/auth/login"
-              title="Keluar / Ganti Akun"
-              className="text-muted-foreground hover:text-foreground transition-colors p-1"
-            >
-              <LogOut className="w-4 h-4" />
-            </Link>
+            <form action="/auth/logout" method="POST">
+              <button
+                type="submit"
+                title="Keluar / Logout"
+                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-muted/60 flex items-center gap-1 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </form>
           </div>
         </div>
       </header>
@@ -166,8 +104,8 @@ async function DashboardContent() {
         </div>
 
         {/* ── Quick Action / Active Curriculums ── */}
-        {activeCurriculums.length === 0 ? (
-          <div className="pijar-gradient-soft rounded-3xl p-8 border border-pijar-200/50 mb-10 flex flex-col sm:flex-row items-center gap-6">
+        {!graphs || graphs.length === 0 ? (
+          <div className="pijar-gradient-soft rounded-3xl p-8 border border-amber-500/20 mb-10 flex flex-col sm:flex-row items-center gap-6">
             <div className="flex-1">
               <div className="text-3xl mb-3">🚀</div>
               <h2 className="text-xl font-bold mb-2">Mulai diagnosa pertamamu</h2>
@@ -196,12 +134,10 @@ async function DashboardContent() {
               </Link>
             </div>
             <div className="space-y-3">
-              {activeCurriculums.map((g) => (
+              {graphs.map((g) => (
                 <Link
                   key={g.id}
-                  href={`/graph?id=${encodeURIComponent(g.id)}${
-                    g.topicKey ? `&topic=${encodeURIComponent(g.topicKey)}` : ''
-                  }`}
+                  href={`/graph?id=${encodeURIComponent(g.id)}`}
                   className="flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:border-amber-400 hover:shadow-md transition-all group"
                 >
                   <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">

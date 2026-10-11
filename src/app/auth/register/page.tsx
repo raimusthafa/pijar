@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Eye, EyeOff, Loader2, ArrowRight, CheckCircle2, Zap } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const BENEFITS = [
@@ -27,95 +27,83 @@ export default function RegisterPage() {
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
+
+    setError('');
+
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+
+    if (!cleanName || cleanName.length < 2) {
+      setError('Nama lengkap minimal 2 karakter.');
+      return;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Masukkan format alamat email yang valid.');
+      return;
+    }
+
     if (password.length < 8) {
       setError('Password minimal 8 karakter.');
       return;
     }
+
     setLoading(true);
-    setError('');
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const isPlaceholder = !supabaseUrl || supabaseUrl.includes('xyzxyz') || supabaseUrl.includes('placeholder');
-
-    // In demo or placeholder mode, persist session locally without calling unresolved backend
-    if (isPlaceholder) {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('pijar_user_name', name);
-        sessionStorage.setItem('pijar_user_email', email);
-        sessionStorage.setItem('pijar_is_demo', 'true');
-        document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
-        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
-      }
-      setSuccess(true);
-      setTimeout(() => router.push('/onboarding'), 1200);
-      return;
-    }
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: cleanEmail,
         password,
         options: {
-          data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/onboarding`,
+          data: { full_name: cleanName },
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback?next=/onboarding` : undefined,
         },
       });
 
       if (signUpError) {
         setError(signUpError.message);
         setLoading(false);
-      } else {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('pijar_user_name', name);
-          sessionStorage.setItem('pijar_user_email', email);
-          document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
-          document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
-        }
-        setSuccess(true);
-        setTimeout(() => router.push('/onboarding'), 1500);
+        return;
       }
-    } catch (networkErr: unknown) {
-      console.warn('Supabase auth network unreachable, falling back to local demo mode:', networkErr);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('pijar_user_name', name);
-        sessionStorage.setItem('pijar_user_email', email);
-        sessionStorage.setItem('pijar_is_demo', 'true');
-        document.cookie = `pijar_user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
-        document.cookie = `pijar_user_email=${encodeURIComponent(email)}; path=/; max-age=604800; SameSite=Lax`;
-      }
-      setSuccess(true);
-      setTimeout(() => router.push('/onboarding'), 1200);
-    }
-  }
 
-  function handleDirectDemo() {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('pijar_user_name', 'Pelajar Pijar');
-      sessionStorage.setItem('pijar_user_email', 'demo@pijar.app');
-      sessionStorage.setItem('pijar_is_demo', 'true');
-      document.cookie = `pijar_user_name=Pelajar%20Pijar; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `pijar_user_email=demo%40pijar.app; path=/; max-age=604800; SameSite=Lax`;
+      if (!data?.user) {
+        setError('Pendaftaran tidak dapat diselesaikan. Silakan coba kembali.');
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(true);
+      // If user has session directly, redirect to onboarding; otherwise allow email verification
+      setTimeout(() => {
+        router.push(data.session ? '/onboarding' : '/auth/login?registered=true');
+        router.refresh();
+      }, 1500);
+    } catch (networkErr: unknown) {
+      console.error('Registration network error:', networkErr);
+      setError('Gagal terhubung ke layanan autentikasi. Periksa koneksi internet Anda.');
+      setLoading(false);
     }
-    setSuccess(true);
-    setTimeout(() => router.push('/onboarding'), 600);
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="min-h-screen flex items-center justify-center px-6 bg-background text-foreground">
         <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+          <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Akun berhasil dibuat!</h2>
-          <p className="text-muted-foreground text-sm">Mengarahkan ke halaman onboarding...</p>
+          <h2 className="text-xl font-bold mb-2">Pendaftaran Berhasil!</h2>
+          <p className="text-muted-foreground text-sm">
+            Menyiapkan ruang belajarmu...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-background text-foreground">
       {/* ── Left Panel ─────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 pijar-gradient-hero flex-col items-center justify-center px-16">
         <div className="max-w-sm">
@@ -131,7 +119,7 @@ export default function RegisterPage() {
           <ul className="space-y-3">
             {BENEFITS.map((b) => (
               <li key={b} className="flex items-center gap-3 text-sm">
-                <CheckCircle2 className="w-5 h-5 text-pijar-500 flex-shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <span>{b}</span>
               </li>
             ))}
@@ -150,11 +138,16 @@ export default function RegisterPage() {
           </div>
 
           <h1 className="text-2xl font-bold mb-1">Buat akun gratis</h1>
-          <p className="text-muted-foreground text-sm mb-8">Mulai diagnosa dalam 2 menit</p>
+          <p className="text-muted-foreground text-sm mb-6">Mulai diagnosa dalam 2 menit</p>
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
-              {error}
+            <div
+              id="register-error-alert"
+              role="alert"
+              className="mb-4 p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium flex items-start gap-2.5"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
@@ -169,7 +162,8 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Nama kamu"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all placeholder:text-muted-foreground/60"
+                disabled={loading}
+                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-muted-foreground/60 disabled:opacity-60"
               />
             </div>
 
@@ -183,7 +177,8 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="kamu@email.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all placeholder:text-muted-foreground/60"
+                disabled={loading}
+                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-muted-foreground/60 disabled:opacity-60"
               />
             </div>
 
@@ -201,7 +196,8 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-2.5 pr-11 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all placeholder:text-muted-foreground/60"
+                  disabled={loading}
+                  className="w-full px-4 py-2.5 pr-11 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-muted-foreground/60 disabled:opacity-60"
                 />
                 <button
                   type="button"
@@ -235,39 +231,28 @@ export default function RegisterPage() {
               id="register-submit"
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl pijar-gradient text-white font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-60 mt-2"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl pijar-gradient text-white font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-60 mt-2 shadow-md cursor-pointer disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Buat Akun <ArrowRight className="w-4 h-4" /></>}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Mendaftarkan...
+                </>
+              ) : (
+                <>
+                  Buat Akun <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-3 bg-background text-xs text-muted-foreground">atau eksplorasi instan</span>
-            </div>
-          </div>
-
-          <button
-            id="register-demo"
-            type="button"
-            onClick={handleDirectDemo}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-background text-sm font-semibold hover:bg-accent transition-all text-foreground"
-          >
-            <Zap className="w-4 h-4 text-pijar-500" />
-            Coba Mode Demo Langsung
-          </button>
-
-          <p className="text-center text-xs text-muted-foreground mt-4">
+          <p className="text-center text-xs text-muted-foreground mt-6">
             Dengan mendaftar, kamu menyetujui{' '}
-            <Link href="/terms" className="underline hover:text-foreground">Syarat & Ketentuan</Link>
+            <Link href="/" className="underline hover:text-foreground">Syarat & Ketentuan</Link>
           </p>
 
           <p className="text-center text-sm text-muted-foreground mt-4">
             Sudah punya akun?{' '}
-            <Link href="/auth/login" className="font-semibold text-pijar-600 hover:underline">
+            <Link href="/auth/login" className="font-semibold text-amber-600 dark:text-amber-400 hover:underline">
               Masuk
             </Link>
           </p>
