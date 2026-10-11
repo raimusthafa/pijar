@@ -123,16 +123,37 @@ export async function saveActiveGraph(
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase
-        .from('learning_graphs')
-        .upsert({
-          user_id: user.id,
-          topic,
-          nodes_json: nodes,
-          edges_json: edges,
-          status: 'active',
-          updated_at: new Date().toISOString(),
-        });
+      let targetId: string | undefined = undefined;
+      if (graphId && graphId !== 'demo-graph' && graphId.length >= 32) {
+        targetId = graphId;
+      } else {
+        const { data: existing } = await supabase
+          .from('learning_graphs')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('topic', topic)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing?.id) {
+          targetId = existing.id;
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        user_id: user.id,
+        topic,
+        nodes_json: nodes,
+        edges_json: edges,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      };
+      if (targetId) {
+        payload.id = targetId;
+      }
+
+      await supabase.from('learning_graphs').upsert(payload);
     }
   } catch (cloudErr) {
     console.warn('Supabase graph save skipped (offline/unauthenticated):', cloudErr);

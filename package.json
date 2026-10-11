@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/auth.test.mjs"
+    "test": "node --test tests/auth.test.mjs tests/graph.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

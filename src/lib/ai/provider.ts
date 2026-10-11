@@ -107,7 +107,15 @@ export async function streamChatResponse(
   systemPrompt: string
 ): Promise<ReadableStream<string>> {
   if (AI_PROVIDER === 'gemini') {
-    return streamWithGemini(messages, systemPrompt);
+    try {
+      return await streamWithGemini(messages, systemPrompt);
+    } catch (geminiErr) {
+      if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('placeholder')) {
+        console.warn('Gemini stream temporarily unavailable, seamless failover to OpenAI:', geminiErr);
+        return streamWithOpenAI(messages, systemPrompt);
+      }
+      throw geminiErr;
+    }
   } else {
     return streamWithOpenAI(messages, systemPrompt);
   }

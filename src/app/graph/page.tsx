@@ -19,10 +19,12 @@ import {
 } from 'lucide-react';
 
 import type { DiagnosticResult } from '@/types';
+import type { EnrichedConceptNode } from '@/lib/graph/types';
 import { adaptDiagnosticToGraph } from '@/lib/graph/adapter';
 import { computeGraphSummary, recommendNextConcept } from '@/lib/graph/engine';
 import { getMasteredNodes, saveActiveGraph } from '@/lib/graph/storage';
 import { CurriculumCanvas } from '@/components/graph/CurriculumCanvas';
+import { createClient } from '@/lib/supabase/client';
 
 // Topic display names
 const TOPIC_NAMES: Record<string, string> = {
@@ -64,37 +66,89 @@ function KnowledgeGraphContent() {
   const [topicKey, setTopicKey] = useState<string>('dsa');
   const [diagnosticData, setDiagnosticData] = useState<DiagnosticResult | null>(null);
   const [masteredNodes, setMasteredNodes] = useState<string[]>([]);
+  const [cloudGraph, setCloudGraph] = useState<{
+    topicName: string;
+    nodes: EnrichedConceptNode[];
+    edges: any[];
+  } | null>(null);
   const [isClientLoaded, setIsClientLoaded] = useState<boolean>(false);
 
   useEffect(() => {
-    // Read from searchParams or sessionStorage
-    const storedTopic = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_topic') : null;
-    const finalTopicKey = paramTopic || storedTopic || 'dsa';
-    setTopicKey(finalTopicKey);
+    let isCancelled = false;
 
-    // Read stored diagnostic result if available
-    if (typeof window !== 'undefined') {
-      const rawStoredResult = sessionStorage.getItem('pijar_diagnostic_result');
-      if (rawStoredResult) {
+    async function loadData() {
+      // Read from searchParams or sessionStorage
+      const storedTopic = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_topic') : null;
+      const finalTopicKey = paramTopic || storedTopic || 'dsa';
+      if (!isCancelled) setTopicKey(finalTopicKey);
+
+      // If paramGraphId looks like a Supabase UUID, try fetching from Supabase
+      if (paramGraphId && paramGraphId !== 'demo-graph' && paramGraphId.length >= 32) {
         try {
-          const parsed = JSON.parse(rawStoredResult) as DiagnosticResult;
-          setDiagnosticData(parsed);
-        } catch {
-          // ignore parsing error
+          const supabase = createClient();
+          const { data: dbGraph } = await supabase
+            .from('learning_graphs')
+            .select('id, topic, nodes_json, edges_json')
+            .eq('id', paramGraphId)
+            .maybeSingle();
+
+          if (dbGraph && Array.isArray(dbGraph.nodes_json) && dbGraph.nodes_json.length > 0 && !isCancelled) {
+            setCloudGraph({
+              topicName: dbGraph.topic,
+              nodes: dbGraph.nodes_json as EnrichedConceptNode[],
+              edges: dbGraph.edges_json,
+            });
+          }
+        } catch (fetchErr) {
+          console.warn('Failed to load cloud graph:', fetchErr);
         }
       }
-      const mastered = getMasteredNodes(finalTopicKey);
-      setMasteredNodes(mastered);
+
+      // Read stored diagnostic result if available
+      if (typeof window !== 'undefined') {
+        const rawStoredResult = sessionStorage.getItem('pijar_diagnostic_result');
+        if (rawStoredResult) {
+          try {
+            const parsed = JSON.parse(rawStoredResult) as DiagnosticResult;
+            if (!isCancelled) setDiagnosticData(parsed);
+          } catch {
+            // ignore parsing error
+          }
+        }
+        const mastered = getMasteredNodes(finalTopicKey);
+        if (!isCancelled) setMasteredNodes(mastered);
+      }
+
+      if (!isCancelled) setIsClientLoaded(true);
     }
 
-    setIsClientLoaded(true);
-  }, [paramTopic]);
+    loadData();
 
-  // Adapt graph data based on topic, diagnostic results, and mastered nodes
+    return () => {
+      isCancelled = true;
+    };
+  }, [paramTopic, paramGraphId]);
+
+  // Adapt graph data based on cloud data, topic, diagnostic results, and mastered nodes
   const graphData = useMemo(() => {
+    if (cloudGraph) {
+      const masteredSet = new Set(masteredNodes);
+      const updatedNodes = cloudGraph.nodes.map(n => {
+        if (masteredSet.has(n.id)) {
+          return { ...n, status: 'completed' as const };
+        }
+        return n;
+      });
+      return {
+        topicName: cloudGraph.topicName,
+        nodes: updatedNodes,
+        edges: cloudGraph.edges,
+        isDemoFallback: false,
+      };
+    }
     const rawTopic = TOPIC_NAMES[topicKey] || topicKey || 'Struktur Data & Algoritma';
     return adaptDiagnosticToGraph(rawTopic, diagnosticData, masteredNodes);
-  }, [topicKey, diagnosticData, masteredNodes]);
+  }, [cloudGraph, topicKey, diagnosticData, masteredNodes]);
 
   // Synchronize graph state to local storage and active topic cookies
   useEffect(() => {
