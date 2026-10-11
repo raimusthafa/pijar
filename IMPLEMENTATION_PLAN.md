@@ -43,12 +43,13 @@ Saat memulai sesi baru dengan AI Assistant, cukup berikan prompt:
 ---
 
 ### 🟩 Fase 1: Auth, Onboarding & User Goal Setting
-*Status: ✅ Selesai*
+*Status: ✅ Selesai & Terverifikasi (Audit Keamanan Lolos 100%)*
 
 - [x] **1.1 Halaman Autentikasi**
-  - [x] `src/middleware.ts` — Route protection & session refresh Supabase SSR.
-  - [x] `app/auth/login/page.tsx` — UI Login split-screen + Demo Login 1-klik.
-  - [x] `app/auth/register/page.tsx` — UI Register + password strength indicator.
+  - [x] `src/proxy.ts` (Next.js 16 Proxy) — Route protection & session validation server-side (`supabase.auth.getUser()`).
+  - [x] `app/auth/login/page.tsx` — Login form dengan verifikasi fail-closed Supabase nyata (tanpa mock bypass).
+  - [x] `app/auth/register/page.tsx` — Pendaftaran akun dengan validasi live Supabase.
+  - [x] `app/auth/logout/route.ts` — Server-side cookie cleanup & Supabase session invalidation.
   - [x] `app/auth/callback/route.ts` — OAuth/email confirmation callback handler.
   - [x] `app/globals.css` — Pijar design system (brand amber, glassmorphism, animations).
   - [x] `app/layout.tsx` — Root layout dengan metadata SEO & TooltipProvider.
@@ -56,85 +57,80 @@ Saat memulai sesi baru dengan AI Assistant, cukup berikan prompt:
 - [x] **1.2 Alur Onboarding**
   - [x] `app/onboarding/page.tsx` — Wizard 3 langkah: pilih topik (6 opsi), tujuan (4 opsi), gaya belajar (2 opsi).
   - [x] Simpan preferensi ke tabel `profiles` via Supabase.
-  - [x] `app/dashboard/page.tsx` — Dashboard Server Component dengan daftar kurikulum aktif.
-- [x] **1.3 Design System Pijar**
-  - [x] Warna brand amber/gold dengan `oklch`.
-  - [x] Glassmorphism, gradient hero, micro-animations, tipografi Plus Jakarta Sans + Inter.
+  - [x] `app/dashboard/page.tsx` — Dashboard Server Component dengan Next.js 16 `connection()` (Partial Prerendering).
 
 ---
 
 ### 🟩 Fase 2: Pre-test Adaptif & Prerequisite Detection (F1 & F2)
-*Status: ✅ Selesai (Dievaluasi & Diverifikasi via Browser Subagent)*
+*Status: ✅ Selesai (Dievaluasi & Diverifikasi via Automated Engine)*
 
 - [x] **2.1 Generator Soal Diagnostik (F1)**
-  - [x] Endpoint `/api/diagnostic/start` untuk menghasilkan 3–5 soal diagnostik adaptif berbasis topik.
-  - [x] Komponen UI kuis interaktif (pertanyaan satu per satu, pilihan ganda, progress indicator, hotkeys A-D).
+  - [x] Endpoint `/api/diagnostic/start` menghasilkan 5 soal diagnostik adaptif berbasis AI dengan topic-aware fallbacks.
+  - [x] Komponen UI kuis interaktif (pertanyaan satu per satu, pilihan ganda, progress indicator).
 - [x] **2.2 Engine Deteksi Prasyarat & Analisis Gap (F2)**
-  - [x] Endpoint `/api/diagnostic/analyze` untuk mengevaluasi jawaban user.
-  - [x] AI prompt khusus untuk mengidentifikasi *root knowledge gap* (konsep prasyarat yang belum dikuasai).
-  - [x] Output JSON terstruktur: daftar konsep prasyarat yang hilang + narasi justifikasi mengapa konsep tersebut krusial.
-  - [x] Tampilan ringkasan hasil diagnosis sebelum masuk ke Knowledge Graph (`/diagnostic` results view).
+  - [x] Endpoint `/api/diagnostic/analyze` mengevaluasi jawaban secara deterministik + sintesis kualitatif AI.
+  - [x] AI prompt mengidentifikasi *root knowledge gap* (konsep prasyarat yang belum dikuasai).
+  - [x] Logging ke tabel `diagnostic_logs` di Supabase.
 
 ---
 
 ### 🟩 Fase 3: Dynamic Curriculum Knowledge Graph (F3)
-*Status: ✅ Selesai (Diverifikasi Algoritmik & Production Build Turbopack)*
+*Status: ✅ Selesai (Diverifikasi 10 Skenario Graph Unit Test & Production Build)*
 
 - [x] **3.1 Graph Data Generator & Domain Engine**
   - [x] Engine graf murni (`src/lib/graph/engine.ts`) dengan validasi DAG Kahn's Algorithm & deteksi siklus.
-  - [x] Atribut Node lengkap (`src/lib/graph/types.ts` & `src/types/index.ts`): `id`, `label`, `category`, `status` (`locked` | `prerequisite_gap` | `ready` | `in_progress` | `completed`), `estimatedMinutes`, `is_gap`, `justification`.
-  - [x] Hierarchical topological DAG layout (`src/lib/graph/layout.ts`) dengan penempatan deterministik kiri-ke-kanan tanpa tumpang tindih.
+  - [x] Atribut Node lengkap (`src/lib/graph/types.ts` & `src/types/index.ts`).
+  - [x] Hierarchical topological DAG layout (`src/lib/graph/layout.ts`) kiri-ke-kanan tanpa tumpang tindih.
   - [x] Adapter multi-topik & hasil diagnostik pre-test (`src/lib/graph/adapter.ts`).
+  - [x] Sinkronisasi Cloud Supabase (`src/lib/graph/storage.ts`) dengan pencegahan duplikasi graf aktif.
 - [x] **3.2 UI Knowledge Graph Canvas**
   - [x] Komponen kanvas React Flow `@xyflow/react` (`src/components/graph/CurriculumCanvas.tsx`).
-  - [x] Desain custom nodes (`ConceptNodeComponent.tsx`) dengan status badges dan efek *restrained gap pulse glow* berbasis `prefers-reduced-motion`.
-  - [x] Kontrol kanvas: Zoom, Pan, Fit View, Recenter, Filter (Semua / Hanya Gap / Siap Belajar), Minimap, dan Legend (`GraphControlsBar.tsx`, `GraphLegend.tsx`).
-  - [x] Inspector panel (`GraphInspector.tsx`) dengan detail konsep, justifikasi gap, daftar prasyarat langsung, materi turunan, tombol fokus & sorot rantai ketergantungan.
-  - [x] Halaman utama `/graph` (`src/app/graph/page.tsx`), dynamic route `/graph/[id]`, serta fallback terhubung ke `/learn/[graphId]/[nodeId]`.
+  - [x] Desain custom nodes (`ConceptNodeComponent.tsx`) dengan status badges dan efek pulse glow.
+  - [x] Kontrol kanvas: Zoom, Pan, Fit View, Filter, Minimap, dan Legend.
+  - [x] Inspector panel (`GraphInspector.tsx`) dengan detail konsep dan penyorotan rantai dependensi.
+  - [x] Halaman utama `/graph` (`src/app/graph/page.tsx`) terhubung langsung ke Supabase cloud graph.
 
 ---
 
-### 🟦 Fase 4: Personalization Learning Journey (F4)
-*Status: 🔲 Belum Mulai*
+### 🟨 Fase 4: Personalization Learning Journey (F4)
+*Status: 🟡 Sebagian Diimplementasikan (Perlu Penyempurnaan Materi Non-Mock)*
 
-- [ ] **4.1 Tampilan Materi Pembelajaran**
-  - [ ] Halaman / Modal detail materi per konsep (`/learn/[graphId]/[nodeId]`).
-  - [ ] Toggle format belajar:
-    - **Mode Teks:** Materi ringkas terstruktur, analogi mudah dipahami, poin penting.
-    - **Mode Video:** Kurasi embed video YouTube / referensi visual interaktif.
-- [ ] **4.2 Checkpoint Kuis & Update Progres**
-  - [ ] Mini kuis pemahaman (1–2 soal per konsep).
-  - [ ] Pembaruan status node menjadi `completed` di Supabase dan membuka node berikutnya di graf secara otomatis.
+- [x] **4.1 Tampilan Materi Pembelajaran**
+  - [x] Halaman detail materi per konsep (`/learn/[graphId]/[nodeId]`).
+  - [x] Toggle format belajar (Mode Teks & Mode Video YouTube).
+  - [ ] *Gap:* Materi konsep selain 'rekursi' masih menggunakan template placeholder umum (perlu AI auto-generator materi).
+- [x] **4.2 Checkpoint Kuis & Update Progres**
+  - [x] Mini kuis pemahaman (checkpoint per konsep).
+  - [x] Pembaruan status node menjadi `completed` di `node_progress` Supabase & localStorage.
 
 ---
 
-### 🟦 Fase 5: AI Copilot & Misconception Detection (F5, F6, F7)
-*Status: 🔲 Belum Mulai*
+### 🟨 Fase 5: AI Copilot & Misconception Detection (F5, F6, F7)
+*Status: 🟡 Sebagian Diimplementasikan (Copilot Streaming Aktif, Misconception Quiz Belum Full)*
 
-- [ ] **5.1 AI Learning Copilot (F6)**
-  - [ ] Widget chat interaktif di samping/bawah materi belajar.
-  - [ ] Streaming respon Gemini / OpenAI via API Route `/api/chat`.
-  - [ ] Pembatasan konteks agar AI hanya menjawab seputar materi konsep yang sedang aktif.
-- [ ] **5.2 Misconception Detection (F7)**
-  - [ ] Analisis pola ketika pengguna salah memilih jawaban pada mini kuis.
-  - [ ] AI memberikan feedback kognitif: membedah mengapa pengguna berpikir opsi tersebut benar dan meluruskan konsep yang sebenarnya.
-- [ ] **5.3 User Dashboard (F5)**
-  - [ ] Halaman dashboard utama: Ringkasan kurikulum aktif, persentase penguasaan, daftar gap yang sudah teratasi.
+- [x] **5.1 AI Learning Copilot (F6)**
+  - [x] Widget chat interaktif di samping/bawah materi belajar.
+  - [x] Streaming respon Gemini / OpenAI via API Route `/api/chat` dengan failover otomatis ke OpenAI `gpt-4o-mini`.
+  - [x] Pembatasan konteks agar AI hanya menjawab seputar materi konsep aktif.
+- [ ] **5.2 Misconception Detection pada Mini Kuis (F7)**
+  - [ ] Analisis kognitif ketika pengguna salah menjawab mini kuis di `/learn` (saat ini baru berupa notifikasi generik).
+- [x] **5.3 User Dashboard (F5)**
+  - [x] Halaman dashboard utama: Ringkasan kurikulum aktif dari Supabase `learning_graphs`.
 
 ---
 
 ### 🟦 Fase 6: Vision Showcase (F8 - F10), Fail-Safe Demo & Final Polish
-*Status: 🔲 Belum Mulai*
+*Status: 🔲 Belum Mulai (UI Vision Mockups)*
 
 - [ ] **6.1 UI Mockup Fitur Vision (Pitch Deck Purpose)**
   - [ ] **F8 Mastery Tracking:** Grafik radar / progress penguasaan materi.
   - [ ] **F9 Learning Scheduler:** Kalender target belajar visual.
   - [ ] **F10 Community:** Feed forum diskusi dummy.
-- [ ] **6.2 Hackathon Fail-Safe Demo Mode**
-  - [ ] Tombol *"Quick Demo Walkthrough"* (memuat data pre-set tanpa menunggu pemrosesan LLM jika terjadi limit API juri).
-  - [ ] Switch toggle Demo Mode (Live AI vs Mock Offline).
-- [ ] **6.3 UI Polish & Aesthetics**
-  - [ ] Dark/Light mode elegan, micro-animations, styling typography Google Font (Inter / Outfit).
+- [x] **6.2 Hackathon Fail-Safe Demo Mode**
+  - [x] Akses demo cepat di landing page dan login form.
+  - [x] Fallback dataset cerdas saat kuota API LLM habis.
+- [x] **6.3 UI Polish & Aesthetics**
+  - [x] Dark/Light mode elegan, micro-animations, tipografi Plus Jakarta Sans.
 
 ---
 
