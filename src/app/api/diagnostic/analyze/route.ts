@@ -17,6 +17,8 @@ export async function POST(request: Request) {
     const topic: string = (body.topic || 'Struktur Data & Algoritma').trim();
     const targetGoal: string = (body.target_goal || 'Persiapan Komprehensif').trim();
     const rawAnswers: DiagnosticAnswer[] = body.answers || [];
+    const isPractitionerTrack = Boolean(body.is_practitioner_track) || targetGoal.toLowerCase().includes('mahir') || targetGoal.toLowerCase().includes('praktisi') || topic.toLowerCase().includes('praktisi');
+    const intakeContext = body.intake_context;
 
     if (!Array.isArray(rawAnswers) || rawAnswers.length === 0) {
       return NextResponse.json(
@@ -122,6 +124,7 @@ Format JSON:
         ...evaluated,
         derivedGaps: refinedGaps,
       },
+      isPractitionerTrack,
     });
 
     let graphId: string = crypto.randomUUID();
@@ -187,6 +190,7 @@ Format JSON:
       nodes: generatedGraph.nodes,
       edges: generatedGraph.edges,
       mode: evaluated.total >= 10 ? 'comprehensive' : 'quick',
+      intake_context: intakeContext,
     };
 
     return NextResponse.json({

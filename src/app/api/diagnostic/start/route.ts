@@ -179,11 +179,17 @@ export async function POST(request: Request) {
     const goal: string = (body.target_goal || 'Persiapan Komprehensif').trim();
     const rawCount = Number(body.question_count);
     const count: number = rawCount === 10 ? 10 : 5; // Default 5 (Quick), or 10 (Comprehensive)
+    const isPractitionerTrack = Boolean(body.is_practitioner_track) || goal.toLowerCase().includes('mahir') || goal.toLowerCase().includes('praktisi') || topic.toLowerCase().includes('praktisi');
 
-    // Dynamic AI Prompt tailored for ANY TOPIC
+    // Dynamic AI Prompt tailored for ANY TOPIC & PRACTIONER LEVEL
     try {
+      const practitionerClause = isPractitionerTrack
+        ? `\nPERHATIAN KHUSUS TINGKAT PRAKTISI MAHIR (ADVANCED PRACTITIONER):
+Siswa menargetkan penguasaan tingkat praktisi industri. Buat soal-soal berbobot tinggi dengan studi kasus nyata, dilema arsitektur sistem produksi, analisis kegagalan (failure modes), dan penalaran teknis mendalam. Mayoritas soal harus bertingkat "intermediate" atau "advanced".`
+        : '';
+
       const prompt = `Buatkan tepat ${count} soal diagnostik (pre-test) adaptif pilihan ganda berbobot untuk topik: "${topic}".
-Target Tujuan Pelajar: "${goal}".
+Target Tujuan Pelajar: "${goal}".${practitionerClause}
 Jumlah Soal yang Diminta: Tepat ${count} butir.
 
 Ketentuan Soal:
@@ -191,7 +197,7 @@ Ketentuan Soal:
 2. Setiap soal memiliki:
    - "id": "q1", "q2", dst.
    - "question": Pertanyaan yang tajam, edukatif, dan menantang logika.
-   - "scenario_context": Konteks skenario/kasus nyata 1-2 kalimat (contoh: "Ketika membangun backend e-commerce...", "Saat melatih model klasifikasi...")
+   - "scenario_context": Konteks skenario/kasus nyata 1-2 kalimat (contoh: "Ketika membangun backend e-commerce...", "Saat mengamankan boundary jaringan...", "Ketika menangani konkurensi...")
    - "difficulty_tier": "foundational" (untuk soal dasar), "intermediate" (mekanisme & trade-off), atau "advanced" (studi kasus arsitektur/sintesis)
    - "options": Array berisi tepat 4 opsi jawaban berkualitas dan masuk akal.
    - "concept_tested": Nama konsep spesifik yang diuji.

@@ -13,11 +13,29 @@ export interface Profile {
   updated_at: string;
 }
 
-// ── ONBOARDING ────────────────────────────────────────────────
+// ── ONBOARDING & COGNITIVE INTAKE ─────────────────────────────
+export type LearnerLevel = 'absolute_beginner' | 'intermediate' | 'advanced_practitioner';
+export type TargetAmbition = 'foundational_clarity' | 'career_ready' | 'master_practitioner';
+
+export interface CognitiveIntakeResult {
+  raw_input: string;
+  canonical_topic: string;           // Nama topik yang dinormalisasi bersih
+  domain_category: string;           // Kategori bidang ilmu
+  detected_level: LearnerLevel;      // Tingkat kemampuan terdeteksi
+  target_ambition: TargetAmbition;    // Ambisi target belajar
+  pain_points: string[];             // Keluh kesah & kendala terdeteksi
+  empathy_mentor_note: string;       // Catatan empati dari AI mentor
+  recommended_diagnostic_focus: string[]; // Area fokus asesmen
+  target_goal: string;               // Rekomendasi sasaran belajar
+  is_practitioner_track: boolean;    // Apakah diarahkan ke jalur praktisi mahir
+  recommended_first_step?: string;   // Rekomendasi langkah awal konkret
+}
+
 export interface OnboardingData {
   topic: string;
   target_goal: string;
   learning_style: 'text' | 'video';
+  intake_context?: CognitiveIntakeResult;
 }
 
 // ── DIAGNOSTIC / PRE-TEST ─────────────────────────────────────
@@ -74,6 +92,7 @@ export interface DiagnosticResult {
   nodes?: CurriculumNode[];
   edges?: CurriculumEdge[];
   mode?: 'quick' | 'comprehensive';
+  intake_context?: CognitiveIntakeResult;
 }
 
 // ── KNOWLEDGE GRAPH ───────────────────────────────────────────

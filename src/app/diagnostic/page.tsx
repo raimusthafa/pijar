@@ -25,6 +25,7 @@ import type {
   DiagnosticResult,
   KnowledgeGap,
   ConfidenceLevel,
+  CognitiveIntakeResult,
 } from '@/types';
 
 // Curated topic name mapper as friendly helper
@@ -66,6 +67,8 @@ function DiagnosticContent() {
   const [topicKey, setTopicKey] = useState<string>('dsa');
   const [topicName, setTopicName] = useState<string>('Struktur Data & Algoritma');
   const [requestedCount, setRequestedCount] = useState<number>(5);
+  const [isPractitioner, setIsPractitioner] = useState<boolean>(false);
+  const [intakeContext, setIntakeContext] = useState<CognitiveIntakeResult | null>(null);
   const [stage, setStage] = useState<'intro' | 'quiz' | 'analyzing' | 'result'>('intro');
 
   const [questions, setQuestions] = useState<DiagnosticQuestion[]>([]);
@@ -81,17 +84,32 @@ function DiagnosticContent() {
   useEffect(() => {
     const paramTopic = searchParams.get('topic');
     const paramCount = Number(searchParams.get('count'));
+    const paramPractitioner = searchParams.get('practitioner') === '1';
     const storedTopic = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_topic') : null;
     const storedTopicKey = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_topic_key') : null;
     const storedCount = typeof window !== 'undefined' ? Number(sessionStorage.getItem('pijar_diagnostic_count')) : 5;
+    const storedPractitioner = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_is_practitioner') === 'true' : false;
 
     const finalName = paramTopic || storedTopic || 'Struktur Data & Algoritma';
     const finalKey = storedTopicKey || (TOPIC_NAMES[finalName] ? finalName : 'custom');
     const finalCount = paramCount === 10 || storedCount === 10 ? 10 : 5;
+    const finalPractitioner = paramPractitioner || storedPractitioner;
 
     setTopicName(TOPIC_NAMES[finalName] || finalName);
     setTopicKey(finalKey);
     setRequestedCount(finalCount);
+    setIsPractitioner(finalPractitioner);
+
+    if (typeof window !== 'undefined') {
+      const rawIntake = sessionStorage.getItem('pijar_intake_context');
+      if (rawIntake) {
+        try {
+          const parsed = JSON.parse(rawIntake) as CognitiveIntakeResult;
+          setIntakeContext(parsed);
+          if (parsed.is_practitioner_track) setIsPractitioner(true);
+        } catch {}
+      }
+    }
   }, [searchParams]);
 
   // Start Diagnostic: Fetch Questions from Dynamic AI API
@@ -104,8 +122,10 @@ function DiagnosticContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: topicName,
-          target_goal: storedGoal || 'Persiapan Komprehensif',
+          target_goal: storedGoal || (isPractitioner ? 'Praktisi Mahir (Industry-Grade)' : 'Persiapan Komprehensif'),
           question_count: requestedCount,
+          is_practitioner_track: isPractitioner,
+          intake_context: intakeContext,
         }),
       });
 
@@ -201,6 +221,8 @@ function DiagnosticContent() {
           topic: topicName,
           target_goal: storedGoal,
           answers: payloadAnswers,
+          is_practitioner_track: isPractitioner,
+          intake_context: intakeContext,
         }),
       });
 
@@ -282,6 +304,58 @@ function DiagnosticContent() {
             <p className="text-muted-foreground text-base sm:text-lg mb-8 leading-relaxed">
               Pijar telah merancang <span className="text-foreground font-semibold">{requestedCount} pertanyaan terarah</span> untuk domain <span className="text-amber-500 font-semibold">{topicName}</span>. Asesmen ini mengukur pemahaman konsep dan penalaran kasus nyata untuk menyusun Knowledge Graph belajarmu secara personal.
             </p>
+
+            {/* Empathetic Mentor Banner */}
+            {intakeContext && (
+              <div className="mb-8 p-5 sm:p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left relative overflow-hidden backdrop-blur-md shadow-lg shadow-amber-500/5">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
+                        Catatan Konselor AI & Kalibrasi Pembelajar
+                      </span>
+                      {isPractitioner ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-black shadow-sm">
+                          Track Praktisi Mahir (Industry-Grade)
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-secondary-foreground">
+                          Track Fondasi Adaptif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm sm:text-base text-foreground font-medium italic leading-relaxed">
+                      &ldquo;{intakeContext.empathy_mentor_note}&rdquo;
+                    </p>
+                    {intakeContext.pain_points && intakeContext.pain_points.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-amber-500/20">
+                        <span className="text-xs text-muted-foreground mr-1">Tantangan Terdeteksi:</span>
+                        {intakeContext.pain_points.map((p, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs px-2.5 py-0.5 rounded-md bg-background/80 border border-border text-foreground font-medium"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!intakeContext && isPractitioner && (
+              <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
+                <div className="text-xs sm:text-sm text-foreground">
+                  <span className="font-bold text-amber-500">Track Praktisi Mahir Aktif:</span> Pertanyaan asesmen dikalibrasi untuk skenario arsitektur riil, edge cases, dan penalaran teknis tingkat tinggi.
+                </div>
+              </div>
+            )}
 
             {/* Feature highlights */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 text-left">
@@ -564,6 +638,22 @@ function DiagnosticContent() {
                 </div>
               </div>
             </div>
+
+            {/* Counselor Recommendation Follow-up Card */}
+            {(analysisResult.intake_context || intakeContext) && (
+              <div className="p-4 sm:p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-sm text-left flex items-start gap-3.5 shadow-sm">
+                <Sparkles className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
+                    Rekomendasi Langkah Awal Berdasarkan Refleksimu
+                  </div>
+                  <p className="text-xs sm:text-sm text-foreground leading-relaxed">
+                    {(analysisResult.intake_context || intakeContext)?.recommended_first_step ||
+                      'Mulailah dengan modul prasyarat fundamental sebelum melangkah ke konsep tingkat lanjut.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Metacognitive Confidence Matrix */}
             {analysisResult.confidence_matrix && (

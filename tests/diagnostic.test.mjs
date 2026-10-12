@@ -5,6 +5,8 @@ import {
   evaluateDiagnosticAnswers,
   sanitizeDAG,
   buildProceduralTopicDAG,
+  analyzeLearnerIntake,
+  buildProceduralIntakeFallback,
 } from '../src/lib/diagnostic/engine.ts';
 
 import { validateDAG } from '../src/lib/graph/engine.ts';
@@ -157,5 +159,67 @@ describe('PIJAR Zero-Mock Diagnostic & Dynamic DAG Curriculum Test Suite', () =>
     // Tidak boleh jatuh ke mock DSA
     const hasDsaLeak = result.nodes.some(n => n.id === 'array' || n.id === 'binary-search');
     assert.equal(hasDsaLeak, false, 'Topik Kubernetes tidak boleh fallback ke mock DSA');
+  });
+
+  test('Skenario 6: Ekstraksi Keluh Kesah Belajar & Empati (Beginner Venting)', async () => {
+    const rawVenting = 'saya ingin belajar tentang cyber security, namun aku bingung harus mulai darimana karena aku tidak punya sumber belajar yang cukup';
+
+    // Test procedural cognitive fallback parser
+    const intake = buildProceduralIntakeFallback(rawVenting);
+
+    assert.ok(intake.canonical_topic.includes('Cybersecurity'), 'Topik harus diekstrak sebagai Cybersecurity');
+    assert.equal(intake.detected_level, 'absolute_beginner', 'Siswa yang bingung harus dideteksi sebagai absolute beginner');
+    assert.equal(intake.target_ambition, 'foundational_clarity', 'Target ambisi harus klarifikasi fondasi');
+    assert.equal(intake.is_practitioner_track, false, 'Bukan jalur praktisi');
+
+    // Cek keluh kesah yang diekstrak
+    assert.ok(
+      intake.pain_points.some(p => p.includes('Roadmap Paralysis') || p.includes('Titik Awal')),
+      'Harus mendeteksi kebingungan titik awal (Roadmap Paralysis)'
+    );
+    assert.ok(
+      intake.pain_points.some(p => p.includes('Sumber Belajar') || p.includes('Keterbatasan')),
+      'Harus mendeteksi masalah keterbatasan sumber belajar'
+    );
+
+    // Cek catatan empati
+    assert.ok(intake.empathy_mentor_note.length > 20, 'Harus memiliki catatan empati mentor yang memvalidasi kecemasan siswa');
+    assert.ok(
+      intake.empathy_mentor_note.toLowerCase().includes('bingung') ||
+      intake.empathy_mentor_note.toLowerCase().includes('wajar'),
+      'Catatan empati harus menenangkan dan memvalidasi kebingungan'
+    );
+  });
+
+  test('Skenario 7: Eskalasi Jalur Praktisi Mahir & Kurikulum Arsitektur Industri', () => {
+    const rawPractitionerInput = 'saya ingin belajar cyber security dan menjadi praktisi yang mahir di industri dengan menguasai arsitektur dan threat modeling mendalam';
+
+    const intake = buildProceduralIntakeFallback(rawPractitionerInput);
+
+    assert.equal(intake.is_practitioner_track, true, 'Harus mendeteksi ambisi praktisi mahir');
+    assert.equal(intake.detected_level, 'advanced_practitioner', 'Tingkat harus terdeteksi advanced practitioner');
+    assert.equal(intake.target_ambition, 'master_practitioner', 'Target ambisi harus master practitioner');
+    assert.ok(intake.canonical_topic.includes('Praktisi Mahir'), 'Label topik harus mengindikasikan jalur praktisi mahir');
+
+    // Test procedural DAG synthesis dengan isPractitionerTrack = true
+    const evalResult = evaluateDiagnosticAnswers(sampleAnswers);
+    const generatedDAG = buildProceduralTopicDAG('Cybersecurity', 'Spesialis Praktisi Mahir', evalResult, true);
+
+    const validation = validateDAG(generatedDAG.nodes, generatedDAG.edges);
+    assert.equal(validation.isValid, true, 'Graf kurikulum praktisi harus valid DAG');
+    assert.equal(validation.hasCycles, false, 'Graf kurikulum praktisi tidak boleh memiliki siklus');
+
+    // Harus mengandung kategori tingkat lanjut/arsitektur
+    const hasArchitecture = generatedDAG.nodes.some(n => n.category === 'Arsitektur' || n.category === 'Penerapan Produksi');
+    assert.equal(hasArchitecture, true, 'Kurikulum praktisi harus memuat node Arsitektur dan Penerapan Produksi');
+
+    // Verifikasi label node yang dikalibrasi untuk praktisi
+    const hasPractitionerNode = generatedDAG.nodes.some(n =>
+      n.label.includes('Threat Model') ||
+      n.label.includes('Internal Engine') ||
+      n.label.includes('Hardening') ||
+      n.label.includes('Edge-Case')
+    );
+    assert.equal(hasPractitionerNode, true, 'Kurikulum harus memuat topik praktisi seperti Threat Model / Hardening');
   });
 });
