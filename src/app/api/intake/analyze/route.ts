@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { analyzeLearnerIntake } from '@/lib/diagnostic/engine';
+import {
+  analyzeLearnerIntake,
+  buildProceduralIntakeFallback,
+} from '@/lib/diagnostic/engine';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +16,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const intakeResult = await analyzeLearnerIntake(rawInput);
+    let intakeResult;
+    try {
+      if (typeof analyzeLearnerIntake === 'function') {
+        intakeResult = await analyzeLearnerIntake(rawInput);
+      } else {
+        intakeResult = buildProceduralIntakeFallback(rawInput);
+      }
+    } catch (analysisErr) {
+      console.warn('AI intake analysis encountered an issue, falling back to procedural parser:', analysisErr);
+      intakeResult = buildProceduralIntakeFallback(rawInput);
+    }
 
     return NextResponse.json({
       success: true,
