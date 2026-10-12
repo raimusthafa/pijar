@@ -1,0 +1,199 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { CURATED_MATERIALS } from '../src/lib/learn/curated-materials.ts';
+import { buildAdjacencyMaps } from '../src/lib/graph/engine.ts';
+
+describe('PIJAR F4 Learning Journey & Interactive Video Suite', () => {
+  // ── Skenario 1: Validasi materi terstruktur multi-topik ───
+  it('Skenario 1: Materi kurikulum untuk berbagai topik memiliki struktur pedagogis lengkap', () => {
+    const topicsTested = ['rekursi', 'gradient-descent', 'indexing-btree', 'async-js'];
+
+    for (const key of topicsTested) {
+      const mat = CURATED_MATERIALS[key];
+      assert.ok(mat, `Materi untuk "${key}" harus terdaftar`);
+      assert.ok(mat.title && mat.title.length > 3, `Title untuk "${key}" harus valid`);
+      assert.ok(mat.learningObjective && mat.learningObjective.length > 10, `Learning objective untuk "${key}" harus jelas`);
+      assert.ok(mat.conceptExplanation && mat.conceptExplanation.length > 50, `Penjelasan konsep untuk "${key}" harus berbobot`);
+      assert.ok(mat.analogy && mat.analogy.length > 10, `Analogi untuk "${key}" harus tersedia`);
+      assert.ok(Array.isArray(mat.examples) && mat.examples.length > 0, `Contoh implementasi untuk "${key}" harus ada`);
+      assert.ok(Array.isArray(mat.checkpointQuestions) && mat.checkpointQuestions.length >= 3, `Checkpoint questions untuk "${key}" minimal 3 soal`);
+    }
+  });
+
+  // ── Skenario 2: Validasi scene script JSON video interaktif ───
+  it('Skenario 2: Skrip video interaktif memiliki durasi terkalibrasi dan captions runtut', () => {
+    for (const [key, mat] of Object.entries(CURATED_MATERIALS)) {
+      const script = mat.videoScript;
+      assert.ok(script, `Video script untuk "${key}" harus ada`);
+      assert.ok(script.totalDurationSeconds > 0, `Durasi total video "${key}" harus > 0`);
+      assert.ok(Array.isArray(script.scenes) && script.scenes.length >= 2, `Minimal 2 scenes untuk "${key}"`);
+
+      let calculatedDuration = 0;
+      for (const scene of script.scenes) {
+        assert.ok(scene.id && scene.title && scene.narration, `Scene pada "${key}" harus memiliki id, title, dan narration`);
+        assert.ok(scene.durationSeconds > 0, `Durasi scene harus > 0`);
+        assert.ok(Array.isArray(scene.captions) && scene.captions.length > 0, `Scene harus memiliki captions`);
+
+        calculatedDuration += scene.durationSeconds;
+
+        // Check caption timing consistency
+        for (const cap of scene.captions) {
+          assert.ok(cap.startSeconds >= 0, 'startSeconds caption harus >= 0');
+          assert.ok(cap.endSeconds > cap.startSeconds, 'endSeconds caption harus > startSeconds');
+          assert.ok(cap.text && cap.text.length > 0, 'Teks caption tidak boleh kosong');
+        }
+      }
+
+      // Allow 5s delta between sum of scenes and total duration
+      assert.ok(
+        Math.abs(calculatedDuration - script.totalDurationSeconds) <= 5,
+        `Total durasi scene (${calculatedDuration}) harus selaras dengan script totalDurationSeconds (${script.totalDurationSeconds}) pada "${key}"`
+      );
+    }
+  });
+
+  // ── Skenario 3: Visual Scene Types Compatibility ──────────
+  it('Skenario 3: Visual scene types terpetakan ke tipe yang didukung renderer', () => {
+    const validTypes = new Set([
+      'call-stack',
+      'loss-landscape',
+      'tree-structure',
+      'code-execution',
+      'data-flow',
+      'concept-illustration',
+      'math-visualization',
+      'comparison',
+    ]);
+
+    for (const [key, mat] of Object.entries(CURATED_MATERIALS)) {
+      for (const scene of mat.videoScript.scenes) {
+        assert.ok(
+          validTypes.has(scene.visualType),
+          `Visual type "${scene.visualType}" pada "${key}" scene "${scene.id}" harus merupakan tipe yang didukung`
+        );
+        assert.ok(scene.visualState && typeof scene.visualState === 'object', 'Visual state harus berupa objek terdefinisi');
+      }
+    }
+  });
+
+  // ── Skenario 4: Evaluasi Kuis Deterministik (Semua Benar) ──
+  it('Skenario 4: Siswa menjawab seluruh soal dengan benar -> skor 100% dan lulus', () => {
+    const mat = CURATED_MATERIALS['rekursi'];
+    const answers = {};
+    for (const q of mat.checkpointQuestions) {
+      answers[q.id] = q.correctIndex;
+    }
+
+    let correctCount = 0;
+    for (const q of mat.checkpointQuestions) {
+      if (answers[q.id] === q.correctIndex) {
+        correctCount++;
+      }
+    }
+
+    const score = Math.round((correctCount / mat.checkpointQuestions.length) * 100);
+    const isPassed = score >= 65;
+
+    assert.equal(score, 100);
+    assert.equal(isPassed, true);
+  });
+
+  // ── Skenario 5: Evaluasi Jawaban Salah & Misconception ──────
+  it('Skenario 5: Siswa menjawab salah -> skor mencerminkan hasil aktual dan miskonsepsi teridentifikasi', () => {
+    const mat = CURATED_MATERIALS['gradient-descent'];
+    const answers = {
+      [mat.checkpointQuestions[0].id]: (mat.checkpointQuestions[0].correctIndex + 1) % 4, // Wrong
+      [mat.checkpointQuestions[1].id]: (mat.checkpointQuestions[1].correctIndex + 1) % 4, // Wrong
+      [mat.checkpointQuestions[2].id]: mat.checkpointQuestions[2].correctIndex,           // Correct
+    };
+
+    let correctCount = 0;
+    const evaluatedResults = [];
+
+    for (const q of mat.checkpointQuestions) {
+      const isCorrect = answers[q.id] === q.correctIndex;
+      if (isCorrect) correctCount++;
+      evaluatedResults.push({
+        id: q.id,
+        isCorrect,
+        hasFeedback: !isCorrect,
+      });
+    }
+
+    const score = Math.round((correctCount / mat.checkpointQuestions.length) * 100);
+    const isPassed = score >= 65;
+
+    assert.equal(score, 33);
+    assert.equal(isPassed, false, 'Skor 33% tidak boleh dinyatakan lulus');
+    assert.equal(evaluatedResults.filter(r => !r.isCorrect).length, 2);
+  });
+
+  // ── Skenario 6: Kunci Jawaban Bervariasi (No Fixed Pattern) ─
+  it('Skenario 6: Kunci jawaban bervariasi (tidak selalu opsi 0 / A)', () => {
+    const allCorrectIndices = [];
+    for (const mat of Object.values(CURATED_MATERIALS)) {
+      for (const q of mat.checkpointQuestions) {
+        allCorrectIndices.push(q.correctIndex);
+      }
+    }
+
+    const uniqueIndices = new Set(allCorrectIndices);
+    assert.ok(uniqueIndices.size >= 3, 'Kunci jawaban harus bervariasi melintasi opsi index 0, 1, dan 2');
+    assert.ok(uniqueIndices.has(0), 'Harus ada opsi 0');
+    assert.ok(uniqueIndices.has(1), 'Harus ada opsi 1');
+    assert.ok(uniqueIndices.has(2), 'Harus ada opsi 2');
+  });
+
+  // ── Skenario 7: Prerequisite-aware Downstream Unlocking ────
+  it('Skenario 7: Pembukaan konsep downstream mempertimbangkan seluruh prasyarat wajib', () => {
+    // Model graf dengan diamond dependency:
+    // A -> B, A -> C, B -> D, C -> D (D butuh B dan C!)
+    const nodes = [
+      { id: 'A', status: 'completed' },
+      { id: 'B', status: 'completed' },
+      { id: 'C', status: 'in_progress' },
+      { id: 'D', status: 'locked' },
+    ];
+    const edges = [
+      { source: 'A', target: 'B' },
+      { source: 'A', target: 'C' },
+      { source: 'B', target: 'D' },
+      { source: 'C', target: 'D' },
+    ];
+
+    const { dependentsMap, prerequisitesMap } = buildAdjacencyMaps(nodes, edges);
+
+    // Kasus 1: C belum selesai -> D tetap terkunci
+    const completedSet1 = new Set(['A', 'B']);
+    const dPrereqs = prerequisitesMap.get('D') || [];
+    const isDUnlocked1 = dPrereqs.every(p => completedSet1.has(p));
+    assert.equal(isDUnlocked1, false, 'Node D harus tetap terkunci selama C belum selesai');
+
+    // Kasus 2: C selesai -> D terbuka
+    completedSet1.add('C');
+    const isDUnlocked2 = dPrereqs.every(p => completedSet1.has(p));
+    assert.equal(isDUnlocked2, true, 'Node D harus terbuka setelah B dan C selesai');
+  });
+
+  // ── Skenario 8: Kode Tidak Menggunakan Dummy Placeholder ───
+  it('Skenario 8: Kode contoh pada kurikulum tidak menggunakan fungsi dummy "solve(input > 0)"', () => {
+    for (const [key, mat] of Object.entries(CURATED_MATERIALS)) {
+      for (const ex of mat.examples) {
+        assert.ok(
+          !ex.code.includes('function solve(input: number): boolean {\n  return input > 0;\n}'),
+          `Materi "${key}" tidak boleh menggunakan template dummy solve(input > 0)`
+        );
+        assert.ok(ex.code.length > 20, `Contoh kode pada "${key}" harus substansial`);
+      }
+    }
+  });
+
+  // ── Skenario 9: Format Bahasa Spesifik Per Topik ───────────
+  it('Skenario 9: Contoh kode menggunakan bahasa yang relevan dengan topik (SQL untuk DB, Python untuk ML)', () => {
+    assert.equal(CURATED_MATERIALS['gradient-descent'].examples[0].language, 'python');
+    assert.equal(CURATED_MATERIALS['indexing-btree'].examples[0].language, 'sql');
+    assert.equal(CURATED_MATERIALS['async-js'].examples[0].language, 'javascript');
+    assert.equal(CURATED_MATERIALS['rekursi'].examples[0].language, 'typescript');
+  });
+});

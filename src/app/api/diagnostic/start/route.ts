@@ -238,6 +238,58 @@ const TOPIC_FALLBACKS: Record<string, DiagnosticQuestion[]> = {
       target_node_id: 'next-app',
     },
   ],
+  stats: [
+    {
+      id: 'stat1',
+      question: 'Ukuran pemusatan data mana yang paling tahan (robust) terhadap pengaruh nilai pencilan (outliers) ekstrem?',
+      options: ['Mean (Rata-rata)', 'Median (Nilai Tengah)', 'Standar Deviasi', 'Varians'],
+      concept_tested: 'Statistik Deskriptif & Robustness',
+      correct_index: 1,
+      explanation: 'Median tidak terpengaruh oleh besaran nilai ekstrem di ekor distribusi karena hanya bergantung pada posisi urutan data.',
+      target_node_id: 'descriptive-stats',
+    },
+    {
+      id: 'stat2',
+      question: 'Jika dua kejadian A dan B saling bebas (independent) dengan P(A)=0.5 dan P(B)=0.4, berapa nilai probabilitas bersama P(A ∩ B)?',
+      options: ['0.90', '0.20', '0.10', '0.50'],
+      concept_tested: 'Kaidah Probabilitas & Independensi',
+      correct_index: 1,
+      explanation: 'Untuk kejadian independen, P(A ∩ B) = P(A) * P(B) = 0.5 * 0.4 = 0.20.',
+      target_node_id: 'prob-rules',
+    },
+    {
+      id: 'stat3',
+      question: 'Berapakah total luas area di bawah kurva fungsi kepekatan probabilitas (PDF) kontinu pada rentang (-∞, +∞)?',
+      options: ['1.0', '100', '0.5', 'Tergantung varians kurva'],
+      concept_tested: 'Variabel Acak & Fungsi Kepekatan (PDF)',
+      correct_index: 0,
+      explanation: 'Aksioma probabilitas menyatakan bahwa total peluang seluruh ruang sampel (integral PDF) selalu tepat bernilai 1.0.',
+      target_node_id: 'random-variables',
+    },
+    {
+      id: 'stat4',
+      question: 'Dalam rumus Teorema Bayes P(A|B) = [P(B|A) * P(A)] / P(B), komponen P(A) merepresentasikan apa?',
+      options: ['Posterior probability', 'Prior probability', 'Likelihood', 'Evidence marginal'],
+      concept_tested: 'Teorema Bayes & Inferensi Bayesian',
+      correct_index: 1,
+      explanation: 'P(A) adalah probabilitas prior, yaitu keyakinan awal sebelum mengamati bukti baru B.',
+      target_node_id: 'bayes-theorem',
+    },
+    {
+      id: 'stat5',
+      question: 'Jika p-value dari hasil uji hipotesis lebih kecil dari tingkat signifikansi alpha (misal p = 0.01 < 0.05), apa kesimpulan statistiknya?',
+      options: [
+        'Tolak Hipotesis Nol (Reject H0), ada bukti signifikan',
+        'Gagal menolak H0, bukti tidak cukup',
+        'Hipotesis Alternatif pasti salah',
+        'Ukuran sampel harus digandakan',
+      ],
+      concept_tested: 'Uji Hipotesis & Signifikansi p-Value',
+      correct_index: 0,
+      explanation: 'Jika p-value < alpha, data yang diamati sangat tidak mungkin terjadi jika H0 benar, sehingga kita menolak H0.',
+      target_node_id: 'hypothesis-test',
+    },
+  ],
 };
 
 export async function POST(request: Request) {
@@ -295,6 +347,8 @@ Pastikan tepat 5 soal, memiliki 4 opsi jawaban tiap soal, correct_index berupa a
       questions = TOPIC_FALLBACKS.ml;
     } else if (topicLower.includes('data') && topicLower.includes('base') || topicLower.includes('sql') || topicLower.includes('db')) {
       questions = TOPIC_FALLBACKS.db;
+    } else if (topicLower.includes('stat') || topicLower.includes('prob') || topicLower.includes('peluang')) {
+      questions = TOPIC_FALLBACKS.stats;
     } else if (topicLower.includes('math') || topicLower.includes('matematika') || topicLower.includes('diskrit')) {
       questions = TOPIC_FALLBACKS.math;
     } else if (topicLower.includes('web') || topicLower.includes('react') || topicLower.includes('frontend')) {

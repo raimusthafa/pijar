@@ -22,10 +22,16 @@ import {
   Send,
   X,
   RotateCcw,
+  AlertTriangle,
+  Award,
+  Zap,
+  Info,
 } from 'lucide-react';
 import { Suspense } from 'react';
-import { MOCK_MATERIAL_REKURSI } from '@/lib/ai/mock-data';
 import { markNodeMastered, getMasteredNodes } from '@/lib/graph/storage';
+import type { DetailedLearningMaterial, QuizEvaluationResult } from '@/lib/learn/types';
+import { CURATED_MATERIALS } from '@/lib/learn/curated-materials';
+import { InteractiveVideoPlayer } from '@/components/learn/InteractiveVideoPlayer';
 
 interface LearnPageProps {
   params: Promise<{
@@ -60,8 +66,16 @@ function LearnContent({ params }: LearnPageProps) {
   // Resolved topic
   const [topicKey, setTopicKey] = useState<string>('dsa');
   const [learningMode, setLearningMode] = useState<'text' | 'video'>('text');
-  const [selectedQuizOption, setSelectedQuizOption] = useState<number | null>(null);
-  const [isQuizSubmitted, setIsQuizSubmitted] = useState<boolean>(false);
+  
+  // Material state
+  const [material, setMaterial] = useState<DetailedLearningMaterial | null>(null);
+  const [isLoadingMaterial, setIsLoadingMaterial] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Quiz State
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
+  const [isSubmittingQuiz, setIsSubmittingQuiz] = useState<boolean>(false);
+  const [quizResult, setQuizResult] = useState<QuizEvaluationResult | null>(null);
   const [isMastered, setIsMastered] = useState<boolean>(false);
 
   // AI Tutor Copilot State
@@ -71,68 +85,75 @@ function LearnContent({ params }: LearnPageProps) {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize topic and mastery state
+  // 1. Initialize topic & load learning material
   useEffect(() => {
+    let isMounted = true;
     const paramTopic = searchParams.get('topic');
     const storedTopic = typeof window !== 'undefined' ? sessionStorage.getItem('pijar_topic') : null;
     const resolvedTopic = paramTopic || storedTopic || 'dsa';
     setTopicKey(resolvedTopic);
 
+    // Check existing mastery
     const mastered = getMasteredNodes(resolvedTopic);
     if (mastered.includes(nodeId)) {
       setIsMastered(true);
-      setIsQuizSubmitted(true);
     }
-  }, [nodeId, searchParams]);
 
-  // If node is rekursi, use rich mock material; otherwise generate structured concept view
-  const isRekursi = nodeId.toLowerCase() === 'rekursi';
-  const material = isRekursi
-    ? MOCK_MATERIAL_REKURSI
-    : {
-        node_id: nodeId,
-        title: `Konsep: ${nodeId.replace(/-/g, ' ').toUpperCase()}`,
-        summary:
-          'Materi pembelajaran ini dirancang untuk menutup knowledge gap prasyarat yang teridentifikasi dalam Knowledge Graph.',
-        key_concepts: [
-          'Memahami definisi dan karakteristik dasar konsep',
-          'Mengidentifikasi relasi dan ketergantungan dengan konsep sebelumnya',
-          'Penerapan praktis pada pemecahan masalah algoritma nyata',
-        ],
-        text_content: `## Pengantar Konsep ${nodeId.replace(/-/g, ' ')}
-Konsep ini merupakan salah satu pilar utama yang harus dikuasai sebelum melangkah ke materi tingkat lanjut.
-Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan pengetahuan yang terdeteksi pada hasil pre-test diagnostik.
+    async function fetchMaterial() {
+      setIsLoadingMaterial(true);
+      setLoadError(null);
 
-### Cara Mempelajari Materi Ini:
-1. Pahami bagaimana konsep ini berakar pada fondasi materi sebelumnya.
-2. Perhatikan alur eksekusi pada contoh kode yang disediakan.
-3. Kerjakan mini checkpoint quiz di bagian bawah untuk memvalidasi penguasaanmu.`,
-        examples: [
-          {
-            title: `Contoh Implementasi Dasar (${nodeId})`,
-            language: 'typescript',
-            code: `// Contoh implementasi konseptual untuk ${nodeId}\nfunction solve(input: number): boolean {\n  // Proses logika konsep\n  return input > 0;\n}`,
-            explanation: 'Logika di atas menggambarkan alur eksekusi paling sederhana dari konsep ini.',
-          },
-        ],
-        mini_quiz: [
-          {
-            id: 'mq-generic',
-            question: `Mengapa konsep ${nodeId.replace(/-/g, ' ')} penting dikuasai terlebih dahulu?`,
-            options: [
-              'Karena merupakan fondasi logika yang dibutuhkan oleh topik turunan berikutnya',
-              'Hanya sekadar formalitas kurikulum',
-              'Tidak memiliki dampak pada materi selanjutnya',
-              'Hanya berguna untuk teori tanpa implementasi',
-            ],
-            correct_index: 0,
-            explanation:
-              'Konsep ini adalah prasyarat fundamental. Mengabaikannya akan mempersulit pemahaman materi tingkat lanjut.',
-          },
-        ],
-      };
+      // Fast path: Check curated material in memory first
+      if (CURATED_MATERIALS[nodeId]) {
+        if (isMounted) {
+          setMaterial(CURATED_MATERIALS[nodeId]);
+          setIsLoadingMaterial(false);
+        }
+        return;
+      }
 
-  const quiz = material.mini_quiz?.[0];
+      // Dynamic path: Call API generator
+      try {
+        const res = await fetch('/api/learn/material', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: resolvedTopic,
+            nodeId,
+            graphId,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.material) {
+          if (isMounted) {
+            setMaterial(data.material);
+          }
+        } else {
+          throw new Error(data.error || 'Gagal memuat materi');
+        }
+      } catch (err: unknown) {
+        console.warn('Failed to fetch dynamic material, using curated fallback:', err);
+        if (isMounted) {
+          // If all else fails, use fallback rekursi or generic
+          const fallback = CURATED_MATERIALS['rekursi'];
+          setMaterial({
+            ...fallback,
+            nodeId,
+            title: `Konsep: ${nodeId.replace(/-/g, ' ').toUpperCase()}`,
+          });
+        }
+      } finally {
+        if (isMounted) setIsLoadingMaterial(false);
+      }
+    }
+
+    fetchMaterial();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [nodeId, graphId, searchParams]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -143,24 +164,57 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
 
   // Seed initial AI tutor greeting
   useEffect(() => {
-    if (messages.length === 0) {
+    if (material && messages.length === 0) {
       setMessages([
         {
           role: 'assistant',
-          content: `Halo! Aku **Pijar AI Tutor**. Aku di sini mendampingimu memahami konsep **${material.title}**.\n\nJika ada penjelasan yang kurang jelas, analogi yang ingin kamu tanyakan, atau butuh arahan terkait checkpoint quiz, silakan tanyakan padaku kapan saja! ✨`,
+          content: `Halo! Aku **Pijar AI Tutor**. Aku siap mendampingimu mempelajari konsep **${material.title}**.\n\nJika ada bagian teori yang ingin kamu tanyakan analoginya, butuh arahan terkait contoh kode, atau ingin berdiskusi seputar kuis checkpoint, silakan tanyakan kapan saja! ✨`,
         },
       ]);
     }
-  }, [material.title, messages.length]);
+  }, [material, messages.length]);
 
-  // Handle quiz submission with persistent mastery
+  // Handle multi-question quiz selection
+  function handleSelectQuizOption(questionId: string, optionIndex: number) {
+    if (quizResult?.isPassed) return; // Prevent changing after passed
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [questionId]: optionIndex,
+    }));
+  }
+
+  // Handle quiz submission with server-side grading & cognitive misconception feedback
   async function handleQuizSubmit() {
-    if (selectedQuizOption === null || !quiz) return;
-    setIsQuizSubmitted(true);
+    if (!material || !material.checkpointQuestions || material.checkpointQuestions.length === 0) return;
+    setIsSubmittingQuiz(true);
 
-    if (selectedQuizOption === quiz.correct_index) {
-      setIsMastered(true);
-      await markNodeMastered(topicKey, nodeId);
+    try {
+      const res = await fetch('/api/learn/evaluate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: topicKey,
+          nodeId,
+          graphId,
+          answers: selectedAnswers,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.result) {
+        setQuizResult(data.result);
+        if (data.result.isPassed) {
+          setIsMastered(true);
+          await markNodeMastered(topicKey, nodeId);
+        }
+      } else {
+        throw new Error(data.error || 'Evaluasi kuis gagal');
+      }
+    } catch (err) {
+      console.error('Quiz evaluation error:', err);
+      alert('Terjadi kendala saat mengevaluasi kuis. Silakan coba kembali.');
+    } finally {
+      setIsSubmittingQuiz(false);
     }
   }
 
@@ -175,7 +229,6 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
     setInputMessage('');
     setIsStreaming(true);
 
-    // Placeholder for incoming assistant message
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
@@ -185,7 +238,7 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
         body: JSON.stringify({
           messages: updatedMessages,
           nodeId,
-          conceptTitle: material.title,
+          conceptTitle: material?.title || nodeId,
           topic: topicKey,
         }),
       });
@@ -231,6 +284,26 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
     }
   }
 
+  if (isLoadingMaterial || !material) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-9 h-9 animate-spin text-amber-500 mx-auto" />
+          <p className="text-sm font-semibold text-foreground">
+            Menyiapkan Materi & Eksplanasi Visual...
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Menyelaraskan kurikulum dengan Knowledge Graph personalmu
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const questions = material.checkpointQuestions || [];
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const isAllAnswered = questions.length > 0 && answeredCount >= questions.length;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col relative">
       {/* ── Topbar ─────────────────────────────────────────── */}
@@ -258,7 +331,7 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
                 onClick={() => setLearningMode('text')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                   learningMode === 'text'
-                    ? 'bg-card text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-sm font-bold'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -269,12 +342,12 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
                 onClick={() => setLearningMode('video')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                   learningMode === 'video'
-                    ? 'bg-card text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-sm font-bold text-amber-500'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Video className="w-3.5 h-3.5" />
-                Mode Video
+                Mode Video Interaktif
               </button>
             </div>
           </div>
@@ -282,13 +355,19 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
       </header>
 
       {/* ── Main Learning Area ──────────────────────────────── */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-10 space-y-8 pb-24">
-        {/* Title & Badge */}
+      <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-10 space-y-8 pb-28">
+        {/* Title, Badge & Objectives */}
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            Remediasi Knowledge Gap
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <Sparkles className="w-3.5 h-3.5" />
+              Remediasi Knowledge Gap
+            </span>
+            <span className="text-xs text-muted-foreground px-2.5 py-1 rounded-full bg-muted border border-border/40 font-mono">
+              ID: {material.nodeId}
+            </span>
           </div>
+
           <h1 className="text-3xl font-extrabold tracking-tight mb-3">
             {material.title}
           </h1>
@@ -297,33 +376,85 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
           </p>
         </div>
 
-        {/* Key Concepts Box */}
-        <div className="p-5 rounded-2xl border border-border bg-card/80">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-            <Lightbulb className="w-4 h-4 text-amber-500" />
-            Poin-Poin Kunci yang Harus Dipahami
-          </h2>
-          <ul className="grid sm:grid-cols-2 gap-2 text-xs text-foreground/90">
-            {material.key_concepts.map((concept, idx) => (
-              <li key={idx} className="flex items-start gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span>{concept}</span>
-              </li>
-            ))}
-          </ul>
+        {/* Learning Objective Box */}
+        <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-3 text-xs leading-relaxed">
+          <Brain className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-foreground font-semibold">Tujuan Pembelajaran: </strong>
+            <span className="text-muted-foreground">{material.learningObjective}</span>
+          </div>
         </div>
 
-        {/* Content Body based on Mode */}
-        {learningMode === 'text' ? (
-          <div className="space-y-6">
-            <div className="p-6 rounded-2xl border border-border bg-card prose dark:prose-invert max-w-none text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
-              {material.text_content}
+        {/* ── Content View: Video vs Text ────────────────────── */}
+        {learningMode === 'video' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-semibold flex items-center gap-1.5 text-foreground">
+                <Video className="w-4 h-4 text-amber-500" />
+                Video Pembelajaran Visual Interaktif
+              </span>
+              <span>Didukung Animasi Real-time & Narasi Suara</span>
             </div>
+
+            <InteractiveVideoPlayer
+              script={material.videoScript}
+              onFinished={() => {
+                // Auto-prompt to take checkpoint quiz
+              }}
+            />
+
+            <div className="p-4 rounded-2xl bg-card border border-border text-xs text-muted-foreground flex items-center justify-between">
+              <span>Ingin membaca penjelasan tertulis secara lebih detail?</span>
+              <button
+                onClick={() => setLearningMode('text')}
+                className="text-amber-600 dark:text-amber-400 font-bold hover:underline"
+              >
+                Beralih ke Mode Teks →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Analogy Box */}
+            {material.analogy && (
+              <div className="p-5 rounded-2xl border border-border bg-card/80">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
+                  <Lightbulb className="w-4 h-4 text-amber-500" />
+                  Analogi Dunia Nyata
+                </h2>
+                <p className="text-sm text-foreground/90 leading-relaxed italic">
+                  "{material.analogy}"
+                </p>
+              </div>
+            )}
+
+            {/* Conceptual Explanation Markdown */}
+            <div className="p-6 rounded-2xl border border-border bg-card prose dark:prose-invert max-w-none text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
+              {material.conceptExplanation}
+            </div>
+
+            {/* Key Definitions */}
+            {material.keyDefinitions && material.keyDefinitions.length > 0 && (
+              <div className="p-5 rounded-2xl border border-border bg-card">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-amber-500" />
+                  Istilah & Definisi Kunci
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {material.keyDefinitions.map((def, idx) => (
+                    <div key={idx} className="p-3 rounded-xl bg-muted/40 border border-border/50 text-xs">
+                      <div className="font-bold text-foreground mb-1">{def.term}</div>
+                      <div className="text-muted-foreground leading-relaxed">{def.definition}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Code Examples */}
             {material.examples && material.examples.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-sm font-bold text-foreground">Contoh Kode:</h3>
+                <h3 className="text-sm font-bold text-foreground">Contoh Implementasi Konsep:</h3>
                 {material.examples.map((ex, exIdx) => (
                   <div key={exIdx} className="rounded-2xl border border-border bg-card overflow-hidden">
                     <div className="px-4 py-2 bg-muted/40 border-b border-border/60 flex items-center justify-between text-xs">
@@ -340,229 +471,314 @@ Dengan memahami prinsip dasarnya, kamu akan mampu menuntaskan kesenjangan penget
                 ))}
               </div>
             )}
-          </div>
-        ) : (
-          <div className="p-8 rounded-2xl border border-border bg-card text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-              <Video className="w-8 h-8" />
-            </div>
-            <h3 className="font-bold text-lg">Kurasi Video Interaktif</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Video penjelasan visual untuk konsep ini sedang dipersiapkan. Kamu bisa beralih ke Mode Teks untuk membaca materi lengkap dan mencoba mini checkpoint quiz.
-            </p>
-            <button
-              onClick={() => setLearningMode('text')}
-              className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-muted hover:bg-muted/80 text-foreground transition-colors"
-            >
-              Beralih ke Mode Teks
-            </button>
+
+            {/* Common Misconceptions */}
+            {material.commonMisconceptions && material.commonMisconceptions.length > 0 && (
+              <div className="p-5 rounded-2xl border border-rose-500/20 bg-rose-500/5 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" />
+                  Miskonsepsi Umum yang Sering Terjadi
+                </h3>
+                {material.commonMisconceptions.map((item, idx) => (
+                  <div key={idx} className="text-xs space-y-1">
+                    <div className="font-semibold text-foreground">
+                      ❌ Salah Paham: <span className="text-rose-600 dark:text-rose-400">{item.misconception}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      ✅ Pelurusan Logika: {item.correction}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Key Takeaways */}
+            {material.keyTakeaways && material.keyTakeaways.length > 0 && (
+              <div className="p-5 rounded-2xl border border-border bg-card">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  Poin-Poin Penting untuk Diingat
+                </h3>
+                <ul className="grid sm:grid-cols-2 gap-2 text-xs text-foreground/90">
+                  {material.keyTakeaways.map((takeaway, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-emerald-500 font-bold">•</span>
+                      <span>{takeaway}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Mini Checkpoint Quiz */}
-        {quiz && (
-          <div className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-4">
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider">
-              <HelpCircle className="w-4 h-4" />
-              Mini Checkpoint: Uji Pemahamanmu
+        {/* ── Multi-Question Checkpoint Quiz ──────────────────── */}
+        {questions.length > 0 && (
+          <section className="p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-amber-500/5 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider">
+                <HelpCircle className="w-4 h-4" />
+                Mini Checkpoint: Validasi Penguasaan Konsep
+              </div>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {answeredCount} dari {questions.length} terjawab
+              </span>
             </div>
-            <h3 className="text-base font-bold text-foreground">{quiz.question}</h3>
 
-            <div className="space-y-2">
-              {quiz.options.map((opt, optIdx) => {
-                const isSelected = selectedQuizOption === optIdx;
-                const isCorrect = optIdx === quiz.correct_index;
+            <div className="space-y-6">
+              {questions.map((q, qIndex) => {
+                const selectedOpt = selectedAnswers[q.id];
+                const qEval = quizResult?.questionResults.find(r => r.questionId === q.id);
 
                 return (
-                  <button
-                    key={optIdx}
-                    onClick={() => {
-                      if (!isQuizSubmitted) setSelectedQuizOption(optIdx);
-                    }}
-                    disabled={isQuizSubmitted}
-                    className={`w-full text-left p-3.5 rounded-xl border text-xs transition-all flex items-center gap-3 ${
-                      isQuizSubmitted
-                        ? isCorrect
-                          ? 'border-emerald-500 bg-emerald-500/10 font-bold text-emerald-700 dark:text-emerald-300'
-                          : isSelected
-                          ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-                          : 'border-border/50 opacity-60'
-                        : isSelected
-                        ? 'border-amber-500 bg-amber-500/10 font-semibold'
-                        : 'border-border bg-card hover:bg-muted/40'
-                    }`}
-                  >
-                    <span className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center font-bold text-[11px] shrink-0">
-                      {String.fromCharCode(65 + optIdx)}
-                    </span>
-                    <span className="flex-1">{opt}</span>
-                  </button>
+                  <div key={q.id} className="p-5 rounded-2xl bg-card border border-border/80 space-y-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-6 h-6 rounded-lg bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold shrink-0">
+                        {qIndex + 1}
+                      </span>
+                      <h4 className="text-sm font-bold text-foreground leading-snug">
+                        {q.question}
+                      </h4>
+                    </div>
+
+                    {/* Options */}
+                    <div className="space-y-2">
+                      {q.options.map((optionText, optIdx) => {
+                        const isChosen = selectedOpt === optIdx;
+                        const isSubmitted = Boolean(quizResult);
+                        const isCorrectOption = qEval?.correctIndex === optIdx;
+
+                        let optionStyle = 'border-border/70 bg-card hover:bg-muted/40 text-foreground';
+
+                        if (isSubmitted) {
+                          if (isCorrectOption) {
+                            optionStyle = 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold';
+                          } else if (isChosen && !qEval?.isCorrect) {
+                            optionStyle = 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300';
+                          } else {
+                            optionStyle = 'border-border/40 bg-muted/20 text-muted-foreground opacity-60';
+                          }
+                        } else if (isChosen) {
+                          optionStyle = 'border-amber-500 bg-amber-500/15 text-foreground font-semibold';
+                        }
+
+                        return (
+                          <button
+                            key={optIdx}
+                            disabled={quizResult?.isPassed}
+                            onClick={() => handleSelectQuizOption(q.id, optIdx)}
+                            className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left text-xs transition-all ${optionStyle}`}
+                          >
+                            <span className="flex-1 pr-2">{optionText}</span>
+                            {isSubmitted && isCorrectOption && (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                            )}
+                            {isSubmitted && isChosen && !qEval?.isCorrect && (
+                              <X className="w-4 h-4 text-rose-500 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cognitive Misconception Feedback (F7) */}
+                    {qEval && !qEval.isCorrect && qEval.misconceptionFeedback && (
+                      <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-1">
+                        <div className="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Analisis Kognitif Miskonsepsi:
+                        </div>
+                        <p className="text-foreground/90 leading-relaxed">
+                          {qEval.misconceptionFeedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Correct Explanation */}
+                    {qEval && qEval.isCorrect && (
+                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-300">
+                        ✅ <strong>Tepat sekali!</strong> {qEval.explanation}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
 
-            {!isQuizSubmitted ? (
-              <button
-                onClick={handleQuizSubmit}
-                disabled={selectedQuizOption === null}
-                className="px-6 py-2.5 rounded-xl text-xs font-bold text-white pijar-gradient shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-              >
-                Kirim Jawaban
-              </button>
-            ) : (
-              <div className="p-5 rounded-xl bg-card border border-border text-xs space-y-3">
-                <div className="font-bold flex items-center gap-1.5">
-                  {selectedQuizOption === quiz.correct_index ? (
-                    <span className="text-emerald-500 flex items-center gap-1.5 text-sm">
-                      <CheckCircle2 className="w-4 h-4" /> Jawaban Tepat! Knowledge gap teratasi & materi berikutnya terbuka!
-                    </span>
+            {/* Quiz Submit Button & Overall Feedback */}
+            <div className="space-y-4 pt-2">
+              {!quizResult?.isPassed && (
+                <button
+                  disabled={!isAllAnswered || isSubmittingQuiz}
+                  onClick={handleQuizSubmit}
+                  className="w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white pijar-gradient shadow-md shadow-amber-500/20 hover:shadow-amber-500/35 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmittingQuiz ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Mengevaluasi Pemahaman & Miskonsepsi...
+                    </>
                   ) : (
-                    <span className="text-rose-500 flex items-center gap-1.5 text-sm">
-                      ⚠️ Belum tepat. Perhatikan penjelasan di bawah:
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Kirim & Periksa Jawaban ({answeredCount}/{questions.length})
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Evaluation Summary Card */}
+              {quizResult && (
+                <div
+                  className={`p-5 rounded-2xl border text-xs sm:text-sm space-y-3 ${
+                    quizResult.isPassed
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-900 dark:text-emerald-200'
+                      : 'bg-amber-500/15 border-amber-500/40 text-foreground'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-2 text-base">
+                      {quizResult.isPassed ? (
+                        <>
+                          <Award className="w-5 h-5 text-emerald-500" />
+                          Selamat! Konsep Berhasil Dikuasai
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="w-5 h-5 text-amber-500" />
+                          Perlu Sedikit Pemantapan Lagi
+                        </>
+                      )}
                     </span>
+                    <span className="text-base font-mono font-extrabold px-3 py-1 rounded-xl bg-card border">
+                      Skor: {quizResult.score}%
+                    </span>
+                  </div>
+
+                  <p className="leading-relaxed text-xs sm:text-sm">
+                    {quizResult.summaryFeedback}
+                  </p>
+
+                  {/* Link to Knowledge Graph on Mastery */}
+                  {quizResult.isPassed && (
+                    <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+                      <Link
+                        href={`/graph?id=${encodeURIComponent(graphId)}&topic=${encodeURIComponent(topicKey)}`}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-md flex items-center justify-center gap-2"
+                      >
+                        Lihat Knowledge Graph yang Terbuka
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
                   )}
                 </div>
-                <p className="text-muted-foreground leading-relaxed">
-                  {quiz.explanation}
-                </p>
-                <div className="pt-2 flex items-center gap-4">
-                  <Link
-                    href={`/graph?id=${encodeURIComponent(graphId)}&topic=${encodeURIComponent(topicKey)}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white pijar-gradient shadow-md hover:opacity-90 transition-all"
-                  >
-                    Kembali ke Knowledge Graph & Buka Materi Berikutnya <ChevronRight className="w-4 h-4" />
-                  </Link>
-                  {selectedQuizOption !== quiz.correct_index && (
-                    <button
-                      onClick={() => {
-                        setIsQuizSubmitted(false);
-                        setSelectedQuizOption(null);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground underline font-semibold"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Coba Lagi
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </section>
         )}
       </main>
 
-      {/* ── AI Tutor Floating Trigger ──────────────────────── */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xl transition-all hover:scale-105 active:scale-95"
-        >
-          <Bot className="w-4 h-4" />
-          <span>Tanya AI Tutor</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-        </button>
-      </div>
-
-      {/* ── AI Tutor Slide-Over Drawer ─────────────────────── */}
-      {isChatOpen && (
-        <div className="fixed bottom-20 right-6 w-96 max-w-[calc(100vw-3rem)] h-[520px] bg-card border border-border rounded-3xl shadow-2xl z-50 flex flex-col overflow-hidden animate-fade-in-up">
-          {/* Header */}
-          <div className="p-4 bg-muted/40 border-b border-border/60 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-                <Bot className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold leading-tight">Pijar AI Tutor</h3>
-                <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">
-                  {material.title}
-                </p>
-              </div>
+      {/* ── AI Learning Copilot Chat Widget (F6) ───────────── */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!isChatOpen ? (
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-card border border-border shadow-2xl hover:border-amber-400 hover:scale-105 transition-all text-xs font-bold group"
+          >
+            <div className="w-7 h-7 rounded-lg pijar-gradient flex items-center justify-center text-white">
+              <Bot className="w-4 h-4" />
             </div>
-            <button
-              onClick={() => setIsChatOpen(false)}
-              className="w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center justify-center transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Messages Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            <span>Tanya AI Tutor</span>
+          </button>
+        ) : (
+          <div className="w-[360px] sm:w-[400px] h-[520px] rounded-3xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden animate-fade-in-up">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-border bg-muted/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg pijar-gradient flex items-center justify-center text-white">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold">Pijar AI Tutor</div>
+                  <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                    Konteks: {material.title}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Chat Body */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+              {messages.map((msg, idx) => (
                 <div
-                  className={`max-w-[85%] rounded-2xl p-3 leading-relaxed whitespace-pre-wrap ${
-                    m.role === 'user'
-                      ? 'bg-amber-500 text-white font-medium rounded-tr-sm shadow-sm'
-                      : 'bg-muted/60 text-foreground border border-border/50 rounded-tl-sm'
-                  }`}
+                  key={idx}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {m.content}
+                  <div
+                    className={`max-w-[85%] p-3 rounded-2xl whitespace-pre-wrap leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-amber-500 text-slate-950 font-medium rounded-br-none'
+                        : 'bg-muted/70 text-foreground border border-border/50 rounded-bl-none'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {isStreaming && (
-              <div className="flex justify-start">
-                <div className="bg-muted/60 border border-border/50 rounded-2xl p-2.5 flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                  <span>AI Tutor sedang merespons...</span>
+              ))}
+              {isStreaming && (
+                <div className="flex justify-start">
+                  <div className="p-2.5 rounded-2xl bg-muted/70 border border-border/50 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                    <span>AI Tutor sedang mengetik...</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-          {/* Quick Suggestion Chips */}
-          <div className="px-3 py-1.5 border-t border-border/40 bg-muted/20 flex gap-1.5 overflow-x-auto no-scrollbar text-[10px]">
-            <button
-              onClick={() => handleSendMessage('💡 Berikan analogi sederhana untuk konsep ini')}
-              disabled={isStreaming}
-              className="shrink-0 px-2.5 py-1 rounded-full bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              💡 Analogi sederhana
-            </button>
-            <button
-              onClick={() => handleSendMessage('🔍 Mengapa konsep ini prasyarat penting?')}
-              disabled={isStreaming}
-              className="shrink-0 px-2.5 py-1 rounded-full bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              🔍 Prasyarat penting
-            </button>
-            <button
-              onClick={() => handleSendMessage('❓ Berikan petunjuk konseptual untuk checkpoint quiz')}
-              disabled={isStreaming}
-              className="shrink-0 px-2.5 py-1 rounded-full bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ❓ Tips kuis
-            </button>
-          </div>
+            {/* Preset Questions */}
+            <div className="px-4 py-2 border-t border-border/40 bg-muted/20 flex gap-1.5 overflow-x-auto text-[11px]">
+              <button
+                onClick={() => handleSendMessage('Bisa berikan contoh analogi sederhana untuk konsep ini?')}
+                className="px-2.5 py-1 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground shrink-0"
+              >
+                💡 Minta Analogi
+              </button>
+              <button
+                onClick={() => handleSendMessage('Mengapa konsep ini menjadi prasyarat materi selanjutnya?')}
+                className="px-2.5 py-1 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground shrink-0"
+              >
+                🔗 Mengapa Prasyarat?
+              </button>
+            </div>
 
-          {/* Input Bar */}
-          <div className="p-3 border-t border-border bg-card flex items-center gap-2">
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={e => setInputMessage(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSendMessage();
-              }}
-              placeholder="Tanya AI Tutor tentang konsep..."
-              disabled={isStreaming}
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-border bg-background focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={!inputMessage.trim() || isStreaming}
-              className="w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white flex items-center justify-center transition-all shrink-0"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            {/* Chat Input */}
+            <div className="p-3 border-t border-border bg-card flex items-center gap-2">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={e => setInputMessage(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Tanyakan kebingunganmu..."
+                className="flex-1 bg-muted/60 border border-border/60 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <button
+                disabled={!inputMessage.trim() || isStreaming}
+                onClick={() => handleSendMessage()}
+                className="p-2 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:opacity-40 transition-all shrink-0"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

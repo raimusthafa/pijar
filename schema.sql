@@ -65,12 +65,25 @@ CREATE TABLE IF NOT EXISTS public.diagnostic_logs (
   created_at           TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 6. ROW LEVEL SECURITY (RLS) ─────────────────────────────────
-ALTER TABLE public.profiles        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.learning_graphs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.node_progress   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_history    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.diagnostic_logs ENABLE ROW LEVEL SECURITY;
+-- ── 6. TABLE: concept_materials ──────────────────────────────────
+-- Menyimpan cache materi pembelajaran terstruktur & skrip video interaktif
+CREATE TABLE IF NOT EXISTS public.concept_materials (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic            TEXT NOT NULL,
+  node_id          TEXT NOT NULL,
+  material_json    JSONB NOT NULL,
+  video_scene_json JSONB,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (topic, node_id)
+);
+
+-- ── 7. ROW LEVEL SECURITY (RLS) ─────────────────────────────────
+ALTER TABLE public.profiles          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.learning_graphs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.node_progress     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_history      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diagnostic_logs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.concept_materials ENABLE ROW LEVEL SECURITY;
 
 -- ── 7. RLS POLICIES (Idempotent: DROP IF EXISTS terlebih dahulu) ──
 
@@ -100,6 +113,13 @@ CREATE POLICY "Users can manage own chat"    ON public.chat_history FOR ALL USIN
 DROP POLICY IF EXISTS "Users can manage own diagnostics" ON public.diagnostic_logs;
 CREATE POLICY "Users can manage own diagnostics" ON public.diagnostic_logs FOR ALL USING (auth.uid() = user_id);
 
+-- Policies: concept_materials (Cached educational content is accessible to all students)
+DROP POLICY IF EXISTS "Public can view concept materials" ON public.concept_materials;
+CREATE POLICY "Public can view concept materials" ON public.concept_materials FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can cache concept materials" ON public.concept_materials;
+CREATE POLICY "Authenticated users can cache concept materials" ON public.concept_materials FOR ALL USING (auth.role() = 'authenticated');
+
 -- ── 8. TRIGGER: Auto-create profile on user signup ───────────────
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -123,3 +143,42 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ── 9. OPTIONAL EXTENSIONS: community_posts & user_study_tasks ────
+CREATE TABLE IF NOT EXISTS public.community_posts (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  content       TEXT NOT NULL,
+  concept_tag   TEXT NOT NULL,
+  category      TEXT CHECK (category IN ('question', 'insight', 'study_note')) DEFAULT 'question',
+  upvotes_count INTEGER DEFAULT 0,
+  replies_count INTEGER DEFAULT 0,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_study_tasks (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  task_key    TEXT NOT NULL,
+  completed   BOOLEAN DEFAULT FALSE,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, task_key)
+);
+
+ALTER TABLE public.community_posts   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_study_tasks  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view community posts" ON public.community_posts;
+CREATE POLICY "Public can view community posts" ON public.community_posts FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.community_posts;
+CREATE POLICY "Authenticated users can create posts" ON public.community_posts FOR INSERT WITH CHECK (auth.uid() = author_id);
+
+DROP POLICY IF EXISTS "Authors can update own posts" ON public.community_posts;
+CREATE POLICY "Authors can update own posts" ON public.community_posts FOR UPDATE USING (auth.uid() = author_id);
+
+DROP POLICY IF EXISTS "Users can manage own study tasks" ON public.user_study_tasks;
+CREATE POLICY "Users can manage own study tasks" ON public.user_study_tasks FOR ALL USING (auth.uid() = user_id);
+
