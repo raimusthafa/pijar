@@ -104,6 +104,25 @@ function KnowledgeGraphContent() {
         }
       }
 
+      // Check if session storage has a freshly generated zero-mock graph
+      if (typeof window !== 'undefined' && !isCancelled) {
+        const storedGenGraph = sessionStorage.getItem('pijar_generated_graph');
+        if (storedGenGraph) {
+          try {
+            const parsed = JSON.parse(storedGenGraph);
+            if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+              setCloudGraph(prev => prev || {
+                topicName: parsed.topic || finalTopicKey,
+                nodes: parsed.nodes as EnrichedConceptNode[],
+                edges: parsed.edges || [],
+              });
+            }
+          } catch {
+            // ignore JSON error
+          }
+        }
+      }
+
       // Read stored diagnostic result if available
       if (typeof window !== 'undefined') {
         const rawStoredResult = sessionStorage.getItem('pijar_diagnostic_result');

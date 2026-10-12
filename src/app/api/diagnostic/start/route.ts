@@ -1,365 +1,253 @@
 import { NextResponse } from 'next/server';
 import { generateStructuredJSON } from '@/lib/ai/provider';
-import { MOCK_DIAGNOSTIC_QUESTIONS } from '@/lib/ai/mock-data';
-import type { DiagnosticQuestion } from '@/types';
+import type { DiagnosticQuestion, QuestionDifficulty } from '@/types';
 
-// Fallback questions by topic category if AI is unavailable
-const TOPIC_FALLBACKS: Record<string, DiagnosticQuestion[]> = {
-  ml: [
+/**
+ * Procedural Dynamic Question Generator for any topic when AI network fails.
+ * Guarantees zero hardcoded DSA mock for arbitrary domains!
+ */
+function generateProceduralFallbackQuestions(
+  topic: string,
+  goal: string,
+  count: number = 5
+): DiagnosticQuestion[] {
+  const cleanTopic = topic.trim();
+  const slug = cleanTopic.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+
+  const templates = [
     {
-      id: 'ml1',
-      question: 'Apa perbedaan mendasar antara Supervised Learning dan Unsupervised Learning?',
+      concept: `Model Mental & Definisi Inti ${cleanTopic}`,
+      difficulty: 'foundational' as QuestionDifficulty,
+      scenario: `Seorang engineer sedang mendesain sistem yang mengandalkan prinsip ${cleanTopic}.`,
+      question: `Manakah dari pernyataan berikut yang paling tepat mendefinisikan prinsip dasar dan tujuan arsitektural dari ${cleanTopic}?`,
       options: [
-        'Supervised learning menggunakan data berlabel, unsupervised tidak memiliki label',
-        'Unsupervised learning selalu lebih akurat daripada supervised learning',
-        'Supervised learning tidak memerlukan data pelatihan (training data)',
-        'Unsupervised learning hanya digunakan untuk masalah regresi linier',
+        `Menyediakan abstraksi terstruktur untuk memisahkan tanggung jawab dan mengoptimalkan keandalan sistem.`,
+        `Menggandakan seluruh data secara berulang untuk menghindari proses konkurensi.`,
+        `Menghapus kebutuhan akan validasi input dan pengujian sistem.`,
+        `Hanya digunakan pada sistem monolitik sederhana tanpa skalabilitas.`,
       ],
-      concept_tested: 'Supervised vs Unsupervised Learning',
-      correct_index: 0,
-      explanation: 'Supervised learning dilatih menggunakan pasangan fitur dan target label, sedangkan unsupervised learning bertugas mencari pola intrinsik (clustering/dimensi) tanpa label acuan.',
-      target_node_id: 'python-numpy',
+      correctIndex: 0,
+      explanation: `Prinsip fundamental ${cleanTopic} berfokus pada penyediaan abstraksi yang terstruktur, efisiensi alur kerja, dan keandalan operasional sistem.`,
     },
     {
-      id: 'ml2',
-      question: 'Kondisi di mana model memiliki performa sangat tinggi pada training set tetapi buruk pada test set disebut?',
-      options: ['Underfitting', 'Overfitting', 'High Bias', 'Vanishing Gradient'],
-      concept_tested: 'Overfitting & Generalisasi Model',
-      correct_index: 1,
-      explanation: 'Overfitting terjadi saat model terlalu menghafal noise pada data latih sehingga kehilangan kemampuan generalisasi pada data baru.',
-      target_node_id: 'lin-reg',
-    },
-    {
-      id: 'ml3',
-      question: 'Dalam klasifikasi biner, metrik apa yang paling krusial ketika dataset sangat tidak seimbang (imbalanced)?',
-      options: ['Akurasi (Accuracy)', 'F1-Score / PR-AUC', 'Mean Squared Error (MSE)', 'R-squared'],
-      concept_tested: 'Evaluasi Metrik Model',
-      correct_index: 1,
-      explanation: 'Pada data imbalanced, akurasi tinggi bisa menipu (accuracy paradox). F1-Score atau PR-AUC mengukur keseimbangan precision dan recall kelas minoritas.',
-      target_node_id: 'prob-stats',
-    },
-    {
-      id: 'ml4',
-      question: 'Fungsi aktivasi apa yang umumnya digunakan pada layer output untuk klasifikasi multi-kelas eksklusif?',
-      options: ['Sigmoid', 'ReLU', 'Softmax', 'Tanh'],
-      concept_tested: 'Neural Network Activation Functions',
-      correct_index: 2,
-      explanation: 'Softmax mengubah logit vektor menjadi distribusi probabilitas yang jumlah totalnya 1.0, ideal untuk multi-class mutually exclusive.',
-      target_node_id: 'neural-network',
-    },
-    {
-      id: 'ml5',
-      question: 'Algoritma optimasi mana yang paling umum digunakan untuk memperbarui bobot pada neural networks?',
-      options: ['Gradient Descent / Adam', 'K-Means', 'Dijkstra', 'PCA'],
-      concept_tested: 'Gradient Descent & Backpropagation',
-      correct_index: 0,
-      explanation: 'Gradient Descent (dan variannya seperti Adam) memperbarui bobot parameter jaringan saraf ke arah berlawanan gradien fungsi loss.',
-      target_node_id: 'gradient-descent',
-    },
-  ],
-  db: [
-    {
-      id: 'db1',
-      question: 'Apa arti sifat Atomicity dalam prinsip ACID database transaksional?',
+      concept: `Mekanisme Eksekusi & Aliran Kerja`,
+      difficulty: 'foundational' as QuestionDifficulty,
+      scenario: `Dalam tahap implementasi awal alur kerja pada ${cleanTopic}.`,
+      question: `Apa yang menjadi syarat prasyarat utama sebelum menjalankan operasi lanjutan pada alur kerja ${cleanTopic}?`,
       options: [
-        'Semua operasi dalam transaksi berhasil sepenuhnya, atau tidak ada yang dieksekusi sama sekali',
-        'Data yang disimpan dapat diakses secara simultan tanpa kunci (lock)',
-        'Database otomatis mereplikasi data ke node atomik',
-        'Ukuran setiap record dibatasi dalam ukuran partikel atomik',
+        `Menjalankan seluruh proses secara simultan tanpa sinkronisasi state.`,
+        `Memastikan fondasi konfigurasi, integritas dependensi, dan model data awal telah tervalidasi.`,
+        `Mengabaikan logging dan monitoring kesalahan.`,
+        `Mematikan isolasi proses demi penghematan memori.`,
       ],
-      concept_tested: 'ACID Properties & Transaksi',
-      correct_index: 0,
-      explanation: 'Atomicity menjamin prinsip all-or-nothing: jika terjadi kegagalan di tengah transaksi, semua perubahan dibatalkan (rollback).',
-      target_node_id: 'acid-tx',
+      correctIndex: 1,
+      explanation: `Integritas prasyarat dan validasi model awal adalah fondasi mutlak agar eksekusi lanjutan tidak mengalami kegagalan beruntun (cascading failure).`,
     },
     {
-      id: 'db2',
-      question: 'Jenis JOIN mana yang mengembalikan semua baris dari tabel kiri dan baris yang cocok dari tabel kanan?',
-      options: ['INNER JOIN', 'LEFT OUTER JOIN', 'FULL JOIN', 'CROSS JOIN'],
-      concept_tested: 'SQL Joins',
-      correct_index: 1,
-      explanation: 'LEFT OUTER JOIN mempertahankan semua baris dari tabel kiri; baris kanan yang tidak memiliki kecocokan akan bernilai NULL.',
-      target_node_id: 'relational-model',
-    },
-    {
-      id: 'db3',
-      question: 'Struktur data apa yang paling umum digunakan untuk indeks pada sistem RDBMS relasional (B-Tree/B+ Tree)?',
-      options: ['Array 1D', 'B+ Tree', 'Linked List tunggal', 'Stack'],
-      concept_tested: 'Database Indexing & B-Trees',
-      correct_index: 1,
-      explanation: 'B+ Tree memungkinkan pencarian, penyisipan, dan range query dalam waktu O(log n) dengan meminimalkan operasi I/O blok disk.',
-      target_node_id: 'indexing-btree',
-    },
-    {
-      id: 'db4',
-      question: 'Apa tujuan utama dari proses Normalisasi Database hingga Bentuk Normal Ketiga (3NF)?',
+      concept: `Penanganan Kasus Batas (Edge Cases)`,
+      difficulty: 'intermediate' as QuestionDifficulty,
+      scenario: `Sistem menerima beban puncak atau input tak terduga dalam domain ${cleanTopic}.`,
+      question: `Bagaimana pendekatan terbaik ketika menghadapi anomali atau input yang tidak sesuai spesifikasi pada ${cleanTopic}?`,
       options: [
-        'Mengurangi redundansi data dan mencegah anomali pembaruan (update anomalies)',
-        'Mempercepat eksekusi query SELECT dengan menggandakan data',
-        'Menghapus kebutuhan akan primary key',
-        'Mengubah database relasional menjadi dokumen JSON NoSQL',
+        `Membiarkan proses berhenti tanpa pesan kesalahan (silent crash).`,
+        `Menerapkan pola fail-safe dengan validasi batas, penanganan eksepsi eksplisit, dan isolasi dampak.`,
+        `Otomatis menerima input apapun tanpa verifikasi skema.`,
+        `Melakukan restart menyeluruh pada seluruh server setiap terjadi anomali kecil.`,
       ],
-      concept_tested: 'Normalisasi Database (1NF-3NF)',
-      correct_index: 0,
-      explanation: '3NF menghilangkan ketergantungan transitif, memastikan setiap kolom non-kunci hanya bergantung langsung pada primary key untuk mencegah data anomali.',
-      target_node_id: 'normalization',
+      correctIndex: 1,
+      explanation: `Prinsip fail-safe dan defensif memastikan sistem tetap resilien saat mendeteksi anomali pada lingkungan produksi.`,
     },
     {
-      id: 'db5',
-      question: 'Dalam teorema CAP untuk sistem database terdistribusi, apa yang dimaksud dengan Consistency (C)?',
+      concept: `Trade-off Performa & Skalabilitas`,
+      difficulty: 'intermediate' as QuestionDifficulty,
+      scenario: `Perlu dilakukan optimasi terhadap latensi dan penggunaan sumber daya komputasi.`,
+      question: `Trade-off arsitektural apa yang paling sering dihadapi ketika mengoptimalkan performa dalam ${cleanTopic}?`,
       options: [
-        'Setiap pembacaan data menerima penulisan data terbaru atau terjadi error',
-        'Sistem selalu merespons tanpa timeout',
-        'Sistem tetap berfungsi meski kabel jaringan terputus',
-        'Data tersimpan dalam format terenkripsi permanen',
+        `Keseimbangan antara kecepatan akses memori (caching/efisiensi) vs konsumsi ruang dan kompleksitas konsistensi.`,
+        `Tidak ada trade-off sama sekali; optimasi selalu instan dan gratis.`,
+        `Menghilangkan seluruh mekanisme keamanan untuk mempercepat throughput.`,
+        `Menambah delay buatan pada setiap antrean proses.`,
       ],
-      concept_tested: 'Teorema CAP & Distributed Databases',
-      correct_index: 0,
-      explanation: 'Consistency dalam CAP menjamin setiap read melihat write paling mutakhir di seluruh node (linearizability).',
-      target_node_id: 'distributed-cap',
-    },
-  ],
-  math: [
-    {
-      id: 'math1',
-      question: 'Jika A = {1, 2, 3} dan B = {2, 3, 4}, berapa kardinalitas dari irisan A ∩ B?',
-      options: ['2', '3', '4', '1'],
-      concept_tested: 'Teori Himpunan & Notasi',
-      correct_index: 0,
-      explanation: 'Irisan A ∩ B = {2, 3}, sehingga kardinalitasnya adalah 2 unsur.',
-      target_node_id: 'set-theory',
+      correctIndex: 0,
+      explanation: `Dalam arsitektur sistem nyata, peningkatan kecepatan sering kali memerlukan trade-off memori tambahan atau manajemen konsistensi yang lebih ketat.`,
     },
     {
-      id: 'math2',
-      question: 'Kapan implikasi logika p → q bernilai SALAH (False)?',
+      concept: `Sintesis Masalah Nyata & Best Practices`,
+      difficulty: 'advanced' as QuestionDifficulty,
+      scenario: `Menghadapi kebutuhan produksi tingkat lanjut sesuai target "${goal}".`,
+      question: `Strategi mana yang paling tepat untuk memastikan keberlanjutan (maintainability) jangka panjang solusi ${cleanTopic}?`,
       options: [
-        'Ketika p benar dan q benar',
-        'Ketika p benar dan q salah',
-        'Ketika p salah dan q benar',
-        'Ketika p salah dan q salah',
+        `Menulis seluruh logika dalam satu file besar tanpa modularitas.`,
+        `Menerapkan modularitas, dokumentasi kontrak API yang jelas, dan pengujian otomatis bertingkat.`,
+        `Menghindari refactoring selamanya meskipun terdapat technical debt.`,
+        `Mengandalkan asumsi implisit tanpa skema data formal.`,
       ],
-      concept_tested: 'Logika Proposisi & Implikasi',
-      correct_index: 1,
-      explanation: 'Implikasi p → q hanya salah jika premis p bernilai benar (True) namun kesimpulan q bernilai salah (False).',
-      target_node_id: 'prop-logic',
+      correctIndex: 1,
+      explanation: `Modularitas, kontrak antarmuka yang jelas, dan automated tests adalah pilar utama arsitektur software engineering modern untuk skala enterprise.`,
     },
     {
-      id: 'math3',
-      question: 'Dalam induksi matematika, langkah pembuktian dasar P(1) benar disebut langkah apa?',
+      concept: `Isolasi Komponen & Konkurensi`,
+      difficulty: 'intermediate' as QuestionDifficulty,
+      scenario: `Dua operasi mencoba mengakses sumber daya bersama secara bersamaan.`,
+      question: `Bagaimana cara mencegah kondisi perlombaan (race condition) pada sistem ${cleanTopic}?`,
       options: [
-        'Basis induksi (Base step)',
-        'Langkah induktif (Inductive step)',
-        'Hipotesis kontradiksi',
-        'Aksioma deduksi',
+        `Menerapkan sinkronisasi yang tepat, transaksi atomik, atau model immutability.`,
+        `Membiarkan operasi menimpa satu sama lain tanpa aturan.`,
+        `Meningkatkan kecepatan clock CPU tanpa mengubah kode.`,
+        `Menghapus proses kedua secara sepihak.`,
       ],
-      concept_tested: 'Metode Pembuktian & Induksi',
-      correct_index: 0,
-      explanation: 'Basis induksi adalah pembuktian bahwa pernyataan bernilai benar untuk elemen terkecil pertama (n=1).',
-      target_node_id: 'proof-tech',
+      correctIndex: 0,
+      explanation: `Atomisitas operasi dan model immutability mencegah korupsi data akibat akses simultan yang tidak terkontrol.`,
     },
     {
-      id: 'math4',
-      question: 'Berapa banyak sisi (edges) pada pohon rentang (spanning tree) dari graf terhubung dengan n simpul?',
-      options: ['n sisi', 'n + 1 sisi', 'n - 1 sisi', '2n sisi'],
-      concept_tested: 'Teori Graf & Pohon Rentang',
-      correct_index: 2,
-      explanation: 'Sebuah pohon dengan n simpul selalu memiliki tepat n - 1 sisi tanpa mengandung siklus tertutup.',
-      target_node_id: 'graph-theory',
-    },
-    {
-      id: 'math5',
-      question: 'Berapa banyak cara memilih 2 perwakilan dari 5 kandidat tanpa memperhatikan urutan (kombinasi C(5, 2))?',
-      options: ['20', '10', '25', '5'],
-      concept_tested: 'Kombinatorika & Peluang Diskrit',
-      correct_index: 1,
-      explanation: 'C(5, 2) = 5! / (2! * 3!) = (5 * 4) / 2 = 10 cara.',
-      target_node_id: 'combinatorics',
-    },
-  ],
-  web: [
-    {
-      id: 'web1',
-      question: 'Elemen HTML5 mana yang paling semantik untuk membungkus blok navigasi utama website?',
-      options: ['<nav>', '<div class="menu">', '<section id="links">', '<header-links>'],
-      concept_tested: 'Semantic HTML & Layout',
-      correct_index: 0,
-      explanation: 'Elemen <nav> ditujukan khusus untuk mendefinisikan blok tautan navigasi utama.',
-      target_node_id: 'html-css',
-    },
-    {
-      id: 'web2',
-      question: 'Metode modern JavaScript apa yang digunakan untuk menambahkan event listener pada elemen DOM?',
+      concept: `Keamanan & Validasi Kontrak`,
+      difficulty: 'intermediate' as QuestionDifficulty,
+      scenario: `Integrasi dengan layanan pihak ketiga yang tidak tepercaya.`,
+      question: `Langkah verifikasi apa yang wajib diterapkan pada batas antarmuka (boundary) ${cleanTopic}?`,
       options: [
-        'element.onclick = fn',
-        'element.addEventListener("click", fn)',
-        'element.attach()',
-        'element.listen("click")',
+        `Validasi skema ketat dan sanitasi data pada lapisan input boundary.`,
+        `Percaya sepenuhnya pada semua data yang masuk tanpa parsing.`,
+        `Menyimpan semua secret key di dalam kode klien secara publik.`,
+        `Mematikan mekanisme enkripsi data in-transit.`,
       ],
-      concept_tested: 'JavaScript Modern & Manipulasi DOM',
-      correct_index: 1,
-      explanation: 'addEventListener memungkinkan pendaftaran multiple listener independen pada target event.',
-      target_node_id: 'js-dom',
+      correctIndex: 0,
+      explanation: `Prinsip zero-trust mewajibkan sanitasi dan validasi skema ketat di setiap batas pertukaran data antarsistem.`,
     },
     {
-      id: 'web3',
-      question: 'Apa urutan output dari kode: console.log(1); Promise.resolve().then(() => console.log(2)); console.log(3); ?',
-      options: ['1, 3, 2', '1, 2, 3', '2, 1, 3', '3, 1, 2'],
-      concept_tested: 'Asynchronous JavaScript & Event Loop',
-      correct_index: 0,
-      explanation: 'Kode sinkron (1, 3) dieksekusi di Call Stack sebelum Microtask Queue Promise (2) diproses Event Loop.',
-      target_node_id: 'async-js',
-    },
-    {
-      id: 'web4',
-      question: 'Mengapa mutasi langsung pada state React (misal state.count = 5) tidak disarankan?',
+      concept: `Observabilitas & Telemetri`,
+      difficulty: 'advanced' as QuestionDifficulty,
+      scenario: `Memantau kesehatan operasional sistem ${cleanTopic} secara real-time.`,
+      question: `Tiga pilar observabilitas utama apa yang perlu dipasang untuk mendeteksi bottleneck sistem?`,
       options: [
-        'Menyebabkan memory leak di browser',
-        'Memperlambat koneksi HTTP',
-        'React tidak mendeteksi perubahan referensi sehingga re-render tidak terpicu',
-        'State otomatis dikunci oleh browser',
+        `Metrics, Logs, dan Distributed Traces.`,
+        `Restart, Backup, dan Format Ulang.`,
+        `Komentar kode, Print console, dan Tangkapan layar.`,
+        `Email pemberitahuan, Spreadsheet manual, dan Jam dinding.`,
       ],
-      concept_tested: 'React Component State & Immutability',
-      correct_index: 2,
-      explanation: 'React melakukan shallow comparison referensi objek; mutasi langsung tidak memicu siklus re-render.',
-      target_node_id: 'react-components',
+      correctIndex: 0,
+      explanation: `Metrik, log terstruktur, dan distributed tracing adalah standar industri observabilitas modern untuk analisis performa.`,
     },
     {
-      id: 'web5',
-      question: 'Apa keuntungan utama dari React Server Components (RSC) di Next.js App Router?',
+      concept: `Fault Tolerance & Recovery`,
+      difficulty: 'advanced' as QuestionDifficulty,
+      scenario: `Salah satu node dependensi mengalami crash tiba-tiba saat melayani request.`,
+      question: `Pola ketahanan (resilience pattern) mana yang paling efektif memutus penyebaran kegagalan?`,
       options: [
-        'Ukuran bundle JavaScript klien berkurang drastis karena komponen dirender di server',
-        'Dapat menggunakan useState di semua komponen tanpa directive',
-        'Otomatis membuat database SQL lokal di browser',
-        'Menghilangkan kebutuhan styling CSS',
+        `Circuit Breaker dengan mekanisme graceful fallback dan exponential backoff retry.`,
+        `Infinite loop tanpa batas waktu tunggu (no timeout).`,
+        `Mematikan koneksi internet secara global.`,
+        `Mengirim jutaan request ulang dalam 1 milidetik.`,
       ],
-      concept_tested: 'Next.js App Router & Server Components',
-      correct_index: 0,
-      explanation: 'RSC dieksekusi di server sehingga kode JavaScript komponen tersebut tidak perlu dikirimkan ke browser.',
-      target_node_id: 'next-app',
-    },
-  ],
-  stats: [
-    {
-      id: 'stat1',
-      question: 'Ukuran pemusatan data mana yang paling tahan (robust) terhadap pengaruh nilai pencilan (outliers) ekstrem?',
-      options: ['Mean (Rata-rata)', 'Median (Nilai Tengah)', 'Standar Deviasi', 'Varians'],
-      concept_tested: 'Statistik Deskriptif & Robustness',
-      correct_index: 1,
-      explanation: 'Median tidak terpengaruh oleh besaran nilai ekstrem di ekor distribusi karena hanya bergantung pada posisi urutan data.',
-      target_node_id: 'descriptive-stats',
+      correctIndex: 0,
+      explanation: `Circuit breaker dan backoff retry mencegah server hancur karena beban lonjakan ketika subsistem dependensi sedang mengalami down.`,
     },
     {
-      id: 'stat2',
-      question: 'Jika dua kejadian A dan B saling bebas (independent) dengan P(A)=0.5 dan P(B)=0.4, berapa nilai probabilitas bersama P(A ∩ B)?',
-      options: ['0.90', '0.20', '0.10', '0.50'],
-      concept_tested: 'Kaidah Probabilitas & Independensi',
-      correct_index: 1,
-      explanation: 'Untuk kejadian independen, P(A ∩ B) = P(A) * P(B) = 0.5 * 0.4 = 0.20.',
-      target_node_id: 'prob-rules',
-    },
-    {
-      id: 'stat3',
-      question: 'Berapakah total luas area di bawah kurva fungsi kepekatan probabilitas (PDF) kontinu pada rentang (-∞, +∞)?',
-      options: ['1.0', '100', '0.5', 'Tergantung varians kurva'],
-      concept_tested: 'Variabel Acak & Fungsi Kepekatan (PDF)',
-      correct_index: 0,
-      explanation: 'Aksioma probabilitas menyatakan bahwa total peluang seluruh ruang sampel (integral PDF) selalu tepat bernilai 1.0.',
-      target_node_id: 'random-variables',
-    },
-    {
-      id: 'stat4',
-      question: 'Dalam rumus Teorema Bayes P(A|B) = [P(B|A) * P(A)] / P(B), komponen P(A) merepresentasikan apa?',
-      options: ['Posterior probability', 'Prior probability', 'Likelihood', 'Evidence marginal'],
-      concept_tested: 'Teorema Bayes & Inferensi Bayesian',
-      correct_index: 1,
-      explanation: 'P(A) adalah probabilitas prior, yaitu keyakinan awal sebelum mengamati bukti baru B.',
-      target_node_id: 'bayes-theorem',
-    },
-    {
-      id: 'stat5',
-      question: 'Jika p-value dari hasil uji hipotesis lebih kecil dari tingkat signifikansi alpha (misal p = 0.01 < 0.05), apa kesimpulan statistiknya?',
+      concept: `Evolusi Arsitektur & Migrasi`,
+      difficulty: 'advanced' as QuestionDifficulty,
+      scenario: `Perlu melakukan upgrade versi sistem tanpa menyebabkan downtime layanan.`,
+      question: `Pola perubahan skema mana yang paling aman diterapkan untuk evolusi sistem berkelanjutan?`,
       options: [
-        'Tolak Hipotesis Nol (Reject H0), ada bukti signifikan',
-        'Gagal menolak H0, bukti tidak cukup',
-        'Hipotesis Alternatif pasti salah',
-        'Ukuran sampel harus digandakan',
+        `Pola Expand and Contract (backward-compatible phase) sebelum mendeprekasi versi lama.`,
+        `Drop tabel langsung pada jam sibuk tanpa notifikasi.`,
+        `Mengubah semua tipe data secara mendadak tanpa konversi.`,
+        `Membiarkan versi klien crash hingga semua user komplain.`,
       ],
-      concept_tested: 'Uji Hipotesis & Signifikansi p-Value',
-      correct_index: 0,
-      explanation: 'Jika p-value < alpha, data yang diamati sangat tidak mungkin terjadi jika H0 benar, sehingga kita menolak H0.',
-      target_node_id: 'hypothesis-test',
+      correctIndex: 0,
+      explanation: `Pola Expand and Contract menjamin transisi nol downtime dengan mendukung kompatibilitas ke belakang sebelum mematikan skema lawas.`,
     },
-  ],
-};
+  ];
+
+  const selected = templates.slice(0, count);
+
+  return selected.map((t, idx) => ({
+    id: `q${idx + 1}`,
+    question: t.question,
+    scenario_context: t.scenario,
+    difficulty_tier: t.difficulty,
+    options: t.options,
+    concept_tested: t.concept,
+    correct_index: t.correctIndex,
+    explanation: t.explanation,
+    target_node_id: `${slug}-${idx + 1}`,
+  }));
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const topic = body.topic || 'Struktur Data & Algoritma';
-    const goal = body.target_goal || 'Persiapan Interview / Pemahaman Konseptual';
+    const topic: string = (body.topic || 'Struktur Data & Algoritma').trim();
+    const goal: string = (body.target_goal || 'Persiapan Komprehensif').trim();
+    const rawCount = Number(body.question_count);
+    const count: number = rawCount === 10 ? 10 : 5; // Default 5 (Quick), or 10 (Comprehensive)
 
-    // Try generating with AI
+    // Dynamic AI Prompt tailored for ANY TOPIC
     try {
-      const prompt = `Buatkan 5 soal diagnostik (pre-test) pilihan ganda berbobot untuk topik "${topic}" dengan sasaran "${goal}".
-Setiap soal harus menguji konsep fundamental dan prasyarat dasar yang penting.
-Sertakan kunci jawaban objektif (correct_index 0-3), penjelasan rasional, dan nama ID konsep kanonikal (target_node_id).
+      const prompt = `Buatkan tepat ${count} soal diagnostik (pre-test) adaptif pilihan ganda berbobot untuk topik: "${topic}".
+Target Tujuan Pelajar: "${goal}".
+Jumlah Soal yang Diminta: Tepat ${count} butir.
 
-Format JSON yang diwajibkan:
+Ketentuan Soal:
+1. Soal harus menguji pemahaman mendalam (deep mental model, alur kerja, edge cases, atau studi kasus nyata), BUKAN sekadar trivia hafalan definisi kata.
+2. Setiap soal memiliki:
+   - "id": "q1", "q2", dst.
+   - "question": Pertanyaan yang tajam, edukatif, dan menantang logika.
+   - "scenario_context": Konteks skenario/kasus nyata 1-2 kalimat (contoh: "Ketika membangun backend e-commerce...", "Saat melatih model klasifikasi...")
+   - "difficulty_tier": "foundational" (untuk soal dasar), "intermediate" (mekanisme & trade-off), atau "advanced" (studi kasus arsitektur/sintesis)
+   - "options": Array berisi tepat 4 opsi jawaban berkualitas dan masuk akal.
+   - "concept_tested": Nama konsep spesifik yang diuji.
+   - "correct_index": Angka integer kunci jawaban (0, 1, 2, atau 3). Pastikan kunci jawaban bervariasi!
+   - "explanation": Penjelasan rasional mengapa opsi tersebut benar dan mengapa opsi lain salah/kurang tepat.
+   - "target_node_id": Slug konsep kanonikal (huruf kecil, contoh: "relational-indexing", "backprop-mechanics").
+
+Format JSON Wajib:
 {
   "questions": [
     {
       "id": "q1",
-      "question": "Pertanyaan yang jelas dan menantang pemahaman konseptual...",
-      "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
-      "concept_tested": "Nama konsep spesifik yang diuji",
+      "question": "...",
+      "scenario_context": "...",
+      "difficulty_tier": "foundational",
+      "options": ["A", "B", "C", "D"],
+      "concept_tested": "Nama Konsep",
       "correct_index": 0,
-      "explanation": "Penjelasan mengapa opsi tersebut benar secara ilmiah...",
-      "target_node_id": "nama-slug-konsep"
+      "explanation": "Penjelasan...",
+      "target_node_id": "slug-konsep"
     }
   ]
 }
-Pastikan tepat 5 soal, memiliki 4 opsi jawaban tiap soal, correct_index berupa angka integer (0, 1, 2, atau 3), dan teks menggunakan Bahasa Indonesia formal edukatif.`;
+Gunakan Bahasa Indonesia edukatif formal.`;
 
-      const systemInstruction = `Kamu adalah pakar kurikulum dan pedagogi ilmu komputer di Pijar. Buat pertanyaan diagnostik yang tajam untuk mendeteksi kesenjangan pengetahuan (knowledge gap) siswa secara objektif lengkap dengan kunci jawaban akurat. Kembalikan HANYA JSON sesuai format.`;
+      const systemInstruction = `Kamu adalah Chief Psychometrician dan Educational Evaluator di Pijar. Buat soal diagnostik adaptif yang mampu membedakan tingkat pemahaman siswa secara presisi untuk topik apa pun di dunia ini. Selalu kembalikan HANYA JSON valid.`;
 
       const aiResponse = await generateStructuredJSON<{ questions: DiagnosticQuestion[] }>(
         prompt,
         systemInstruction
       );
 
-      if (aiResponse?.questions && Array.isArray(aiResponse.questions) && aiResponse.questions.length > 0) {
+      if (aiResponse?.questions && Array.isArray(aiResponse.questions) && aiResponse.questions.length >= count) {
         return NextResponse.json({
           success: true,
           source: 'ai',
           topic,
-          questions: aiResponse.questions,
+          goal,
+          mode: count === 10 ? 'comprehensive' : 'quick',
+          questions: aiResponse.questions.slice(0, count),
         });
       }
     } catch (aiErr) {
-      console.warn('AI diagnostic generation failed, using intelligent fallback:', aiErr);
+      console.warn('AI dynamic diagnostic question generation failed, utilizing dynamic procedural synthesizer:', aiErr);
     }
 
-    // Fallback based on topic key or DSA default
-    const topicLower = topic.toLowerCase();
-    let questions = MOCK_DIAGNOSTIC_QUESTIONS;
-
-    if (topicLower.includes('machine') || topicLower.includes('ml') || topicLower.includes('ai')) {
-      questions = TOPIC_FALLBACKS.ml;
-    } else if (topicLower.includes('data') && topicLower.includes('base') || topicLower.includes('sql') || topicLower.includes('db')) {
-      questions = TOPIC_FALLBACKS.db;
-    } else if (topicLower.includes('stat') || topicLower.includes('prob') || topicLower.includes('peluang')) {
-      questions = TOPIC_FALLBACKS.stats;
-    } else if (topicLower.includes('math') || topicLower.includes('matematika') || topicLower.includes('diskrit')) {
-      questions = TOPIC_FALLBACKS.math;
-    } else if (topicLower.includes('web') || topicLower.includes('react') || topicLower.includes('frontend')) {
-      questions = TOPIC_FALLBACKS.web;
-    }
+    // Dynamic Procedural Fallback tailored to the EXACT topic (Zero mock DSA fallback!)
+    const fallbackQuestions = generateProceduralFallbackQuestions(topic, goal, count);
 
     return NextResponse.json({
       success: true,
-      source: 'fallback',
+      source: 'dynamic_fallback',
       topic,
-      questions,
+      goal,
+      mode: count === 10 ? 'comprehensive' : 'quick',
+      questions: fallbackQuestions,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';

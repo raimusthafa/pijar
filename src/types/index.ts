@@ -21,6 +21,9 @@ export interface OnboardingData {
 }
 
 // ── DIAGNOSTIC / PRE-TEST ─────────────────────────────────────
+export type QuestionDifficulty = 'foundational' | 'intermediate' | 'advanced';
+export type ConfidenceLevel = 'low' | 'medium' | 'high';
+
 export interface DiagnosticQuestion {
   id: string;
   question: string;
@@ -29,6 +32,8 @@ export interface DiagnosticQuestion {
   correct_index?: number;  // Indeks opsi yang benar (0-3)
   explanation?: string;    // Penjelasan rasional pedagogis
   target_node_id?: string; // Canonical node ID pada Knowledge Graph
+  difficulty_tier?: QuestionDifficulty;
+  scenario_context?: string; // Konteks kasus atau skenario nyata
 }
 
 export interface DiagnosticAnswer {
@@ -40,6 +45,14 @@ export interface DiagnosticAnswer {
   is_correct?: boolean;
   concept_tested: string;
   target_node_id?: string;
+  confidence_level?: ConfidenceLevel;
+}
+
+export interface ConfidenceMatrix {
+  misconceptions: number;  // Salah & Yakin tinggi
+  regular_gaps: number;    // Salah & Ragu/sedang
+  fragile: number;         // Benar & Ragu
+  solid: number;           // Benar & Yakin
 }
 
 export interface KnowledgeGap {
@@ -56,6 +69,11 @@ export interface DiagnosticResult {
   correct_count: number;
   identified_gaps: KnowledgeGap[];
   summary_narrative: string; // Narasi hasil diagnosa untuk ditampilkan ke user
+  confidence_matrix?: ConfidenceMatrix;
+  graph_id?: string;
+  nodes?: CurriculumNode[];
+  edges?: CurriculumEdge[];
+  mode?: 'quick' | 'comprehensive';
 }
 
 // ── KNOWLEDGE GRAPH ───────────────────────────────────────────

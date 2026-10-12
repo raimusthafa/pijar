@@ -1,8 +1,8 @@
-import type { CurriculumNode, CurriculumEdge, DiagnosticResult, KnowledgeGap } from '@/types';
-import type { EnrichedConceptNode } from './types';
-import { MOCK_GRAPH_NODES, MOCK_GRAPH_EDGES } from '@/lib/ai/mock-data';
-import { calculateHierarchicalLayout } from './layout';
-import { buildAdjacencyMaps } from './engine';
+import type { CurriculumNode, CurriculumEdge, DiagnosticResult, KnowledgeGap } from '../../types/index.ts';
+import type { EnrichedConceptNode } from './types.ts';
+import { MOCK_GRAPH_NODES, MOCK_GRAPH_EDGES } from '../ai/mock-data.ts';
+import { calculateHierarchicalLayout } from './layout.ts';
+import { buildAdjacencyMaps } from './engine.ts';
 
 // ================================================================
 // PIJAR - Multi-Topic Graph Catalog & Diagnostic Adapter
@@ -143,6 +143,29 @@ export function getBaselineCurriculum(topic: string): {
       edges: STATS_EDGES,
     };
   }
+  
+  // Dynamic procedural baseline for arbitrary custom topics (Zero DSA mock lock-in!)
+  const clean = topic.trim();
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  if (clean && !t.includes('dsa') && !t.includes('algoritma') && !t.includes('struktur data')) {
+    const customNodes: CurriculumNode[] = [
+      { id: `${slug}-foundations`, label: `Fondasi & Konsep Dasar`, category: 'Fondasi', description: `Prinsip fundamental dan model mental ${clean}`, status: 'completed', estimated_minutes: 25, is_gap: false },
+      { id: `${slug}-core-mechanics`, label: `Mekanisme & Alur Kerja`, category: 'Konsep Inti', description: `Arsitektur dan mekanisme eksekusi dalam ${clean}`, status: 'ready', estimated_minutes: 35, is_gap: false },
+      { id: `${slug}-best-practices`, label: `Penerapan & Best Practices`, category: 'Penerapan', description: `Implementasi praktis dan pola desain industri`, status: 'locked', estimated_minutes: 45, is_gap: false },
+      { id: `${slug}-advanced`, label: `Optimasi & Kasus Mahir`, category: 'Lanjutan', description: `Skalabilitas dan pemecahan kasus kompleks`, status: 'locked', estimated_minutes: 60, is_gap: false },
+    ];
+    const customEdges: CurriculumEdge[] = [
+      { id: `${slug}-e1`, source: `${slug}-foundations`, target: `${slug}-core-mechanics`, label: 'fondasi prasyarat' },
+      { id: `${slug}-e2`, source: `${slug}-core-mechanics`, target: `${slug}-best-practices`, label: 'alur penerapan' },
+      { id: `${slug}-e3`, source: `${slug}-best-practices`, target: `${slug}-advanced`, label: 'pendalaman mahir' },
+    ];
+    return {
+      topicName: clean,
+      nodes: customNodes,
+      edges: customEdges,
+    };
+  }
+
   // Default to Data Structures & Algorithms
   return {
     topicName: 'Struktur Data & Algoritma',

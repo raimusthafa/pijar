@@ -1,6 +1,6 @@
-import type { CurriculumNode, CurriculumEdge } from '@/types';
-import type { EnrichedConceptNode } from './types';
-import { buildAdjacencyMaps } from './engine';
+import type { CurriculumNode, CurriculumEdge } from '../../types/index.ts';
+import type { EnrichedConceptNode } from './types.ts';
+import { buildAdjacencyMaps } from './engine.ts';
 
 // ================================================================
 // PIJAR - Deterministic Topological Hierarchical Graph Layout

@@ -1,180 +1,210 @@
 import { NextResponse } from 'next/server';
 import { generateStructuredJSON } from '@/lib/ai/provider';
-import { MOCK_DIAGNOSTIC_RESULT } from '@/lib/ai/mock-data';
 import { createClient } from '@/lib/supabase/server';
-import type { DiagnosticResult } from '@/types';
-
-interface UserAnswerPayload {
-  question_id: string;
-  question: string;
-  options: string[];
-  selected_option: number; // 0-3
-  concept_tested: string;
-  correct_index?: number;
-  explanation?: string;
-  target_node_id?: string;
-}
+import {
+  evaluateDiagnosticAnswers,
+  generateCurriculumGraph,
+} from '@/lib/diagnostic/engine';
+import type {
+  DiagnosticAnswer,
+  DiagnosticResult,
+  KnowledgeGap,
+} from '@/types';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const topic: string = body.topic || 'Struktur Data & Algoritma';
-    const answers: UserAnswerPayload[] = body.answers || [];
+    const topic: string = (body.topic || 'Struktur Data & Algoritma').trim();
+    const targetGoal: string = (body.target_goal || 'Persiapan Komprehensif').trim();
+    const rawAnswers: DiagnosticAnswer[] = body.answers || [];
 
-    if (!Array.isArray(answers) || answers.length === 0) {
+    if (!Array.isArray(rawAnswers) || rawAnswers.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Daftar jawaban tidak boleh kosong' },
         { status: 400 }
       );
     }
 
-    const total = answers.length;
+    // 1. Deterministic Evaluation with Metacognitive Confidence Matrix
+    const evaluated = evaluateDiagnosticAnswers(rawAnswers);
 
-    // 1. Deterministic Evaluation
-    const hasKeys = answers.some(a => typeof a.correct_index === 'number');
-    let deterministicCorrectCount = 0;
-    const incorrectAnswers: UserAnswerPayload[] = [];
-    const correctAnswers: UserAnswerPayload[] = [];
+    // 2. Qualitative AI Analysis for Misconceptions & Pedagogical Narrative
+    let refinedGaps: KnowledgeGap[] = evaluated.derivedGaps;
+    let summaryNarrative = '';
 
-    if (hasKeys) {
-      for (const a of answers) {
-        if (typeof a.correct_index === 'number' && a.selected_option === a.correct_index) {
-          deterministicCorrectCount++;
-          correctAnswers.push(a);
-        } else {
-          incorrectAnswers.push(a);
-        }
-      }
-    } else {
-      // Legacy fallback if client provided no keys
-      deterministicCorrectCount = Math.max(1, Math.floor(total * 0.5));
-    }
-
-    let diagnosticResult: DiagnosticResult | null = null;
-
-    // 2. AI Qualitative Misconception & Narrative Synthesis
     try {
-      const answersPromptText = answers.map((a, idx) => {
-        const chosenText = a.options[a.selected_option] ?? 'Tidak dijawab';
-        const correctText = typeof a.correct_index === 'number' ? a.options[a.correct_index] : 'Tidak diketahui';
-        const isRight = typeof a.correct_index === 'number' ? a.selected_option === a.correct_index : 'Perlu evaluasi';
+      const answersPromptText = evaluated.evaluatedAnswers
+        .map((a, idx) => {
+          const chosenText = a.options?.[a.selected_option] ?? 'Opsi ' + a.selected_option;
+          const correctText =
+            typeof a.correct_index === 'number' && a.options?.[a.correct_index]
+              ? a.options[a.correct_index]
+              : 'Index ' + (a.correct_index ?? -1);
 
-        return `Soal ${idx + 1}: "${a.question}"
-- Konsep yang diuji: ${a.concept_tested} (ID: ${a.target_node_id || 'n/a'})
-- Opsi pilihan: ${JSON.stringify(a.options)}
-- Jawaban pengguna: Opsi index ${a.selected_option} ("${chosenText}")
-- Kunci jawaban sebenarnya: Opsi index ${a.correct_index ?? -1} ("${correctText}")
-- Status: ${isRight ? 'BENAR' : 'SALAH / PERLU PENINGKATAN'}`;
-      }).join('\n\n');
+          return `Soal ${idx + 1}: "${a.question || a.concept_tested}"
+- Konsep yang Diuji: ${a.concept_tested} (ID: ${a.target_node_id || 'n/a'})
+- Jawaban Siswa: "${chosenText}" (Tingkat Keyakinan: ${a.confidence_level || 'medium'})
+- Kunci Jawaban: "${correctText}"
+- Status: ${a.is_correct ? 'BENAR' : 'SALAH'}`;
+        })
+        .join('\n\n');
 
       const prompt = `Analisis hasil pre-test diagnostik siswa untuk topik "${topic}".
-Total Soal: ${total}
-Jumlah Jawaban Benar (Deterministik): ${deterministicCorrectCount}
+Sasaran Belajar Siswa: "${targetGoal}".
+Total Soal: ${evaluated.total}
+Skor Jawaban Benar: ${evaluated.correctCount} / ${evaluated.total}
+Metriks Keyakinan:
+- Miskonsepsi Kritis (Salah & Yakin Tinggi): ${evaluated.confidenceMatrix.misconceptions}
+- Kesenjangan Belum Dipelajari (Salah & Ragu): ${evaluated.confidenceMatrix.regular_gaps}
+- Pengetahuan Rapuh (Benar tapi Ragu): ${evaluated.confidenceMatrix.fragile}
+- Penguasaan Kokoh (Benar & Yakin): ${evaluated.confidenceMatrix.solid}
 
-Berikut detail soal dan jawaban siswa:
+Detail Jawaban Siswa:
 ${answersPromptText}
 
 TUGAS AI:
-1. Identifikasi konsep-konsep prasyarat yang paling lemah berdasarkan soal-soal yang salah.
-2. Buat daftar "identified_gaps" dengan:
-   - "concept": Nama konsep prasyarat (singkat, jelas)
-   - "target_node_id": ID slug konsep jika tersedia dari soal
-   - "severity": "critical" | "moderate" | "minor"
-   - "justification": Penjelasan mengapa konsep ini fundamental untuk dipelajari
+1. Analisis konsep-konsep prasyarat yang paling lemah atau miskonsepsi aktif.
+2. Buat daftar "identified_gaps":
+   - "concept": Nama konsep
+   - "target_node_id": slug ID
+   - "severity": "critical" (untuk miskonsepsi/salah fatal) | "moderate" | "minor"
+   - "justification": Alasan pedagogis mengapa konsep ini harus diperkuat
    - "prerequisites": Daftar konsep dasar pendukungnya
-3. Buat "summary_narrative": Rangkuman pedagogis evaluatif yang empatik, konstruktif, dan memotivasi.
+3. Buat "summary_narrative": Ringkasan pedagogis evaluatif yang empatik, tajam, dan memotivasi (2-3 paragraf).
 
-Kembalikan format JSON:
+Format JSON:
 {
-  "topic": "${topic}",
-  "total_questions": ${total},
-  "correct_count": ${deterministicCorrectCount},
   "identified_gaps": [
     {
       "concept": "Nama Konsep",
-      "target_node_id": "slug-node",
+      "target_node_id": "slug-id",
       "severity": "critical",
-      "justification": "Alasan pedagogis...",
-      "prerequisites": ["Konsep A", "Konsep B"]
+      "justification": "...",
+      "prerequisites": ["Konsep Dasar"]
     }
   ],
-  "summary_narrative": "Paragraf ringkasan evaluasi..."
+  "summary_narrative": "..."
 }`;
 
-      const systemInstruction = `Kamu adalah AI Diagnostic Engine Pijar yang mengkhususkan diri dalam deteksi Root Knowledge Gap dan Misconception. Berikan analisis pedagogis yang akurat dan empati. Kembalikan HANYA JSON valid.`;
+      const systemInstruction = `Kamu adalah Chief Diagnostic Psychologist di Pijar. Evaluasi hasil tes siswa dengan analisis akar miskonsepsi (Root Cause Analysis). Kembalikan HANYA JSON valid.`;
 
-      const aiResponse = await generateStructuredJSON<DiagnosticResult>(
-        prompt,
-        systemInstruction
-      );
+      const aiAnalysis = await generateStructuredJSON<{
+        identified_gaps: KnowledgeGap[];
+        summary_narrative: string;
+      }>(prompt, systemInstruction);
 
-      if (aiResponse && Array.isArray(aiResponse.identified_gaps)) {
-        diagnosticResult = {
-          ...aiResponse,
-          topic,
-          total_questions: total,
-          correct_count: deterministicCorrectCount,
-        };
+      if (aiAnalysis?.identified_gaps && Array.isArray(aiAnalysis.identified_gaps)) {
+        refinedGaps = aiAnalysis.identified_gaps;
+        summaryNarrative = aiAnalysis.summary_narrative;
       }
     } catch (aiErr) {
-      console.warn('AI diagnostic qualitative analysis failed, using deterministic fallback synthesis:', aiErr);
+      console.warn('AI qualitative narrative analysis failed, using structured fallback narrative:', aiErr);
     }
 
-    // 3. Robust Topic-Aware Fallback Synthesis if AI was unavailable
-    if (!diagnosticResult) {
-      const generatedGaps = incorrectAnswers.length > 0
-        ? incorrectAnswers.map(a => ({
-            concept: a.concept_tested,
-            target_node_id: a.target_node_id,
-            severity: 'critical' as const,
-            justification: a.explanation || `Konsep "${a.concept_tested}" merupakan prasyarat fundamental yang perlu diperkuat agar kamu dapat memahami topik lanjutan dengan lancar.`,
-            prerequisites: [a.concept_tested],
-          }))
-        : [
-            {
-              concept: `${topic} - Pemantapan Lanjutan`,
-              target_node_id: undefined,
-              severity: 'minor' as const,
-              justification: 'Kamu telah menjawab soal diagnostik dengan sangat baik. Jalur kurikulum siap untuk materi tingkat lanjut.',
-              prerequisites: [],
-            },
-          ];
+    if (!summaryNarrative) {
+      if (evaluated.correctCount === evaluated.total) {
+        summaryNarrative = `Luar biasa! Kamu berhasil menjawab seluruh ${evaluated.total} soal diagnostik untuk topik "${topic}" dengan akurasi 100%. Fondasi konsepmu sangat kokoh. Kurikulum Knowledge Graph kamu telah diinisialisasi agar kamu dapat langsung melompat ke konsep-konsep tingkat lanjut.`;
+      } else {
+        const misConceptNote = evaluated.confidenceMatrix.misconceptions > 0
+          ? ` Terdapat ${evaluated.confidenceMatrix.misconceptions} area di mana kamu sangat yakin namun menghasilkan kesimpulan yang kurang tepat—ini adalah miskonsepsi aktif yang akan kita luruskan.`
+          : '';
 
-      diagnosticResult = {
-        topic,
-        total_questions: total,
-        correct_count: deterministicCorrectCount,
-        identified_gaps: generatedGaps,
-        summary_narrative: deterministicCorrectCount === total
-          ? `Luar biasa! Kamu berhasil menjawab seluruh ${total} soal diagnostik untuk topik "${topic}" dengan tepat. Kurikulum belajarmu telah disesuaikan untuk melangkah langsung ke konsep lanjutan.`
-          : `Dari hasil pre-test diagnostik topik "${topic}", kamu berhasil menjawab ${deterministicCorrectCount} dari ${total} soal. Pijar mendeteksi beberapa konsep prasyarat fundamental yang perlu diperkuat terlebih dahulu agar proses belajarmu lebih kokoh.`,
-      };
+        summaryNarrative = `Dari hasil pre-test diagnostik topik "${topic}", kamu berhasil menjawab ${evaluated.correctCount} dari ${evaluated.total} soal dengan tepat.${misConceptNote} Pijar telah mengidentifikasi konsep-konsep prasyarat yang perlu diperkuat agar proses belajarmu tidak terhambat di materi lanjutan.`;
+      }
     }
 
-    // Optional: Log to Supabase diagnostic_logs if user session exists
+    // 3. ZERO-MOCK DYNAMIC KNOWLEDGE GRAPH SYNTHESIS
+    // Generate an authentic DAG specifically created for this topic and this user's gaps!
+    const generatedGraph = await generateCurriculumGraph({
+      topic,
+      targetGoal,
+      evaluatedResult: {
+        ...evaluated,
+        derivedGaps: refinedGaps,
+      },
+    });
+
+    let graphId: string = crypto.randomUUID();
+    let isPersistedInCloud = false;
+
+    // 4. SUPABASE PERSISTENCE (Store real graph & logs)
     try {
       const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) {
-        await supabase.from('diagnostic_logs').insert({
-          user_id: user.id,
-          topic,
-          answers_json: answers,
-          identified_gaps_json: diagnosticResult.identified_gaps,
-        });
+        // Insert learning graph
+        const { data: dbGraph, error: graphErr } = await supabase
+          .from('learning_graphs')
+          .insert({
+            user_id: user.id,
+            topic,
+            nodes_json: generatedGraph.nodes,
+            edges_json: generatedGraph.edges,
+            status: 'active',
+          })
+          .select('id')
+          .single();
+
+        if (dbGraph && !graphErr) {
+          graphId = dbGraph.id;
+          isPersistedInCloud = true;
+
+          // Insert diagnostic logs
+          await supabase.from('diagnostic_logs').insert({
+            user_id: user.id,
+            topic,
+            answers_json: evaluated.evaluatedAnswers,
+            identified_gaps_json: refinedGaps,
+          });
+
+          // Insert initial node progress
+          const progressRows = generatedGraph.nodes.map((node) => ({
+            user_id: user.id,
+            graph_id: graphId,
+            node_id: node.id,
+            status: node.status,
+            score: node.status === 'completed' ? 100 : 0,
+          }));
+
+          await supabase.from('node_progress').insert(progressRows);
+        }
       }
-    } catch (logErr) {
-      console.warn('Failed to persist diagnostic log to Supabase (non-blocking):', logErr);
+    } catch (dbErr) {
+      console.warn('Supabase graph persistence notice (operating in local session mode):', dbErr);
     }
+
+    const finalResult: DiagnosticResult = {
+      topic,
+      total_questions: evaluated.total,
+      correct_count: evaluated.correctCount,
+      confidence_matrix: evaluated.confidenceMatrix,
+      identified_gaps: refinedGaps,
+      summary_narrative: summaryNarrative,
+      graph_id: graphId,
+      nodes: generatedGraph.nodes,
+      edges: generatedGraph.edges,
+      mode: evaluated.total >= 10 ? 'comprehensive' : 'quick',
+    };
 
     return NextResponse.json({
       success: true,
-      result: diagnosticResult,
+      result: finalResult,
+      graph: {
+        id: graphId,
+        topic,
+        nodes: generatedGraph.nodes,
+        edges: generatedGraph.edges,
+        persisted: isPersistedInCloud,
+      },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error analyzing diagnostic answers:', err);
     return NextResponse.json(
-      { success: false, error: 'Gagal menganalisis diagnostik: ' + message },
+      { success: false, error: 'Gagal menganalisis jawaban diagnostik: ' + message },
       { status: 500 }
     );
   }
