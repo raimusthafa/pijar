@@ -107,7 +107,7 @@ async function DashboardContent() {
           </p>
         </div>
 
-        {/* ── Interactive Hub: Curriculum, Mastery Tracking, Scheduler & Community ── */}
+        {/* ── Active Curriculum Hub ── */}
         <DashboardTabbedHub
           graphs={graphs || []}
           userName={profile?.name || rawName}

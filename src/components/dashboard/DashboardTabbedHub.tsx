@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   GitBranch,
-  Award,
-  Calendar,
-  MessageSquare,
   ArrowRight,
   Sparkles,
+  BrainCircuit,
+  CheckCircle2,
+  Lock,
+  AlertTriangle,
+  PlayCircle,
+  Plus,
+  Compass,
 } from 'lucide-react';
 import type { CurriculumNode, CurriculumEdge } from '@/types';
-import { MasteryTrackingView } from './MasteryTrackingView';
-import { LearningSchedulerView } from './LearningSchedulerView';
-import { CommunityView } from './CommunityView';
 
 interface DashboardTabbedHubProps {
   graphs: Array<{
@@ -37,197 +38,229 @@ export function DashboardTabbedHub({
   defaultEdges,
   defaultTopicName,
 }: DashboardTabbedHubProps) {
-  const [activeTab, setActiveTab] = useState<'curriculum' | 'mastery' | 'scheduler' | 'community'>('curriculum');
+  // Client-side fallback if user just completed diagnostic in local session
+  const [localGraph, setLocalGraph] = useState<{
+    id: string;
+    topic: string;
+    status: string;
+    created_at: string;
+    nodes_json?: CurriculumNode[];
+    edges_json?: CurriculumEdge[];
+  } | null>(null);
 
-  const activeGraph = graphs && graphs.length > 0 ? graphs[0] : null;
-  const nodes = (activeGraph?.nodes_json && activeGraph.nodes_json.length > 0)
-    ? activeGraph.nodes_json
-    : defaultNodes;
-  const edges = (activeGraph?.edges_json && activeGraph.edges_json.length > 0)
-    ? activeGraph.edges_json
-    : defaultEdges;
-  const topicName = activeGraph?.topic || defaultTopicName;
-  const graphId = activeGraph?.id || 'demo-graph';
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (!graphs || graphs.length === 0)) {
+      const storedTopic = sessionStorage.getItem('pijar_topic');
+      const storedGraphId = sessionStorage.getItem('pijar_active_graph_id');
+      const rawGraph = sessionStorage.getItem('pijar_generated_graph');
+
+      if (storedTopic) {
+        let nodes: CurriculumNode[] | undefined;
+        let edges: CurriculumEdge[] | undefined;
+        if (rawGraph) {
+          try {
+            const parsed = JSON.parse(rawGraph);
+            nodes = parsed.nodes;
+            edges = parsed.edges;
+          } catch {}
+        }
+        setLocalGraph({
+          id: storedGraphId || 'active-session-graph',
+          topic: storedTopic,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          nodes_json: nodes,
+          edges_json: edges,
+        });
+      }
+    }
+  }, [graphs]);
+
+  const allGraphs = graphs && graphs.length > 0 ? graphs : localGraph ? [localGraph] : [];
 
   return (
     <div className="space-y-6">
-      {/* ── Navigation Tabs ─────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-muted/60 border border-border/60 overflow-x-auto text-xs font-semibold">
-        <button
-          onClick={() => setActiveTab('curriculum')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all shrink-0 ${
-            activeTab === 'curriculum'
-              ? 'bg-card text-foreground font-bold shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <GitBranch className="w-4 h-4 text-amber-500" />
-          <span>Kurikulum Aktif</span>
-          {graphs.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
-              {graphs.length}
-            </span>
-          )}
-        </button>
+      {/* ── Header: Kurikulum Aktif ───────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/40">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+              <GitBranch className="w-4 h-4" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight">Kurikulum Aktif</h2>
+            {allGraphs.length > 0 && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
+                {allGraphs.length} Aktif
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Peta jalan pembelajaran terstruktur berbasis Knowledge Graph yang sedang kamu pelajari.
+          </p>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('mastery')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all shrink-0 ${
-            activeTab === 'mastery'
-              ? 'bg-card text-foreground font-bold shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+        <Link
+          href="/onboarding"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-colors shrink-0"
         >
-          <Award className="w-4 h-4 text-emerald-500" />
-          <span>Mastery Tracking (F8)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('scheduler')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all shrink-0 ${
-            activeTab === 'scheduler'
-              ? 'bg-card text-foreground font-bold shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Calendar className="w-4 h-4 text-blue-500" />
-          <span>Jadwal Belajar (F9)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('community')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all shrink-0 ${
-            activeTab === 'community'
-              ? 'bg-card text-foreground font-bold shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4 text-purple-500" />
-          <span>Komunitas Belajar (F10)</span>
-        </button>
+          <Plus className="w-4 h-4" />
+          Mulai / Eksplorasi Topik Baru
+        </Link>
       </div>
 
-      {/* ── Tab Contents ────────────────────────────────────── */}
-      {activeTab === 'curriculum' && (
-        <div className="space-y-6">
-          {!graphs || graphs.length === 0 ? (
-            <div className="pijar-gradient-soft rounded-3xl p-8 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-6">
-              <div className="flex-1">
-                <div className="text-3xl mb-3">🚀</div>
-                <h2 className="text-xl font-bold mb-2">Mulai diagnosa pertamamu</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Jawab 5 soal singkat untuk mendapatkan Knowledge Graph kurikulum yang personal.
-                  Hanya butuh ~3 menit!
-                </p>
-              </div>
-              <Link
-                href="/onboarding"
-                id="dashboard-start-diagnostic"
-                className="flex-shrink-0 flex items-center gap-2 px-6 py-3 rounded-xl pijar-gradient text-white font-semibold text-sm hover:opacity-90 transition-all shadow-lg"
-              >
-                Mulai Pre-test <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">Daftar Kurikulum Aktif</h3>
-                <Link
-                  href="/onboarding"
-                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-semibold"
-                >
-                  Mulai topik baru <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              <div className="grid gap-3">
-                {graphs.map(g => (
-                  <Link
-                    key={g.id}
-                    href={`/graph?id=${encodeURIComponent(g.id)}`}
-                    className="flex items-center gap-4 p-5 rounded-2xl border border-border bg-card hover:border-amber-400 hover:shadow-md transition-all group"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <GitBranch className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-foreground truncate">{g.topic}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        Dibuat: {new Date(g.created_at).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 hidden sm:inline">
-                        Buka Knowledge Graph
-                      </span>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Previews of F8 & F10 */}
-          <div className="grid sm:grid-cols-2 gap-4 pt-2">
-            <div
-              onClick={() => setActiveTab('mastery')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-emerald-500/50 hover:shadow-md transition-all cursor-pointer group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                <Award className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-foreground mb-1">Mastery Tracking</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Lihat statistik penguasaan konsep, tingkat kelulusan kurikulum, dan titik hambatan prasyarat.
-              </p>
-              <span className="inline-block mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                Buka Statistik Mastery →
-              </span>
-            </div>
-
-            <div
-              onClick={() => setActiveTab('scheduler')}
-              className="p-6 rounded-2xl border border-border bg-card hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-foreground mb-1">Learning Scheduler</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Rencana belajar adaptif harian berdasarkan alokasi waktu dan prioritas knowledge gap.
-              </p>
-              <span className="inline-block mt-3 text-xs font-semibold text-blue-600 dark:text-blue-400">
-                Buka Jadwal Belajar →
-              </span>
-            </div>
+      {/* ── Active Curriculum List ────────────────────────── */}
+      {allGraphs.length === 0 ? (
+        <div className="pijar-gradient-soft rounded-3xl p-8 sm:p-10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-8 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 shadow-md">
+            <Sparkles className="w-8 h-8" />
           </div>
+          <div className="flex-1 text-center sm:text-left space-y-2">
+            <h3 className="text-xl font-bold text-foreground">
+              Belum Ada Kurikulum yang Aktif
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
+              Pijar merancang kurikulum adaptif secara dinamis dari keluh kesah dan asesmen awalmu.
+              Hanya butuh 3 menit pre-test untuk menyusun Knowledge Graph belajarmu!
+            </p>
+          </div>
+          <Link
+            href="/onboarding"
+            id="dashboard-start-diagnostic"
+            className="flex-shrink-0 flex items-center gap-2 px-6 py-3.5 rounded-xl pijar-gradient text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-amber-500/20"
+          >
+            Mulai Pre-test Diagnostik <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
-      )}
+      ) : (
+        <div className="grid gap-5">
+          {allGraphs.map((g) => {
+            const nodes = g.nodes_json || [];
+            const completedCount = nodes.filter((n) => n.status === 'completed').length;
+            const gapCount = nodes.filter(
+              (n) => n.status === 'prerequisite_gap' || n.is_gap
+            ).length;
+            const readyCount = nodes.filter(
+              (n) => n.status === 'ready' || n.status === 'in_progress'
+            ).length;
+            const lockedCount = nodes.filter((n) => n.status === 'locked').length;
+            const totalCount = nodes.length > 0 ? nodes.length : 8;
+            const progressPercent =
+              totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+            const isPractitioner =
+              g.topic.toLowerCase().includes('praktisi') ||
+              g.topic.toLowerCase().includes('mahir');
 
-      {activeTab === 'mastery' && (
-        <MasteryTrackingView
-          nodes={nodes}
-          edges={edges}
-          topicName={topicName}
-          graphId={graphId}
-        />
-      )}
+            return (
+              <div
+                key={g.id}
+                className="p-6 sm:p-7 rounded-2xl border border-border/80 bg-card hover:border-amber-500/40 hover:shadow-lg transition-all space-y-5"
+              >
+                {/* Top Row: Info & Badges */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Sedang Berjalan
+                      </span>
+                      {isPractitioner ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-black">
+                          Track Praktisi Mahir
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                          Track Fondasi Adaptif
+                        </span>
+                      )}
+                    </div>
 
-      {activeTab === 'scheduler' && (
-        <LearningSchedulerView
-          nodes={nodes}
-          edges={edges}
-          graphId={graphId}
-        />
-      )}
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight pt-1">
+                      {g.topic}
+                    </h3>
+                  </div>
 
-      {activeTab === 'community' && (
-        <CommunityView currentUserName={userName} />
+                  <div className="text-xs text-muted-foreground sm:text-right shrink-0">
+                    <div>Terakhir diperbarui:</div>
+                    <div className="font-medium text-foreground">
+                      {new Date(g.created_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-muted-foreground">Kemajuan Kurikulum</span>
+                    <span className="text-amber-500 font-bold">{progressPercent}% Selesai</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full pijar-gradient rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(progressPercent, 4)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Nodes breakdown stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-foreground">{completedCount} Konsep</div>
+                      <div className="text-[10px] text-muted-foreground">Telah Dikuasai</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center gap-2.5">
+                    <PlayCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-foreground">
+                        {readyCount > 0 ? readyCount : 1} Konsep
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Siap Dipelajari</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/20 flex items-center gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-foreground">{gapCount} Prasyarat</div>
+                      <div className="text-[10px] text-muted-foreground">Fokus Penguatan</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40 flex items-center gap-2.5">
+                    <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-foreground">{lockedCount} Konsep</div>
+                      <div className="text-[10px] text-muted-foreground">Menunggu Prasyarat</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions Bottom Bar */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/50">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1.5 self-start sm:self-auto">
+                    <BrainCircuit className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Total {totalCount} modul konsep saling terhubung (DAG)</span>
+                  </div>
+
+                  <Link
+                    href={`/graph?id=${encodeURIComponent(g.id)}&topic=${encodeURIComponent(g.topic)}`}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white pijar-gradient shadow-md shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    Buka Knowledge Graph Personal
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
