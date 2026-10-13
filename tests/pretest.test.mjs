@@ -31,3 +31,26 @@ describe('adaptive pretest', () => {
     assert.equal(summarize(s).startNodeId, 'd');
   });
 });
+
+import { pickGoalNode, applyAdaptiveStatuses, gapDetail } from '../src/lib/diagnostic/adaptive-graph.ts';
+
+describe('adaptive graph glue', () => {
+  test('goal is the sink with the most prerequisites', () => {
+    assert.equal(pickGoalNode(nodes, edges), 'e');
+    const branched = [...nodes, n('x')];
+    assert.equal(pickGoalNode(branched, edges), 'e'); // x is a sink with no prerequisites
+  });
+  test('statuses: gaps flagged, mastered plus ancestors completed, rest ready or locked', () => {
+    const out = applyAdaptiveStatuses(nodes, edges, { startNodeId: 'c', gaps: [{ nodeId: 'c', depth: 2, reason: 'wrong_easy' }], mastered: ['d'] });
+    const st = Object.fromEntries(out.map(x => [x.id, x.status]));
+    // d mastered, but its prerequisite c is a gap: c stays a gap, a and b (ancestors) complete
+    assert.deepEqual(st, { a: 'completed', b: 'completed', c: 'prerequisite_gap', d: 'completed', e: 'ready' });
+  });
+  test('gapDetail picks the first failed check', () => {
+    const a = (nodeId, level, correct) => ({ nodeId, level, depth: 0, correct });
+    assert.equal(gapDetail([a('x', 'medium', false), a('x', 'easy', false)], 'x'), 'easy');
+    assert.equal(gapDetail([a('x', 'medium', true), a('x', 'hard', false)], 'x'), 'hard');
+    assert.equal(gapDetail([a('x', 'medium', false), a('x', 'easy', true)], 'x'), 'mediumEasyOk');
+    assert.equal(gapDetail([a('x', 'medium', false)], 'x'), 'medium');
+  });
+});

@@ -6,6 +6,7 @@ import {
   generateCurriculumGraph,
 } from '@/lib/diagnostic/engine';
 import { summarize } from '@/lib/diagnostic/adaptive';
+import { applyAdaptiveStatuses } from '@/lib/diagnostic/adaptive-graph';
 import type {
   DiagnosticAnswer,
   DiagnosticResult,
@@ -35,7 +36,9 @@ export async function POST(request: Request) {
     let refinedGaps: KnowledgeGap[] = evaluated.derivedGaps;
     let summaryNarrative = '';
 
+    // Adaptive pretest: the result screen needs no narrative, so skip the AI call (free-tier quota)
     try {
+      if (body.adaptive_state) throw new Error('adaptive: narrative not needed');
       const answersPromptText = evaluated.evaluatedAnswers
         .map((a, idx) => {
           const chosenText = a.options?.[a.selected_option] ?? 'Opsi ' + a.selected_option;
@@ -118,15 +121,19 @@ Format JSON:
 
     // 3. ZERO-MOCK DYNAMIC KNOWLEDGE GRAPH SYNTHESIS
     // Generate an authentic DAG specifically created for this topic and this user's gaps!
-    const generatedGraph = await generateCurriculumGraph({
-      topic,
-      targetGoal,
-      evaluatedResult: {
-        ...evaluated,
-        derivedGaps: refinedGaps,
-      },
-      isPractitionerTrack,
-    });
+    // Adaptive pretest: the client sends the graph it walked, so keep it and only set statuses.
+    const given = body.adaptive_state && Array.isArray(body.graph?.nodes) && Array.isArray(body.graph?.edges) ? body.graph : null;
+    const generatedGraph = given
+      ? { nodes: applyAdaptiveStatuses(given.nodes, given.edges, summarize(body.adaptive_state)), edges: given.edges }
+      : await generateCurriculumGraph({
+          topic,
+          targetGoal,
+          evaluatedResult: {
+            ...evaluated,
+            derivedGaps: refinedGaps,
+          },
+          isPractitionerTrack,
+        });
 
     let graphId: string = crypto.randomUUID();
     let isPersistedInCloud = false;
