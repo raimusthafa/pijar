@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/auth.test.mjs tests/graph.test.mjs tests/learn.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs",
+    "test": "node --test tests/auth.test.mjs tests/graph.test.mjs tests/learn.test.mjs tests/math-spec.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs tests/pretest.test.mjs tests/review.test.mjs tests/five-e.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

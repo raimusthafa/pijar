@@ -7,6 +7,11 @@ import type { CurriculumNode, CurriculumEdge } from '@/types';
 import { buildAdjacencyMaps, recommendNextConcept } from '../graph/engine.ts';
 import type { EnrichedConceptNode } from '../graph/types';
 
+/** Score (percent) that must be EXCEEDED to mark a node mastered. Single source of truth. */
+export const MASTERY_THRESHOLD = 70;
+export const MAX_POST_TEST_ITEMS = 10;
+export const isMastered = (scorePercent: number) => scorePercent > MASTERY_THRESHOLD;
+
 export interface CategoryMastery {
   category: string;
   total: number;

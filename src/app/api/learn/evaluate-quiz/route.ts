@@ -5,6 +5,14 @@ import { generateStructuredJSON } from '@/lib/ai/provider';
 import type { QuizEvaluationResult } from '@/lib/learn/types';
 import type { CurriculumNode, CurriculumEdge } from '@/types';
 import { buildAdjacencyMaps } from '@/lib/graph/engine';
+import { isMastered, MASTERY_THRESHOLD } from '@/lib/mastery/engine';
+import { getPostTest } from '@/lib/learn/question-bank';
+
+// Review columns come from a migration that may not be applied yet: probe once, degrade quietly.
+async function reviewColumnsOk(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { error } = await supabase.from('node_progress').select('stability_days').limit(1);
+  return !error;
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +27,8 @@ export async function POST(request: Request) {
       answers = {}, // { [questionId]: selectedIndex }
       nodes = [],   // optional client graph snapshot
       edges = [],   // optional client graph snapshot
+      postTest = false, // true: grade the (up to 10 item) post-test from the question bank
+      language = 'id',
     } = body;
 
     if (!nodeId || typeof nodeId !== 'string') {
@@ -30,7 +40,11 @@ export async function POST(request: Request) {
 
     // 1. Load authoritative questions for this concept
     const material = await getOrGenerateMaterial({ topic, nodeId });
-    const questions = material.checkpointQuestions || [];
+    const questions: Array<(typeof material.checkpointQuestions)[number]> = postTest
+      ? (await getPostTest({ topic, nodeId, label: material.title, language })).map(q => ({
+          ...q, conceptTested: q.conceptTested || material.title,
+        })) as never
+      : material.checkpointQuestions || [];
 
     if (questions.length === 0) {
       return NextResponse.json(
@@ -85,7 +99,12 @@ export async function POST(request: Request) {
 
     const totalQuestions = questions.length;
     const score = Math.round((correctCount / totalQuestions) * 100);
-    const isPassed = score >= 65; // At least 2 of 3 (67%) or 1 of 1 (100%)
+    const isPassed = isMastered(score); // score must exceed MASTERY_THRESHOLD
+
+    // Weak concepts: concepts of wrongly answered items (unique)
+    const weakConcepts = [...new Set(
+      questions.filter((q, i) => !questionResults[i].isCorrect).map(q => q.conceptTested).filter(Boolean)
+    )];
 
     // 3. AI Cognitive Misconception Enrichment (if errors occurred)
     if (incorrectForAI.length > 0) {
@@ -162,6 +181,7 @@ Format output JSON:
             status: 'completed',
             score,
             updated_at: new Date().toISOString(),
+            ...(await reviewColumnsOk(supabase) ? { last_reviewed_at: new Date().toISOString(), stability_days: 1, review_count: 0 } : {}),
           }, { onConflict: 'user_id,graph_id,node_id' });
       } catch (dbErr) {
         console.warn('Supabase node progress persistence skipped:', dbErr);
@@ -183,7 +203,9 @@ Format output JSON:
       questionResults,
       unlockedNodeIds,
       summaryFeedback,
-    };
+      masteryThreshold: MASTERY_THRESHOLD,
+      weakConcepts,
+    } as QuizEvaluationResult;
 
     return NextResponse.json({
       success: true,

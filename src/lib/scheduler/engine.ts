@@ -150,3 +150,55 @@ export function generateStudySchedule(
     generatedAt: new Date().toISOString(),
   };
 }
+
+// ================================================================
+// Daily review: Ebbinghaus forgetting curve  R = exp(-days / stability)
+// ================================================================
+
+export const DUE_RETENTION = 0.7;
+export const MAX_STABILITY_DAYS = 60;
+
+export interface ReviewRow {
+  node_id: string;
+  status: string;
+  last_reviewed_at?: string | null;
+  updated_at?: string | null;
+  stability_days?: number | null;
+  review_count?: number | null;
+}
+
+const DAY_MS = 86_400_000;
+const lastSeen = (r: ReviewRow) => Date.parse(r.last_reviewed_at || r.updated_at || '') || 0;
+
+export function retention(r: ReviewRow, now: Date = new Date()): number {
+  const days = Math.max(0, (now.getTime() - lastSeen(r)) / DAY_MS);
+  return Math.exp(-days / Math.max(0.1, r.stability_days ?? 1));
+}
+
+export const isDue = (r: ReviewRow, now: Date = new Date()) => retention(r, now) < DUE_RETENTION;
+
+/** Success multiplies stability by 2.2 (cap 60); failure halves it (min 1). Both bump review_count. */
+export function applyReview(r: ReviewRow, success: boolean, now: Date = new Date()) {
+  const s = r.stability_days ?? 1;
+  return {
+    last_reviewed_at: now.toISOString(),
+    review_count: (r.review_count ?? 0) + 1,
+    stability_days: success ? Math.min(MAX_STABILITY_DAYS, s * 2.2) : Math.max(1, s * 0.5),
+  };
+}
+
+/**
+ * Most decayed completed nodes first (due only). If nothing is due, fall back to the
+ * current goal node, then the most recently touched node, then any completed node.
+ */
+export function pickDailyReview(
+  rows: ReviewRow[], now: Date = new Date(), max = 5, goalNodeId?: string
+): ReviewRow[] {
+  const done = rows.filter(r => r.status === 'completed');
+  const due = done.filter(r => isDue(r, now)).sort((a, b) => retention(a, now) - retention(b, now));
+  if (due.length) return due.slice(0, max);
+  const goal = rows.find(r => r.node_id === goalNodeId);
+  const recent = [...rows].sort((a, b) => lastSeen(b) - lastSeen(a))[0];
+  const pool = [goal, recent, ...done].filter((r): r is ReviewRow => !!r);
+  return [...new Map(pool.map(r => [r.node_id, r])).values()].slice(0, max);
+}

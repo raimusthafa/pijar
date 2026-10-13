@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateStructuredJSON } from '@/lib/ai/provider';
+import { initAdaptive } from '@/lib/diagnostic/adaptive';
+import { nextAdaptiveQuestion } from '@/lib/diagnostic/adaptive-server';
 import type { DiagnosticQuestion, QuestionDifficulty } from '@/types';
 
 /**
@@ -179,6 +181,17 @@ export async function POST(request: Request) {
     const goal: string = (body.target_goal || 'Persiapan Komprehensif').trim();
     const rawCount = Number(body.question_count);
     const count: number = rawCount === 10 ? 10 : 5; // Default 5 (Quick), or 10 (Comprehensive)
+    // Optional adaptive mode: client sends a prerequisite graph and the goal node
+    if (Array.isArray(body.nodes) && Array.isArray(body.edges) && typeof body.goal_node_id === 'string') {
+      try {
+        const adaptive_state = initAdaptive(body.goal_node_id);
+        const next = await nextAdaptiveQuestion(adaptive_state, body.nodes, topic, body.language);
+        return NextResponse.json({ success: true, source: 'adaptive', topic, goal, mode: 'adaptive', questions: next ? [next.question] : [], adaptive_state, next });
+      } catch (e) {
+        console.warn('Adaptive pretest init failed, using standard flow:', e);
+      }
+    }
+
     const isPractitionerTrack = Boolean(body.is_practitioner_track) || goal.toLowerCase().includes('mahir') || goal.toLowerCase().includes('praktisi') || topic.toLowerCase().includes('praktisi');
 
     // Dynamic AI Prompt tailored for ANY TOPIC & PRACTIONER LEVEL

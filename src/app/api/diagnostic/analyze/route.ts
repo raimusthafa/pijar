@@ -5,6 +5,7 @@ import {
   evaluateDiagnosticAnswers,
   generateCurriculumGraph,
 } from '@/lib/diagnostic/engine';
+import { summarize } from '@/lib/diagnostic/adaptive';
 import type {
   DiagnosticAnswer,
   DiagnosticResult,
@@ -203,6 +204,7 @@ Format JSON:
         edges: generatedGraph.edges,
         persisted: isPersistedInCloud,
       },
+      adaptive: body.adaptive_state ? summarize(body.adaptive_state) : undefined,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
