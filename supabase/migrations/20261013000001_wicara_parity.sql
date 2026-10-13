@@ -96,3 +96,6 @@ DROP POLICY IF EXISTS "Users read own evidence" ON storage.objects;
 CREATE POLICY "Users read own evidence" ON storage.objects
   FOR SELECT TO authenticated
   USING (bucket_id = 'evidence' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- One workspace per user and node (guards the open-or-create race)
+CREATE UNIQUE INDEX IF NOT EXISTS workspaces_user_node_uniq ON public.workspaces (user_id, graph_id, node_id);
