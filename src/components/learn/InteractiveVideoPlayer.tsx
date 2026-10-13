@@ -92,6 +92,11 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const activeScene = currentSceneInfo?.scene || scenes[0];
   const activeSceneIndex = scenes.findIndex(s => s.id === activeScene?.id);
 
+  // Before first play, show the finished frame as a poster instead of an empty graph.
+  const sceneProgress = currentSceneInfo && (isPlaying || currentTime > 0)
+    ? Math.min(1, Math.max(0, (currentTime - currentSceneInfo.start) / Math.max(0.1, currentSceneInfo.end - currentSceneInfo.start)))
+    : 1;
+
   // Determine active caption
   const activeCaption = React.useMemo(() => {
     if (!activeScene || !showCaptions) return null;
@@ -277,6 +282,8 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
               type={activeScene.visualType}
               state={activeScene.visualState}
               title={activeScene.title}
+              progress={sceneProgress}
+              interactive={!isPlaying || currentTime >= totalDuration}
             />
           </div>
         )}

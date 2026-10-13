@@ -2,15 +2,20 @@
 
 import React from 'react';
 import type { VisualSceneType, VisualSceneState } from '@/lib/learn/types';
+import { MathVisual } from './MathVisual';
 import { Layers, Sparkles, TrendingDown, GitFork, Terminal, Cpu, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface SceneVisualRendererProps {
   type: VisualSceneType;
   state: VisualSceneState;
   title?: string;
+  /** 0..1 progress through the current scene (1 = final frame). */
+  progress?: number;
+  /** Dragging allowed (player paused or finished). */
+  interactive?: boolean;
 }
 
-export function SceneVisualRenderer({ type, state, title }: SceneVisualRendererProps) {
+export function SceneVisualRenderer({ type, state, title, progress = 1, interactive = false }: SceneVisualRendererProps) {
   switch (type) {
     case 'call-stack':
       return <CallStackVisual state={state} />;
@@ -23,6 +28,8 @@ export function SceneVisualRenderer({ type, state, title }: SceneVisualRendererP
     case 'data-flow':
       return <DataFlowVisual state={state} />;
     case 'math-visualization':
+      if (state.math) return <MathVisual spec={state.math} progress={progress} interactive={interactive} />;
+      return <ConceptIllustrationVisual state={state} title={title} />;
     case 'concept-illustration':
     default:
       return <ConceptIllustrationVisual state={state} title={title} />;

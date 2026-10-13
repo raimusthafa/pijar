@@ -12,7 +12,22 @@ export type VisualSceneType =
   | 'math-visualization'
   | 'comparison';
 
+export type MathTemplate = 'function-plot' | 'vector-add' | 'tangent' | 'area' | 'ratio' | 'exponential';
+
+/** Declarative math visual. Data only: formulas are compiled by an allow-list (see math-spec.ts). */
+export interface MathSpec {
+  template: MathTemplate;
+  viewBox?: { x: [number, number]; y: [number, number] };
+  functions?: { expr: string; label?: string }[]; // max 3
+  vectors?: { from?: [number, number]; to: [number, number]; label?: string }[]; // max 4
+  points?: { at: [number, number]; label?: string }[]; // max 6
+  tangentAt?: number;
+  shadeArea?: [number, number];
+  ratio?: { a: number; b: number };
+}
+
 export interface VisualSceneState {
+  math?: MathSpec;
   currentStep?: number;
   totalSteps?: number;
   highlightedLine?: number;

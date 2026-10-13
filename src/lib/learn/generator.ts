@@ -5,7 +5,8 @@
 
 import { generateStructuredJSON } from '@/lib/ai/provider';
 import { CURATED_MATERIALS } from './curated-materials';
-import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType } from './types';
+import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType, MathSpec, MathTemplate } from './types';
+import { DEFAULT_MATH_SPECS, sanitizeScenesMath } from './math-spec';
 import { createClient } from '@/lib/supabase/server';
 
 // In-memory cache for ultra-fast, zero-cost reads during runtime
@@ -46,8 +47,44 @@ function validateMaterialContract(data: any): data is DetailedLearningMaterial {
     return false;
   }
 
+  // Math specs are optional extras: bad ones are dropped, never fail the material.
+  sanitizeScenesMath(data);
+
   return true;
 }
+
+const MATH_WORDS = /kalkulus|calculus|vektor|vector|fungsi|function|turunan|derivative|integral|limit|rasio|ratio|perbandingan|eksponen|exponen|aljabar|algebra|matematika|math|gradien|slope/i;
+
+/** True when the lesson is about functions, vectors, derivatives, integrals, limits, ratios or exponents. */
+function isMathTopic(params: { topic: string; nodeId: string; nodeLabel?: string; nodeDescription?: string }): boolean {
+  const { lang, visualType } = getTopicLanguage(params.topic, params.nodeId);
+  void lang;
+  return visualType === 'math-visualization' || MATH_WORDS.test(`${params.topic} ${params.nodeId} ${params.nodeLabel ?? ''} ${params.nodeDescription ?? ''}`);
+}
+
+function pickMathTemplate(text: string): MathTemplate {
+  if (/vektor|vector/i.test(text)) return 'vector-add';
+  if (/integral|luas|area/i.test(text)) return 'area';
+  if (/rasio|ratio|perbandingan/i.test(text)) return 'ratio';
+  if (/eksponen|exponen/i.test(text)) return 'exponential';
+  return 'tangent';
+}
+
+const MATH_PROMPT_GUIDE = `
+SPESIFIKASI VISUAL MATEMATIKA (wajib untuk topik matematika):
+Setiap scene dengan "visualType": "math-visualization" HARUS punya "visualState.math" berupa JSON deklaratif (bukan kode).
+Template yang tersedia: "function-plot", "vector-add", "tangent", "area", "ratio", "exponential".
+Field (semua opsional kecuali template): viewBox {x:[min,max], y:[min,max]} (-100..100), functions [{expr,label}] maks 3,
+vectors [{from:[x,y], to:[x,y], label}] maks 4, points [{at:[x,y], label}] maks 6, tangentAt (angka), shadeArea [a,b], ratio {a,b}.
+Rumus "expr" hanya boleh memakai variabel x, angka, + - * / ^ ( ), fungsi sin cos tan asin acos atan sqrt exp ln log abs, dan konstanta pi e. Maks 80 karakter. Tanpa kata lain.
+Contoh per template:
+{"template":"function-plot","viewBox":{"x":[-5,5],"y":[-2,10]},"functions":[{"expr":"x^2","label":"f(x) = x^2"}]}
+{"template":"vector-add","viewBox":{"x":[-1,7],"y":[-1,6]},"vectors":[{"to":[3,1],"label":"a"},{"to":[1,3],"label":"b"}]}
+{"template":"tangent","viewBox":{"x":[-3,3],"y":[-1,9]},"functions":[{"expr":"x^2"}],"tangentAt":1}
+{"template":"area","viewBox":{"x":[-1,5],"y":[-1,5]},"functions":[{"expr":"sqrt(x)"}],"shadeArea":[0,4]}
+{"template":"ratio","ratio":{"a":2,"b":3}}
+{"template":"exponential","viewBox":{"x":[-3,4],"y":[-1,10]},"functions":[{"expr":"2^x","label":"f(x) = 2^x"}]}
+Pilih template yang sesuai dengan konsep, dan buat tiap scene math punya spec yang berbeda agar visual berkembang.`;
 
 /**
  * Determines appropriate programming language or notation based on curriculum topic.
@@ -82,7 +119,12 @@ function buildTopicAwareFallback(params: MaterialGenerationParams): DetailedLear
   const label = nodeLabel || nodeId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   const category = nodeCategory || 'Konsep Kurikulum';
   const desc = nodeDescription || `Konsep fundamental dalam kurikulum ${topic}.`;
-  const { lang, visualType } = getTopicLanguage(topic, nodeId);
+  const { lang, visualType: baseVisual } = getTopicLanguage(topic, nodeId);
+  const mathy = isMathTopic(params);
+  const visualType: VisualSceneType = mathy ? 'math-visualization' : baseVisual;
+  const mathSpecs: [MathSpec, MathSpec] | null = mathy
+    ? [DEFAULT_MATH_SPECS['function-plot'], DEFAULT_MATH_SPECS[pickMathTemplate(`${label} ${nodeId} ${desc}`)]]
+    : null;
 
   return {
     nodeId,
@@ -184,6 +226,7 @@ Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${lab
           visualState: {
             notes: `Fokus pembelajaran: ${desc}`,
             activeNodes: [label, category],
+            ...(mathSpecs ? { math: mathSpecs[0] } : {}),
           },
           captions: [
             { startSeconds: 0, endSeconds: 6, text: `Memahami konsep ${label} secara komprehensif.` },
@@ -201,6 +244,7 @@ Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${lab
             currentStep: 2,
             totalSteps: 3,
             notes: `Alur eksekusi logis konsep ${label}.`,
+            ...(mathSpecs ? { math: mathSpecs[1] } : {}),
           },
           captions: [
             { startSeconds: 12, endSeconds: 19, text: `Perhatikan struktur dan hubungan antar komponen logis.` },
@@ -268,6 +312,7 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
   const { lang, visualType } = getTopicLanguage(topic, nodeId);
   const nodeLabel = params.nodeLabel || nodeId.replace(/-/g, ' ');
   const nodeDesc = params.nodeDescription || 'Konsep kurikulum';
+  const mathGuide = isMathTopic(params) ? MATH_PROMPT_GUIDE : '';
 
   const systemInstruction = `Kamu adalah Principal Curriculum Architect dan Senior Learning Experience Designer di Pijar.
 Tugasmu adalah menghasilkan materi edukasi berbobot ilmiah tinggi, intuitif, ramah pembelajar, dan skrip video visual interaktif untuk konsep teknologi.
@@ -395,7 +440,7 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
     ]
   }
 }
-Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan scene captions bersambung.`;
+Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan scene captions bersambung.${mathGuide}`;
 
   try {
     const aiOutput = await generateStructuredJSON<DetailedLearningMaterial>(prompt, systemInstruction);
