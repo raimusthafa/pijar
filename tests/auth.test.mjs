@@ -338,3 +338,82 @@ describe('PIJAR Full Authentication & Authorization Security Suite', () => {
     assert.equal(result.redirectUrl, '/dashboard', 'Open redirect ke domain luar harus dinetralkan ke /dashboard');
   });
 });
+
+// ================================================================
+// Real helpers: src/lib/auth/form.ts and src/lib/onboarding/goals.ts
+// ================================================================
+import {
+  safeNext, emailProblem, nameProblem, passwordProblem, authErrorKind, isObfuscatedDuplicate,
+} from '../src/lib/auth/form.ts';
+import {
+  isMissingGoalsTable, startConcept, profileGoal, defaultDiagnosticCount, orderGoals,
+} from '../src/lib/onboarding/goals.ts';
+
+describe('auth form helpers', () => {
+  test('safeNext only lets same-origin paths through', () => {
+    assert.equal(safeNext('/graph?id=1'), '/graph?id=1');
+    for (const bad of ['//evil.com', 'https://evil.com', '@evil.com', '/\\evil.com','', null, undefined]) {
+      assert.equal(safeNext(bad), '/dashboard', String(bad));
+    }
+    assert.equal(safeNext('//x', '/onboarding'), '/onboarding');
+  });
+
+  test('field validation', () => {
+    assert.equal(emailProblem(' '), 'empty');
+    assert.equal(emailProblem('a@b'), 'invalid');
+    assert.equal(emailProblem(' a@b.co '), null);
+    assert.equal(nameProblem('A'), 'short');
+    assert.equal(nameProblem('Ay'), null);
+    assert.equal(passwordProblem('', 8), 'empty');
+    assert.equal(passwordProblem('1234567', 8), 'short');
+    assert.equal(passwordProblem('12345678', 8), null);
+    assert.equal(passwordProblem('x'), null);
+  });
+
+  test('Supabase errors map to a kind', () => {
+    assert.equal(authErrorKind({ code: 'invalid_credentials' }), 'credentials');
+    assert.equal(authErrorKind({ message: 'Invalid login credentials' }), 'credentials');
+    assert.equal(authErrorKind({ code: 'email_not_confirmed' }), 'unconfirmed');
+    assert.equal(authErrorKind({ message: 'User already registered' }), 'exists');
+    assert.equal(authErrorKind({ code: 'weak_password' }), 'weak');
+    assert.equal(authErrorKind({ code: 'over_email_send_rate_limit' }), 'rate');
+    assert.equal(authErrorKind({ status: 429 }), 'rate');
+    assert.equal(authErrorKind({ message: 'TypeError: Failed to fetch' }), 'network');
+    assert.equal(authErrorKind({ message: 'boom' }), 'unknown');
+  });
+
+  test('sign-up of an existing address (no identities) is detected', () => {
+    assert.equal(isObfuscatedDuplicate({ identities: [] }), true);
+    assert.equal(isObfuscatedDuplicate({ identities: [{}] }), false);
+    assert.equal(isObfuscatedDuplicate(null), false);
+  });
+});
+
+describe('onboarding goal helpers', () => {
+  test('missing table errors are recognised', () => {
+    assert.equal(isMissingGoalsTable({ code: '42P01' }), true);
+    assert.equal(isMissingGoalsTable({ code: 'PGRST205' }), true);
+    assert.equal(isMissingGoalsTable({ message: "Could not find the table 'public.learning_goals' in the schema cache" }), true);
+    assert.equal(isMissingGoalsTable({ code: '42501', message: 'permission denied' }), false);
+    assert.equal(isMissingGoalsTable(null), false);
+  });
+
+  test('intake maps to start concept, profile goal and diagnostic length', () => {
+    const begin = { canonical_topic: 'Cybersecurity', detected_level: 'absolute_beginner', recommended_diagnostic_focus: ['CIA triad', 'Hashing'] };
+    const pro = { canonical_topic: 'Zero trust', detected_level: 'advanced_practitioner', is_practitioner_track: true, recommended_first_step: ' Threat modelling ' };
+    assert.equal(startConcept(begin), 'CIA triad');
+    assert.equal(startConcept(pro), 'Threat modelling');
+    assert.equal(startConcept(null), '');
+    assert.equal(profileGoal(begin), 'beginner');
+    assert.equal(profileGoal(pro), 'practitioner');
+    assert.equal(profileGoal({ canonical_topic: 'x', detected_level: 'intermediate' }), 'deepen');
+    assert.equal(defaultDiagnosticCount(begin), 5);
+    assert.equal(defaultDiagnosticCount(pro), 10);
+  });
+
+  test('goal history lists the active goal first and each topic once', () => {
+    const g = (id, topic, status) => ({ id, topic, status, node_id: null, graph_id: null });
+    const out = orderGoals([g('1', 'Rust', 'done'), g('2', 'SQL', 'pending'), g('3', 'rust', 'active'), g('4', 'SQL', 'done')]);
+    assert.deepEqual(out.map((x) => x.id), ['3', '2']);
+  });
+});

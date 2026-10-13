@@ -19,7 +19,11 @@ export async function POST(request: Request) {
     let intakeResult;
     try {
       if (typeof analyzeLearnerIntake === 'function') {
-        intakeResult = await analyzeLearnerIntake(rawInput);
+        // A slow or rate-limited model must not leave the learner waiting: fall back to the procedural reading after 9s.
+        intakeResult = await Promise.race([
+          analyzeLearnerIntake(rawInput),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('intake timeout')), 9000)),
+        ]);
       } else {
         intakeResult = buildProceduralIntakeFallback(rawInput);
       }
