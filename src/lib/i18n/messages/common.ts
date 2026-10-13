@@ -1,0 +1,41 @@
+import { defineMessages } from '../define';
+
+// Words every page needs. Keep it short: page copy belongs in the page's own namespace.
+export default defineMessages({
+  id: {
+    'brand.name': 'Pijar',
+    'action.save': 'Simpan',
+    'action.cancel': 'Batal',
+    'action.close': 'Tutup',
+    'action.back': 'Kembali',
+    'action.next': 'Lanjut',
+    'action.retry': 'Coba lagi',
+    'action.delete': 'Hapus',
+    'action.signIn': 'Masuk',
+    'action.signUp': 'Daftar',
+    'action.signOut': 'Keluar',
+    'state.loading': 'Memuat',
+    'state.error': 'Terjadi masalah. Coba lagi sebentar lagi.',
+    'locale.label': 'Bahasa',
+    'locale.id': 'Bahasa Indonesia',
+    'locale.en': 'English',
+  },
+  en: {
+    'brand.name': 'Pijar',
+    'action.save': 'Save',
+    'action.cancel': 'Cancel',
+    'action.close': 'Close',
+    'action.back': 'Back',
+    'action.next': 'Next',
+    'action.retry': 'Try again',
+    'action.delete': 'Delete',
+    'action.signIn': 'Sign in',
+    'action.signUp': 'Sign up',
+    'action.signOut': 'Sign out',
+    'state.loading': 'Loading',
+    'state.error': 'Something went wrong. Try again in a moment.',
+    'locale.label': 'Language',
+    'locale.id': 'Bahasa Indonesia',
+    'locale.en': 'English',
+  },
+});

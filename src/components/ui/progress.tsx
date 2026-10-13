@@ -3,6 +3,7 @@
 import { Progress as ProgressPrimitive } from "@base-ui/react/progress"
 import { cn } from "cn"
 
+/* Progress is the one place amber fills a bar. Track is a tone shift, not a border. */
 function Progress({
   className,
   children,
@@ -13,7 +14,7 @@ function Progress({
     <ProgressPrimitive.Root
       value={value}
       data-slot="progress"
-      className={cn("flex flex-wrap gap-3", className)}
+      className={cn("flex flex-wrap gap-2", className)}
       {...props}
     >
       {children}
@@ -28,7 +29,7 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
   return (
     <ProgressPrimitive.Track
       className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
+        "relative flex h-2 w-full items-center overflow-hidden rounded-pill bg-surface-strong",
         className
       )}
       data-slot="progress-track"
@@ -44,7 +45,10 @@ function ProgressIndicator({
   return (
     <ProgressPrimitive.Indicator
       data-slot="progress-indicator"
-      className={cn("h-full bg-primary transition-all", className)}
+      className={cn(
+        "h-full rounded-pill bg-amber transition-[width] duration-500 ease-out-pj",
+        className
+      )}
       {...props}
     />
   )

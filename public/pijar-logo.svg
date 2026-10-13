@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="328" height="336" viewBox="0 0 328 336" role="img" aria-label="Pijar">
+  <title>Pijar</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M155 96 105 142" stroke="#242D3A" stroke-width="15"/>
+    <path d="M94 196 159 251" stroke="#242D3A" stroke-width="15"/>
+    <path d="M208 102 252 143" stroke="#D9A648" stroke-width="15"/>
+    <path d="M252 209 212 242" stroke="#D9A648" stroke-width="15"/>
+  </g>
+  <g fill="#242D3A">
+    <circle cx="179" cy="83" r="33"/>
+    <circle cx="76" cy="178" r="33"/>
+    <circle cx="179" cy="266" r="33"/>
+  </g>
+  <circle cx="280" cy="178" r="33" fill="#D9A648"/>
+</svg>

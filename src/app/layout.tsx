@@ -1,37 +1,52 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { HtmlLang } from '@/components/shell/HtmlLang';
+import { I18nProvider } from '@/lib/i18n/client';
+import { getLocale } from '@/lib/i18n/server';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-sans',
+// Headline face: Outfit, vendored in public/fonts (OFL). Body and app UI use the system stack.
+const outfit = localFont({
+  src: [
+    { path: '../../public/fonts/Outfit-latin-ext.woff2', weight: '100 900', style: 'normal' },
+    { path: '../../public/fonts/Outfit-latin.woff2', weight: '100 900', style: 'normal' },
+  ],
+  variable: '--font-outfit',
   display: 'swap',
 });
 
+// Static on purpose: cacheComponents forbids reading the locale cookie in metadata.
 export const metadata: Metadata = {
-  title: 'Pijar — Adaptive Learning Platform',
-  description:
-    'Pijar mendiagnosis knowledge gap kamu dan membangun jalur belajar personal berbasis AI. Mulai dari mana kamu berada, capai tujuanmu lebih cepat.',
-  keywords: ['adaptive learning', 'AI tutor', 'knowledge graph', 'belajar adaptif', 'pijar'],
+  title: { default: 'Pijar', template: '%s | Pijar' },
+  description: 'Pijar mencari konsep dasar yang belum kuat, lalu menyusun jalur belajar dari titik itu.',
   openGraph: {
-    title: 'Pijar — Adaptive Learning Platform',
-    description: 'Platform belajar adaptif bertenaga AI yang membangun kurikulum personal untukmu.',
+    title: 'Pijar',
+    description: 'Pijar mencari konsep dasar yang belum kuat, lalu menyusun jalur belajar dari titik itu.',
     type: 'website',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// The locale cookie is runtime data, so it is read inside Suspense (cacheComponents is on).
+// <html lang> is "id" in the static shell and HtmlLang corrects it right after hydration.
+async function LocaleBoundary({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="id" className={`${inter.variable} h-full antialiased`}>
+    <I18nProvider locale={locale}>
+      <HtmlLang locale={locale} />
+      <TooltipProvider delay={300}>{children}</TooltipProvider>
+    </I18nProvider>
+  );
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="id" className={`${outfit.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <TooltipProvider delay={300}>
-          {children}
-        </TooltipProvider>
+        <Suspense fallback={null}>
+          <LocaleBoundary>{children}</LocaleBoundary>
+        </Suspense>
       </body>
     </html>
   );

@@ -1,239 +1,469 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Pijar Design System — Brand Colors & Custom Tokens */
+/*
+  Pijar design tokens. This is the only file with theme tokens (CLAUDE.md 8).
+  Light theme only. Layers: raw --pj-* tokens, then shadcn names mapped onto them,
+  then Tailwind names (@theme inline), then base rules.
+  Rules this file enforces: no pure #000/#fff as flat surface or text, one accent (amber),
+  hairlines and tone shifts instead of shadows, radius hierarchy instead of one radius.
+*/
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── 1. Raw tokens ─────────────────────────────────────────── */
+:root {
+  /* Brand (from the logo) */
+  --pj-ink: #242d3a;
+  --pj-amber: #d9a648;
+  --pj-amber-fg: #242d3a; /* text and icons on an amber fill: always ink, never white */
+
+  /* Surfaces: ground is the content area, surface is chrome and cards, strong is hover or active on surface */
+  --pj-ground: #fbfaf7;
+  --pj-surface: #f3f2ee;
+  --pj-surface-strong: #e8e7e1;
+  --pj-raised: #fefdfb; /* card inside a surface card, popovers, fields */
+  --pj-hairline: rgba(36, 45, 58, 0.1);
+  --pj-hairline-strong: rgba(36, 45, 58, 0.18);
+  --pj-field-border: rgba(36, 45, 58, 0.42); /* form controls need 3:1 against ground */
+  --pj-hover: rgba(36, 45, 58, 0.06);
+  --pj-scrim: rgba(36, 45, 58, 0.36);
+
+  /* Text */
+  --pj-text: #1b222c;
+  --pj-text-muted: #5b6573; /* 5.6:1 on ground, 5.1:1 on surface */
+  --pj-text-faint: #7a8491; /* placeholders and disabled only, never body text */
+
+  /* Action: ink pill with near-white text */
+  --pj-action-bg: var(--pj-ink);
+  --pj-action-bg-hover: #323c4b;
+  --pj-action-fg: #fbfaf7;
+  --pj-focus: var(--pj-ink);
+
+  /* Status: solid fills only. Warning amber is yellower and brighter than the brand amber on purpose. */
+  --pj-danger: #c0392f;
+  --pj-danger-fg: #fbfaf7;
+  --pj-warning: #f0b429;
+  --pj-warning-fg: #242d3a;
+  --pj-success: #2f7d4f;
+  --pj-success-fg: #fbfaf7;
+  --pj-neutral: #5b6573;
+  --pj-neutral-fg: #fbfaf7;
+  --pj-disabled-bg: #e8e7e1;
+  --pj-disabled-fg: #7a8491;
+
+  /* Decorative panels only (CLAUDE.md 8.3 E1): hero and large panels, soft and low contrast */
+  --pj-panel-from: #f6e6c2;
+  --pj-panel-to: #fbfaf7;
+
+  /* Radius hierarchy. Not one uniform radius. */
+  --pj-r-pill: 100px; /* buttons, chips, nav pill, tabs */
+  --pj-r-card-lg: 48px; /* large marketing cards, hero frame */
+  --pj-r-card: 22px; /* cards, dialogs, app content panel */
+  --pj-r-inner: 16px; /* card inside a card, empty-state tile, sheets */
+  --pj-r-control: 8px; /* inputs, menu items, tooltips, skeleton lines */
+
+  /* Spacing (multiples of 4) */
+  --pj-gutter: 20px; /* page side padding on mobile, 52px from md up (see .pj-gutter) */
+  --pj-gutter-lg: 52px;
+  --pj-card-gap: 16px; /* app card gap */
+  --pj-card-gap-lg: 36px; /* marketing card gap */
+  --pj-card-pad: 24px;
+  --pj-card-pad-lg: 36px;
+  --pj-sidebar-w: 256px;
+  --pj-topbar-h: 48px;
+  --pj-panel-inset: 8px;
+  --pj-content-max: 1200px;
+
+  /* Motion. Springs are for things the user touches, ease-out for everything else. */
+  --pj-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --pj-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --pj-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --pj-ease-spring: linear(0, 0.046, 0.157, 0.298, 0.446, 0.586, 0.708, 0.809, 0.889, 0.947, 0.989, 1.015, 1.03, 1.037, 1.038, 1.036, 1.031, 1.025, 1.02, 1.015, 1.01, 1.006, 1.004, 1.002, 1); /* damping about 0.7, 4% overshoot, momentum gestures only */
+  --pj-dur-press: 100ms;
+  --pj-dur-fast: 150ms;
+  --pj-dur-base: 200ms;
+  --pj-dur-slow: 300ms;
+  --pj-dur-sheet: 360ms;
+
+  /* Layers (z-index scale) */
+  --pj-z-sticky: 20;
+  --pj-z-nav: 40;
+  --pj-z-overlay: 50;
+}
+
+/* ── 2. shadcn variable names mapped onto the tokens ───────── */
+:root {
+  --background: var(--pj-ground);
+  --foreground: var(--pj-text);
+  --card: var(--pj-surface);
+  --card-foreground: var(--pj-text);
+  --popover: var(--pj-raised);
+  --popover-foreground: var(--pj-text);
+  --primary: var(--pj-action-bg);
+  --primary-foreground: var(--pj-action-fg);
+  --secondary: var(--pj-surface);
+  --secondary-foreground: var(--pj-text);
+  --muted: var(--pj-surface);
+  --muted-foreground: var(--pj-text-muted);
+  --accent: var(--pj-hover);
+  --accent-foreground: var(--pj-text);
+  --destructive: var(--pj-danger);
+  --border: var(--pj-hairline);
+  --input: var(--pj-field-border);
+  --ring: var(--pj-focus);
+  /* One accent only: charts use amber first, then ink and neutral tones, never a rainbow */
+  --chart-1: var(--pj-amber);
+  --chart-2: var(--pj-ink);
+  --chart-3: var(--pj-neutral);
+  --chart-4: var(--pj-surface-strong);
+  --chart-5: var(--pj-hairline-strong);
+  --radius: var(--pj-r-inner);
+  --sidebar: var(--pj-surface);
+  --sidebar-foreground: var(--pj-text);
+  --sidebar-primary: var(--pj-action-bg);
+  --sidebar-primary-foreground: var(--pj-action-fg);
+  --sidebar-accent: var(--pj-surface-strong);
+  --sidebar-accent-foreground: var(--pj-text);
+  --sidebar-border: var(--pj-hairline);
+  --sidebar-ring: var(--pj-focus);
+}
+
+/* ── 3. Tailwind names ─────────────────────────────────────── */
 @theme inline {
+  /* Fonts. --font-outfit is set by next/font in layout.tsx. */
+  --font-sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-outfit), ui-rounded, system-ui, sans-serif;
+  --font-heading: var(--font-display);
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+
+  /* Colors: tokens first, then the shadcn names */
+  --color-ink: var(--pj-ink);
+  --color-amber: var(--pj-amber);
+  --color-amber-foreground: var(--pj-amber-fg);
+  --color-ground: var(--pj-ground);
+  --color-surface: var(--pj-surface);
+  --color-surface-strong: var(--pj-surface-strong);
+  --color-raised: var(--pj-raised);
+  --color-hairline: var(--pj-hairline);
+  --color-hairline-strong: var(--pj-hairline-strong);
+  --color-field: var(--pj-field-border);
+  --color-hover: var(--pj-hover);
+  --color-scrim: var(--pj-scrim);
+  --color-text: var(--pj-text);
+  --color-text-muted: var(--pj-text-muted);
+  --color-text-faint: var(--pj-text-faint);
+  --color-action: var(--pj-action-bg);
+  --color-action-hover: var(--pj-action-bg-hover);
+  --color-action-foreground: var(--pj-action-fg);
+  --color-danger: var(--pj-danger);
+  --color-danger-foreground: var(--pj-danger-fg);
+  --color-warning: var(--pj-warning);
+  --color-warning-foreground: var(--pj-warning-fg);
+  --color-success: var(--pj-success);
+  --color-success-foreground: var(--pj-success-fg);
+  --color-neutral: var(--pj-neutral);
+  --color-neutral-foreground: var(--pj-neutral-fg);
+  --color-disabled: var(--pj-disabled-bg);
+  --color-disabled-foreground: var(--pj-disabled-fg);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
-
-  /* Pijar Brand Colors */
-  --color-pijar-50:  var(--pijar-50);
-  --color-pijar-100: var(--pijar-100);
-  --color-pijar-200: var(--pijar-200);
-  --color-pijar-300: var(--pijar-300);
-  --color-pijar-400: var(--pijar-400);
-  --color-pijar-500: var(--pijar-500);
-  --color-pijar-600: var(--pijar-600);
-  --color-pijar-700: var(--pijar-700);
-  --color-pijar-800: var(--pijar-800);
-  --color-pijar-900: var(--pijar-900);
-
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.4);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Radius: rounded-pill, rounded-card-lg, rounded-card, rounded-inner, rounded-control */
+  --radius-pill: var(--pj-r-pill);
+  --radius-card-lg: var(--pj-r-card-lg);
+  --radius-card: var(--pj-r-card);
+  --radius-inner: var(--pj-r-inner);
+  --radius-control: var(--pj-r-control);
+  /* Default Tailwind steps, re-pointed so shadcn classes land on the hierarchy */
+  --radius-sm: 6px;
+  --radius-md: var(--pj-r-control);
+  --radius-lg: 12px;
+  --radius-xl: var(--pj-r-inner);
+  --radius-2xl: var(--pj-r-card);
+  --radius-3xl: 32px;
+  --radius-4xl: var(--pj-r-card-lg);
+
+  /* Easing: ease-out-pj, ease-drawer, ease-spring */
+  --ease-out-pj: var(--pj-ease-out);
+  --ease-in-out-pj: var(--pj-ease-in-out);
+  --ease-drawer: var(--pj-ease-drawer);
+  --ease-spring: var(--pj-ease-spring);
+
+  /*
+    Type scale: size / leading / tracking travel together. Use text-display, text-h1 ... text-h4 with font-display.
+    Large text tightens, small text opens a little, body stays at 0 (Apple, size-specific tracking).
+  */
+  --text-display: clamp(2.75rem, 9.5vw, 5rem); /* 80px at desktop, hero */
+  --text-display--line-height: 0.92;
+  --text-display--letter-spacing: -0.04em;
+  --text-h1: clamp(2.5rem, 7vw, 3.5rem); /* 56px at desktop */
+  --text-h1--line-height: 1;
+  --text-h1--letter-spacing: -0.04em;
+  --text-h2: clamp(2rem, 5.5vw, 2.75rem); /* 44px at desktop, section title */
+  --text-h2--line-height: 1.1;
+  --text-h2--letter-spacing: -0.04em;
+  --text-h3: 1.75rem; /* 28px, card title */
+  --text-h3--line-height: 1.2;
+  --text-h3--letter-spacing: -0.03em;
+  --text-h4: 1.25rem; /* 20px, app page and panel titles */
+  --text-h4--line-height: 1.3;
+  --text-h4--letter-spacing: -0.02em;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.55;
+  --text-lg--letter-spacing: -0.005em;
+  --text-base: 1rem; /* 16px marketing body */
+  --text-base--line-height: 1.5;
+  --text-base--letter-spacing: 0em;
+  --text-sm: 0.875rem; /* 14px app UI */
+  --text-sm--line-height: 1.45;
+  --text-sm--letter-spacing: 0em;
+  --text-xs: 0.75rem; /* 12px captions, chips */
+  --text-xs--line-height: 1.4;
+  --text-xs--letter-spacing: 0.01em;
 }
 
-:root {
-  /* Pijar Brand — Warm Amber/Gold as primary (spark of learning) */
-  --pijar-50:  oklch(0.98 0.025 85);
-  --pijar-100: oklch(0.95 0.055 82);
-  --pijar-200: oklch(0.90 0.100 78);
-  --pijar-300: oklch(0.84 0.150 75);
-  --pijar-400: oklch(0.76 0.185 70);
-  --pijar-500: oklch(0.68 0.200 65);   /* Core brand */
-  --pijar-600: oklch(0.58 0.195 60);
-  --pijar-700: oklch(0.48 0.175 55);
-  --pijar-800: oklch(0.38 0.140 50);
-  --pijar-900: oklch(0.28 0.100 45);
-
-  --background: oklch(0.99 0.005 85);
-  --foreground: oklch(0.15 0.015 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.015 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.015 240);
-  --primary: oklch(0.68 0.200 65);         /* Pijar amber */
-  --primary-foreground: oklch(0.10 0 0);
-  --secondary: oklch(0.96 0.010 85);
-  --secondary-foreground: oklch(0.30 0.020 240);
-  --muted: oklch(0.96 0.008 85);
-  --muted-foreground: oklch(0.52 0.015 240);
-  --accent: oklch(0.94 0.035 85);
-  --accent-foreground: oklch(0.30 0.020 240);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.010 85);
-  --input: oklch(0.93 0.008 85);
-  --ring: oklch(0.68 0.200 65);
-  --chart-1: oklch(0.68 0.200 65);
-  --chart-2: oklch(0.60 0.180 220);
-  --chart-3: oklch(0.55 0.160 150);
-  --chart-4: oklch(0.65 0.190 30);
-  --chart-5: oklch(0.58 0.170 280);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.985 0.005 85);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.68 0.200 65);
-  --sidebar-primary-foreground: oklch(0.10 0 0);
-  --sidebar-accent: oklch(0.94 0.035 85);
-  --sidebar-accent-foreground: oklch(0.30 0.020 240);
-  --sidebar-border: oklch(0.91 0.010 85);
-  --sidebar-ring: oklch(0.68 0.200 65);
-}
-
-.dark {
-  --background: oklch(0.12 0.010 240);
-  --foreground: oklch(0.95 0.008 85);
-  --card: oklch(0.17 0.012 240);
-  --card-foreground: oklch(0.95 0.008 85);
-  --popover: oklch(0.17 0.012 240);
-  --popover-foreground: oklch(0.95 0.008 85);
-  --primary: oklch(0.76 0.185 70);         /* Slightly lighter amber for dark */
-  --primary-foreground: oklch(0.10 0 0);
-  --secondary: oklch(0.22 0.015 240);
-  --secondary-foreground: oklch(0.90 0.008 85);
-  --muted: oklch(0.22 0.012 240);
-  --muted-foreground: oklch(0.60 0.015 240);
-  --accent: oklch(0.25 0.025 240);
-  --accent-foreground: oklch(0.90 0.008 85);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.76 0.185 70);
-  --chart-1: oklch(0.76 0.185 70);
-  --chart-2: oklch(0.65 0.180 220);
-  --chart-3: oklch(0.60 0.160 150);
-  --chart-4: oklch(0.70 0.190 30);
-  --chart-5: oklch(0.63 0.170 280);
-  --sidebar: oklch(0.15 0.012 240);
-  --sidebar-foreground: oklch(0.95 0.008 85);
-  --sidebar-primary: oklch(0.76 0.185 70);
-  --sidebar-primary-foreground: oklch(0.10 0 0);
-  --sidebar-accent: oklch(0.22 0.020 240);
-  --sidebar-accent-foreground: oklch(0.90 0.008 85);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.76 0.185 70);
-}
-
+/* ── 4. Base rules ─────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  html {
+    font-family: var(--font-sans);
+    background: var(--pj-ground);
+    color: var(--pj-text);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--pj-ground);
+    color: var(--pj-text);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--pj-amber) 45%, transparent);
+    color: var(--pj-text);
+  }
+  ::placeholder {
+    color: var(--pj-text-faint);
+  }
+  /* One visible focus style for the whole app. Components do not add their own rings. */
+  :focus-visible {
+    outline: 2px solid var(--pj-focus);
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+  button,
+  [role="button"],
+  summary {
+    touch-action: manipulation;
+  }
+}
+
+/* Reduced motion: no looping, no travel. Short opacity and color changes stay. */
+@media (prefers-reduced-motion: reduce) {
   html {
-    @apply font-sans;
-    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: auto;
   }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-    @apply font-semibold tracking-tight;
-  }
-}
-
-/* ── Pijar Utility Classes ─────────────────────────────────── */
-@layer utilities {
-  /* Gradient backgrounds */
-  .pijar-gradient {
-    background: linear-gradient(135deg, oklch(0.76 0.185 70) 0%, oklch(0.65 0.200 50) 100%);
-  }
-  .pijar-gradient-soft {
-    background: linear-gradient(135deg, oklch(0.98 0.025 85) 0%, oklch(0.95 0.055 82) 100%);
-  }
-  .pijar-gradient-hero {
-    background: radial-gradient(ellipse at 30% 50%, oklch(0.95 0.055 82 / 60%) 0%, transparent 60%),
-                radial-gradient(ellipse at 70% 20%, oklch(0.92 0.060 220 / 30%) 0%, transparent 50%),
-                oklch(0.99 0.005 85);
-  }
-  .dark .pijar-gradient-hero {
-    background: radial-gradient(ellipse at 30% 50%, oklch(0.25 0.060 70 / 40%) 0%, transparent 60%),
-                radial-gradient(ellipse at 70% 20%, oklch(0.22 0.050 220 / 30%) 0%, transparent 50%),
-                oklch(0.12 0.010 240);
-  }
-
-  /* Glass effect */
-  .glass {
-    backdrop-filter: blur(16px) saturate(1.8);
-    background: oklch(1 0 0 / 70%);
-    border: 1px solid oklch(1 0 0 / 40%);
-  }
-  .dark .glass {
-    background: oklch(0.17 0.012 240 / 70%);
-    border: 1px solid oklch(1 0 0 / 8%);
-  }
-
-  /* Status node colors */
-  .node-locked         { @apply bg-slate-100 border-slate-300 text-slate-500; }
-  .node-prerequisite   { @apply bg-red-50 border-red-300 text-red-700; }
-  .node-ready          { @apply bg-blue-50 border-blue-300 text-blue-700; }
-  .node-in-progress    { @apply bg-amber-50 border-amber-400 text-amber-800; }
-  .node-completed      { @apply bg-emerald-50 border-emerald-400 text-emerald-800; }
-
-  /* Animation utilities */
-  .animate-fade-in-up {
-    animation: fadeInUp 0.5s ease-out forwards;
-  }
-  .animate-float {
-    animation: float 4s ease-in-out infinite;
-  }
-  .animate-gap-pulse {
-    animation: gapPulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
   }
 }
 
-@keyframes gapPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4), 0 4px 12px rgba(245, 158, 11, 0.12);
+/* Reduced transparency and more contrast: translucent chrome becomes solid with a firm border */
+@media (prefers-reduced-transparency: reduce) {
+  .pj-glass {
+    background: var(--pj-ground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --pj-hairline: rgba(36, 45, 58, 0.45);
+    --pj-hairline-strong: rgba(36, 45, 58, 0.6);
+    --pj-text-muted: #3f4855;
+  }
+}
+
+/* ── 5. Utilities ──────────────────────────────────────────── */
+@utility pj-gutter {
+  padding-inline: var(--pj-gutter);
+  @media (min-width: 768px) {
+    padding-inline: var(--pj-gutter-lg);
+  }
+}
+
+/* Press feedback on pointer down (Apple: respond on press, not release). */
+@utility pj-press {
+  transition: transform var(--pj-dur-press) var(--pj-ease-out);
+  &:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active:not(:disabled) {
+      transform: none;
+    }
+  }
+}
+
+/* Light nav surface: the only translucent material allowed (floating nav pill). */
+@utility pj-glass {
+  background: color-mix(in srgb, var(--pj-ground) 78%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Soft decorative panel: hero and large panels only (CLAUDE.md 8.3 E1). Never on controls or text. */
+@utility pj-panel-soft {
+  background: linear-gradient(180deg, var(--pj-panel-from), var(--pj-panel-to));
+}
+
+/* Skeleton: calm opacity pulse, stops under reduced motion (see the reduce block above). */
+@keyframes pj-pulse {
+  0%,
+  100% {
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0), 0 6px 18px rgba(245, 158, 11, 0.22);
+    opacity: 0.55;
   }
 }
+@utility pj-skeleton {
+  background: var(--pj-surface-strong);
+  animation: pj-pulse 1.6s var(--pj-ease-in-out) infinite;
+}
 
-@media (prefers-reduced-motion: reduce) {
+/* Enter animation for page content: opacity and 8px rise, once. */
+@keyframes pj-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@utility pj-rise {
+  animation: pj-rise var(--pj-dur-slow) var(--pj-ease-out) both;
+  animation-delay: calc(var(--pj-i, 0) * 50ms);
+}
+
+/*
+  ── 6. Legacy compatibility ───────────────────────────────
+  Pages written before the redesign still use these class names. They are mapped to the new tokens
+  so nothing breaks. Do not use them in new code; delete each one when its last user is migrated.
+*/
+@theme inline {
+  --color-pijar-50: color-mix(in srgb, var(--pj-amber) 8%, var(--pj-ground));
+  --color-pijar-100: color-mix(in srgb, var(--pj-amber) 18%, var(--pj-ground));
+  --color-pijar-200: color-mix(in srgb, var(--pj-amber) 32%, var(--pj-ground));
+  --color-pijar-300: color-mix(in srgb, var(--pj-amber) 55%, var(--pj-ground));
+  --color-pijar-400: var(--pj-amber);
+  --color-pijar-500: var(--pj-amber);
+  --color-pijar-600: var(--pj-ink);
+  --color-pijar-700: var(--pj-ink);
+  --color-pijar-800: var(--pj-ink);
+  --color-pijar-900: var(--pj-ink);
+}
+@layer utilities {
+  .pijar-gradient {
+    background: var(--pj-action-bg);
+    color: var(--pj-action-fg);
+  }
+  .pijar-gradient-soft,
+  .pijar-gradient-hero {
+    background: var(--pj-surface);
+  }
+  .glass {
+    background: var(--pj-ground);
+    border: 1px solid var(--pj-hairline);
+  }
+  .node-locked {
+    background: var(--pj-surface);
+    border-color: var(--pj-hairline-strong);
+    color: var(--pj-text-muted);
+  }
+  .node-prerequisite {
+    background: var(--pj-danger);
+    border-color: var(--pj-danger);
+    color: var(--pj-danger-fg);
+  }
+  .node-ready {
+    background: var(--pj-raised);
+    border-color: var(--pj-ink);
+    color: var(--pj-text);
+  }
+  .node-in-progress {
+    background: var(--pj-amber);
+    border-color: var(--pj-amber);
+    color: var(--pj-amber-fg);
+  }
+  .node-completed {
+    background: var(--pj-success);
+    border-color: var(--pj-success);
+    color: var(--pj-success-fg);
+  }
+  .animate-fade-in-up {
+    animation: pj-rise var(--pj-dur-slow) var(--pj-ease-out) both;
+  }
+  .animate-float {
+    animation: none;
+  }
   .animate-gap-pulse {
     animation: none;
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 0 2px var(--pj-amber);
   }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-8px); }
 }
