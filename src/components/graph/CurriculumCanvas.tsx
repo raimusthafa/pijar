@@ -1,354 +1,278 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import {
-  ReactFlow,
-  Background,
-  MiniMap,
-  useReactFlow,
-  ReactFlowProvider,
-  type Node,
-  type Edge,
-  type OnNodesChange,
-  type OnEdgesChange,
-  applyNodeChanges,
-  applyEdgeChanges,
-  MarkerType,
-} from '@xyflow/react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactFlow, ReactFlowProvider, MarkerType, useReactFlow, type Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-
-import type { CurriculumEdge } from '@/types';
+import { ArrowLeft, List as ListIcon, Network } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { buildAdjacencyMaps, recommendNextConcept } from '@/lib/graph/engine';
+import { calculateHierarchicalLayout } from '@/lib/graph/layout';
+import { prerequisitesWithin } from '@/lib/graph/prereq';
 import type { EnrichedConceptNode } from '@/lib/graph/types';
-import { inspectPrerequisiteChain, recommendNextConcept } from '@/lib/graph/engine';
-import { ConceptNodeComponent } from './ConceptNodeComponent';
+import { useT } from '@/lib/i18n/client';
+import type { CurriculumEdge, CurriculumNode } from '@/types';
+import { ConceptNodeComponent, type ConceptFlowNode } from './ConceptNodeComponent';
+import { GraphFilterBar, GraphZoomBar, type GraphFilter } from './GraphControlsBar';
 import { GraphInspector } from './GraphInspector';
-import { GraphControlsBar } from './GraphControlsBar';
 import { GraphLegend } from './GraphLegend';
+import { OutlineView, type OutlineGroup } from './OutlineView';
 
-const nodeTypes = {
-  conceptNode: ConceptNodeComponent,
-};
+const NODE_W = 232;
+const NODE_H = 96;
+const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 88, nodeSpacing: 28, startX: 40, startY: 40 };
+const nodeTypes = { conceptNode: ConceptNodeComponent };
+const PANEL = 376; // inspector width plus its margin on desktop
 
-interface CurriculumCanvasProps {
-  initialNodes: EnrichedConceptNode[];
-  initialEdges: CurriculumEdge[];
-  topicName: string;
-  graphId?: string;
+const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dur = (ms: number) => (reduced() ? 0 : ms);
+const isDesktop = () => window.innerWidth >= 768;
+
+type Placed = EnrichedConceptNode & { x: number; y: number };
+
+export function GraphWorkspaceSkeleton() {
+  return (
+    <div className="flex h-full flex-col" aria-hidden>
+      <div className="flex items-center gap-4 px-5 py-3 md:px-6">
+        <Skeleton className="h-9 w-24 rounded-pill" />
+        <Skeleton className="h-6 w-56" />
+      </div>
+      <div className="min-h-0 flex-1 px-3 pb-3">
+        <Skeleton className="h-full min-h-80 w-full rounded-inner" />
+      </div>
+    </div>
+  );
 }
 
-export function CurriculumCanvas({
-  initialNodes,
-  initialEdges,
-  topicName,
-  graphId,
-}: CurriculumCanvasProps) {
-  return (
-    <ReactFlowProvider>
-      <CurriculumCanvasInner
-        initialNodes={initialNodes}
-        initialEdges={initialEdges}
-        topicName={topicName}
-        graphId={graphId}
-      />
-    </ReactFlowProvider>
-  );
-}
+export function GraphWorkspace({ graphId, topic, nodes, edges }: { graphId: string; topic: string; nodes: CurriculumNode[]; edges: CurriculumEdge[] }) {
+  const { t } = useT();
+  const placed = useMemo(() => calculateHierarchicalLayout(nodes, edges, LAYOUT) as Placed[], [nodes, edges]);
+  const byId = useMemo(() => new Map<string, EnrichedConceptNode>(placed.map((n) => [n.id, n])), [placed]);
+  const prereqs = useMemo(() => buildAdjacencyMaps(nodes, edges).prerequisitesMap, [nodes, edges]);
+  const groups = useMemo<OutlineGroup[]>(() => {
+    const xs = [...new Set(placed.map((n) => n.x))].sort((a, b) => a - b);
+    return xs.map((x, level) => ({ level, nodes: placed.filter((n) => n.x === x).sort((a, b) => a.y - b.y) }));
+  }, [placed]);
 
-function CurriculumCanvasInner({
-  initialNodes,
-  initialEdges,
-  topicName,
-  graphId,
-}: CurriculumCanvasProps) {
-  const { fitView, zoomIn, zoomOut, setCenter } = useReactFlow();
+  const [view, setView] = useState<'map' | 'list' | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [shownId, setShownId] = useState<string | null>(null);
+  const viaKeyboard = useRef(false);
+  const panelRef = useRef<HTMLElement>(null);
 
-  // Selected node state
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  // Highlighted prerequisite chain state
-  const [highlightedChain, setHighlightedChain] = useState<Set<string> | null>(null);
-  // Filter state
-  const [activeFilter, setActiveFilter] = useState<'all' | 'gaps' | 'ready'>('all');
+  // Phones get the outline first: a canvas is a poor fit for a thumb.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setView(isDesktop() ? 'map' : 'list'));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
-  // Node Map lookup
-  const allNodesMap = useMemo(() => {
-    return new Map(initialNodes.map(n => [n.id, n]));
-  }, [initialNodes]);
-
-  // Compute recommendation
-  const recommendation = useMemo(() => {
-    return recommendNextConcept(initialNodes, initialEdges);
-  }, [initialNodes, initialEdges]);
-
-  // Selected node object
-  const selectedNode = useMemo(() => {
-    if (!selectedNodeId) return null;
-    return allNodesMap.get(selectedNodeId) || null;
-  }, [selectedNodeId, allNodesMap]);
-
-  // Calculate chain info for selected node
-  const chainInfo = useMemo(() => {
-    if (!selectedNodeId) return null;
-    return inspectPrerequisiteChain(selectedNodeId, initialNodes, initialEdges);
-  }, [selectedNodeId, initialNodes, initialEdges]);
-
-  // Focus a node on the canvas smoothly
-  const handleFocusNode = useCallback((nodeId: string) => {
-    const node = allNodesMap.get(nodeId);
-    if (!node || node.x === undefined || node.y === undefined) return;
-
-    // Node is ~250px wide and ~110px tall
-    setCenter(node.x + 125, node.y + 55, {
-      zoom: 1.15,
-      duration: 800,
-    });
-  }, [allNodesMap, setCenter]);
-
-  // Node selection handler
-  const handleSelectNode = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    handleFocusNode(nodeId);
-  }, [handleFocusNode]);
-
-  // Highlight prerequisite chain toggle
-  const handleHighlightChain = useCallback((nodeId: string) => {
-    if (highlightedChain) {
-      setHighlightedChain(null);
-      return;
-    }
-
-    const chain = inspectPrerequisiteChain(nodeId, initialNodes, initialEdges);
-    const chainSet = new Set<string>([
-      nodeId,
-      ...chain.allAncestors,
-      ...chain.unlockedDownstream,
-    ]);
-    setHighlightedChain(chainSet);
-  }, [highlightedChain, initialNodes, initialEdges]);
-
-  // Focus top recommended concept
-  const handleFocusRecommendation = useCallback(() => {
-    if (recommendation.recommendedNode) {
-      setSelectedNodeId(recommendation.recommendedNode.id);
-      handleFocusNode(recommendation.recommendedNode.id);
-    }
-  }, [recommendation, handleFocusNode]);
-
-  // Build React Flow Nodes
-  const rfNodes: Node[] = useMemo(() => {
-    return initialNodes.map(n => {
-      const isSelected = n.id === selectedNodeId;
-      const isRecommended = recommendation.recommendedNode?.id === n.id;
-
-      // Filtering logic
-      let isDimmed = false;
-      if (activeFilter === 'gaps' && n.status !== 'prerequisite_gap') {
-        isDimmed = true;
-      } else if (activeFilter === 'ready' && n.status !== 'ready' && n.status !== 'prerequisite_gap') {
-        isDimmed = true;
-      }
-
-      // Path highlight dimming
-      let isPathHighlighted = false;
-      if (highlightedChain) {
-        if (highlightedChain.has(n.id)) {
-          isPathHighlighted = true;
-        } else {
-          isDimmed = true;
-        }
-      }
-
-      return {
-        id: n.id,
-        type: 'conceptNode',
-        position: { x: n.x ?? 0, y: n.y ?? 0 },
-        data: {
-          node: n,
-          isSelected,
-          isDimmed,
-          isPathHighlighted,
-          isRecommendedTarget: isRecommended,
-          onSelect: handleSelectNode,
-        },
-      };
-    });
-  }, [initialNodes, selectedNodeId, recommendation, activeFilter, highlightedChain, handleSelectNode]);
-
-  // Build React Flow Edges
-  const rfEdges: Edge[] = useMemo(() => {
-    return initialEdges.map(e => {
-      const isSourceSelected = e.source === selectedNodeId;
-      const isTargetSelected = e.target === selectedNodeId;
-      const isConnectedToSelected = isSourceSelected || isTargetSelected;
-
-      let isPathActive = false;
-      let isDimmed = false;
-
-      if (highlightedChain) {
-        if (highlightedChain.has(e.source) && highlightedChain.has(e.target)) {
-          isPathActive = true;
-        } else {
-          isDimmed = true;
-        }
-      }
-
-      const targetNode = allNodesMap.get(e.target);
-      const isPrerequisiteGapTarget = targetNode?.status === 'prerequisite_gap';
-
-      return {
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: 'smoothstep',
-        animated: isConnectedToSelected || isPathActive || isPrerequisiteGapTarget,
-        style: {
-          stroke: isConnectedToSelected || isPathActive
-            ? '#f59e0b' // Amber brand
-            : isPrerequisiteGapTarget
-            ? '#fb923c' // Warm coral
-            : 'rgba(156, 163, 175, 0.4)',
-          strokeWidth: isConnectedToSelected || isPathActive ? 2.5 : 1.75,
-          opacity: isDimmed ? 0.15 : 1,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: isConnectedToSelected || isPathActive
-            ? '#f59e0b'
-            : isPrerequisiteGapTarget
-            ? '#fb923c'
-            : 'rgba(156, 163, 175, 0.6)',
-          width: 14,
-          height: 14,
-        },
-        label: e.label,
-        labelStyle: {
-          fontSize: 10,
-          fontWeight: 600,
-          fill: '#6b7280',
-        },
-        labelBgStyle: {
-          fill: 'var(--color-card, #ffffff)',
-          fillOpacity: 0.85,
-        },
-        labelBgPadding: [4, 2] as [number, number],
-        labelBgBorderRadius: 4,
-      };
-    });
-  }, [initialEdges, selectedNodeId, highlightedChain, allNodesMap]);
-
-  // Internal node/edge state for dragging
-  const [nodes, setNodes] = useState<Node[]>(rfNodes);
-  const [edges, setEdges] = useState<Edge[]>(rfEdges);
+  const select = useCallback((id: string, kb = false) => {
+    viaKeyboard.current = kb;
+    setSelectedId(id);
+    setShownId(id);
+  }, []);
 
   useEffect(() => {
-    setNodes(rfNodes);
-  }, [rfNodes]);
+    if (selectedId && viaKeyboard.current) panelRef.current?.focus();
+  }, [selectedId]);
 
-  useEffect(() => {
-    setEdges(rfEdges);
-  }, [rfEdges]);
+  const close = useCallback(() => {
+    setSelectedId(null);
+    if (viaKeyboard.current && shownId) requestAnimationFrame(() => document.getElementById(`gnode-${shownId}`)?.focus());
+  }, [shownId]);
 
-  const onNodesChange: OnNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    []
-  );
-
-  const onEdgesChange: OnEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    []
-  );
-
-  // Initial fit-view on mount
-  const hasFitViewRef = useRef(false);
-  useEffect(() => {
-    if (!hasFitViewRef.current && nodes.length > 0) {
-      hasFitViewRef.current = true;
-      const timer = setTimeout(() => {
-        fitView({ padding: 0.2, duration: 600 });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [fitView, nodes]);
+  const done = placed.filter((n) => n.status === 'completed').length;
+  const pct = placed.length ? Math.round((done / placed.length) * 100) : 0;
 
   return (
-    <div className="relative w-full h-full flex flex-col md:flex-row overflow-hidden bg-background">
-      {/* ── Graph Workspace ───────────────────────────────────── */}
-      <div className="relative flex-1 h-full min-h-[500px]">
-        {/* Controls Bar (Zoom, Fit, Filter, Focus Recommendation) */}
-        <GraphControlsBar
-          onFitView={() => fitView({ padding: 0.2, duration: 500 })}
-          onZoomIn={() => zoomIn({ duration: 300 })}
-          onZoomOut={() => zoomOut({ duration: 300 })}
-          onResetView={() => fitView({ padding: 0.25, duration: 500 })}
-          onFocusRecommendation={handleFocusRecommendation}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          hasRecommendation={Boolean(recommendation.recommendedNode)}
-        />
+    <div
+      className="relative flex h-full min-h-[28rem] flex-col"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && selectedId) close();
+      }}
+    >
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline px-4 py-3 md:px-6">
+        <Button variant="ghost" size="sm" render={<Link href="/graph" />} nativeButton={false} className="-ml-2">
+          <ArrowLeft strokeWidth={1.75} aria-hidden />
+          {t('graph.back')}
+        </Button>
+        <h1 className="min-w-0 flex-1 truncate font-display text-h4 font-semibold">{topic}</h1>
+        <div className="flex items-center gap-3 max-sm:order-last max-sm:w-full">
+          <Progress value={pct} aria-label={t('graph.map.progress', { done, total: placed.length })} className="w-28 flex-none max-sm:flex-1" />
+          <span className="text-sm text-muted-foreground tabular-nums">{t('graph.map.progress', { done, total: placed.length })}</span>
+        </div>
+        <Tabs value={view ?? 'map'} onValueChange={(v) => setView(v as 'map' | 'list')}>
+          <TabsList aria-label={t('graph.view.label')}>
+            <TabsTrigger value="map"><Network strokeWidth={1.75} aria-hidden />{t('graph.view.map')}</TabsTrigger>
+            <TabsTrigger value="list"><ListIcon strokeWidth={1.75} aria-hidden />{t('graph.view.list')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </header>
 
-        {/* React Flow Canvas */}
-        <ReactFlow
-          nodes={nodes}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {view === null && <Skeleton className="m-3 h-[calc(100%-1.5rem)] rounded-inner" aria-hidden />}
+        {view === 'map' && (
+          <ReactFlowProvider>
+            <MapCanvas placed={placed} edges={edges} selectedId={selectedId} onSelect={select} onClear={close} />
+          </ReactFlowProvider>
+        )}
+        {view === 'list' && (
+          <OutlineView groups={groups} selectedId={selectedId} onSelect={select} prereqs={prereqs} padBottom={Boolean(selectedId)} />
+        )}
+        <GraphInspector
+          ref={panelRef}
+          node={shownId ? (byId.get(shownId) ?? null) : null}
+          open={Boolean(selectedId)}
+          nodes={byId}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          onPaneClick={() => {
-            setSelectedNodeId(null);
-            setHighlightedChain(null);
-          }}
-          minZoom={0.3}
-          maxZoom={1.8}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
-          proOptions={{ hideAttribution: true }}
-          className="bg-dot-pattern select-none"
-        >
-          {/* Subtle Grid Background */}
-          <Background
-            gap={24}
-            size={1.5}
-            color="rgba(156, 163, 175, 0.2)"
-          />
+          graphId={graphId}
+          topic={topic}
+          onClose={close}
+          onSelect={select}
+        />
+      </div>
+    </div>
+  );
+}
 
-          {/* MiniMap */}
-          <MiniMap
-            nodeColor={(n) => {
-              const nd = (n.data as unknown as { node?: EnrichedConceptNode })?.node;
-              if (nd?.status === 'completed') return '#10b981';
-              if (nd?.status === 'prerequisite_gap') return '#f59e0b';
-              if (nd?.status === 'ready') return '#fbbf24';
-              if (nd?.status === 'in_progress') return '#0284c7';
-              return '#9ca3af';
-            }}
-            nodeStrokeWidth={2}
-            zoomable
-            pannable
-            className="!hidden lg:!block !rounded-2xl !border !border-border/70 !bg-card/90 !shadow-lg !bottom-5 !right-5 !m-0"
-            style={{ width: 140, height: 95 }}
-          />
-        </ReactFlow>
+function MapCanvas({
+  placed,
+  edges,
+  selectedId,
+  onSelect,
+  onClear,
+}: {
+  placed: Placed[];
+  edges: CurriculumEdge[];
+  selectedId: string | null;
+  onSelect: (id: string, kb?: boolean) => void;
+  onClear: () => void;
+}) {
+  const { t } = useT();
+  const { fitView, zoomIn, zoomOut, setCenter, getZoom, flowToScreenPosition } = useReactFlow();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<GraphFilter>('all');
+  const [roving, setRoving] = useState<string | null>(placed[0]?.id ?? null);
+  const posOf = useMemo(() => new Map(placed.map((n) => [n.id, n])), [placed]);
+  const recommended = useMemo(() => recommendNextConcept(placed, edges).recommendedNode, [placed, edges]);
+  const path = useMemo(() => (selectedId ? prerequisitesWithin(selectedId, edges) : null), [selectedId, edges]);
 
-        {/* Legend */}
+  const pick = useCallback((id: string, kb = false) => {
+    setRoving(id);
+    onSelect(id, kb);
+  }, [onSelect]);
+
+  // Arrow keys jump to the nearest concept in that direction.
+  const onArrow = useCallback((id: string, key: string) => {
+    const from = posOf.get(id);
+    if (!from) return;
+    const dir = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[key];
+    if (!dir) return;
+    let best: { id: string; score: number } | null = null;
+    for (const n of placed) {
+      if (n.id === id) continue;
+      const dx = n.x - from.x, dy = n.y - from.y;
+      const along = dx * dir[0] + dy * dir[1];
+      if (along <= 0) continue;
+      const score = along + 2 * Math.abs(dx * dir[1] + dy * dir[0]);
+      if (!best || score < best.score) best = { id: n.id, score };
+    }
+    if (best) {
+      setRoving(best.id);
+      document.getElementById(`gnode-${best.id}`)?.focus();
+    }
+  }, [placed, posOf]);
+
+  // Keep the selected concept and its prerequisite path clear of the inspector, panning only when part of it would be hidden.
+  useEffect(() => {
+    const el = wrapRef.current;
+    const ids = selectedId ? [selectedId, ...(path?.level.keys() ?? [])] : [];
+    const boxes = ids.map((id) => posOf.get(id)).filter((n): n is Placed => Boolean(n));
+    if (!boxes.length || !el) return;
+    const x0 = Math.min(...boxes.map((n) => n.x)), x1 = Math.max(...boxes.map((n) => n.x)) + NODE_W;
+    const y0 = Math.min(...boxes.map((n) => n.y)), y1 = Math.max(...boxes.map((n) => n.y)) + NODE_H;
+    const r = el.getBoundingClientRect();
+    const desktop = isDesktop();
+    const z = getZoom();
+    const tl = flowToScreenPosition({ x: x0, y: y0 });
+    const fits =
+      tl.x >= r.left + 16 &&
+      tl.x + (x1 - x0) * z <= r.right - 16 - (desktop ? PANEL : 0) &&
+      tl.y >= r.top + 56 &&
+      tl.y + (y1 - y0) * z <= r.bottom - 16 - (desktop ? 0 : r.height * 0.78);
+    if (fits) return;
+    setCenter((x0 + x1) / 2 + (desktop ? PANEL / 2 / z : 0), (y0 + y1) / 2 + (desktop ? 0 : (r.height * 0.39) / z), { zoom: z, duration: dur(350) });
+  }, [selectedId, path, posOf, getZoom, flowToScreenPosition, setCenter]);
+
+  const rfNodes = useMemo<ConceptFlowNode[]>(() => placed.map((n) => {
+    const onPath = Boolean(path?.level.has(n.id));
+    const matches = filter === 'all' || n.status === 'prerequisite_gap' || (filter === 'ready' && n.status === 'ready');
+    return {
+      id: n.id,
+      type: 'conceptNode',
+      position: { x: n.x, y: n.y },
+      data: {
+        node: n,
+        selected: n.id === selectedId,
+        onPath,
+        dimmed: !matches || Boolean(selectedId && n.id !== selectedId && !onPath),
+        tabbable: n.id === roving,
+        onSelect: pick,
+        onArrow,
+      },
+    };
+  }), [placed, path, filter, selectedId, roving, pick, onArrow]);
+
+  const rfEdges = useMemo<Edge[]>(() => edges.map((e) => {
+    const active = Boolean(path?.edgeIds.has(e.id));
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      style: {
+        stroke: 'var(--pj-text)',
+        strokeWidth: active ? 2 : 1,
+        opacity: active ? 0.9 : selectedId ? 0.1 : 0.25,
+        transition: 'opacity 200ms cubic-bezier(0.23, 1, 0.32, 1)',
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: active ? 'var(--pj-text)' : 'var(--pj-text-muted)' },
+    };
+  }), [edges, path, selectedId]);
+
+  const fit = useCallback(() => fitView({ padding: 0.12, maxZoom: 1.25, duration: dur(300) }), [fitView]);
+
+  return (
+    <div ref={wrapRef} role="group" aria-label={t('graph.canvas.label')} className="relative h-full">
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.15, maxZoom: 1.25 }}
+        minZoom={0.4}
+        maxZoom={1.6}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        nodesFocusable={false}
+        edgesFocusable={false}
+        onPaneClick={onClear}
+        proOptions={{ hideAttribution: true }}
+        className="bg-background!"
+      />
+      <GraphFilterBar
+        filter={filter}
+        onFilter={setFilter}
+        hasNext={Boolean(recommended)}
+        onNext={() => recommended && pick(recommended.id)}
+      />
+      <div className="absolute bottom-3 left-3 z-10 flex items-end gap-3">
+        <GraphZoomBar onZoomIn={() => zoomIn({ duration: dur(200) })} onZoomOut={() => zoomOut({ duration: dur(200) })} onFit={fit} />
         <GraphLegend />
       </div>
-
-      {/* ── Concept Inspector Panel (Desktop Sidebar / Mobile Overlay) */}
-      {selectedNode && (
-        <GraphInspector
-          selectedNode={selectedNode}
-          chainInfo={chainInfo}
-          allNodesMap={allNodesMap}
-          onClose={() => {
-            setSelectedNodeId(null);
-            setHighlightedChain(null);
-          }}
-          onSelectNode={handleSelectNode}
-          onFocusNode={handleFocusNode}
-          onHighlightChain={handleHighlightChain}
-          isChainHighlighted={Boolean(highlightedChain)}
-          graphId={graphId}
-          topic={topicName}
-        />
-      )}
     </div>
   );
 }

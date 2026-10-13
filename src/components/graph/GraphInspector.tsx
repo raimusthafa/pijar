@@ -1,301 +1,145 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
-import {
-  X,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-  Play,
-  ArrowRight,
-  Clock,
-  Compass,
-  Layers,
-  ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
-  GitFork,
-  BookOpen,
-} from 'lucide-react';
-import type { EnrichedConceptNode, PrerequisiteChainResult } from '@/lib/graph/types';
+import { forwardRef, useMemo } from 'react';
+import { PencilRuler, RotateCcw, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { prerequisitesWithin } from '@/lib/graph/prereq';
+import type { EnrichedConceptNode } from '@/lib/graph/types';
+import { useT } from '@/lib/i18n/client';
+import { cn } from '@/lib/utils';
+import type { CurriculumEdge } from '@/types';
+import { StatusChip } from './StatusChip';
 
-interface GraphInspectorProps {
-  selectedNode: EnrichedConceptNode | null;
-  chainInfo: PrerequisiteChainResult | null;
-  allNodesMap: Map<string, EnrichedConceptNode>;
+type Props = {
+  node: EnrichedConceptNode | null;
+  open: boolean;
+  nodes: Map<string, EnrichedConceptNode>;
+  edges: CurriculumEdge[];
+  graphId: string;
+  topic: string;
   onClose: () => void;
-  onSelectNode: (nodeId: string) => void;
-  onFocusNode: (nodeId: string) => void;
-  onHighlightChain: (nodeId: string) => void;
-  isChainHighlighted: boolean;
-  graphId?: string;
-  topic?: string;
+  onSelect: (id: string) => void;
+};
+
+function PrereqList({ ids, nodes, edges, to, onSelect }: { ids: string[]; nodes: Map<string, EnrichedConceptNode>; edges: CurriculumEdge[]; to: string; onSelect: (id: string) => void }) {
+  return (
+    <ul className="grid gap-1">
+      {ids.map((id) => {
+        const n = nodes.get(id);
+        if (!n) return null;
+        const why = edges.find((e) => e.source === id && e.target === to)?.label;
+        return (
+          <li key={id}>
+            <button
+              type="button"
+              onClick={() => onSelect(id)}
+              className="pj-press flex min-h-11 w-full items-center gap-3 rounded-control px-2 py-1.5 text-left transition-colors duration-150 hover:bg-hover"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{n.label}</span>
+                {why && <span className="block truncate text-xs text-muted-foreground">{why}</span>}
+              </span>
+              <StatusChip status={n.status} />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
-export function GraphInspector({
-  selectedNode,
-  chainInfo,
-  allNodesMap,
-  onClose,
-  onSelectNode,
-  onFocusNode,
-  onHighlightChain,
-  isChainHighlighted,
-  graphId = 'demo-graph',
-  topic,
-}: GraphInspectorProps) {
-  if (!selectedNode) return null;
-
-  const isGap = selectedNode.status === 'prerequisite_gap' || selectedNode.is_gap;
-  const isCompleted = selectedNode.status === 'completed';
-  const isReady = selectedNode.status === 'ready';
-  const isLocked = selectedNode.status === 'locked';
-
-  const directPrereqNodes = (chainInfo?.directPrerequisites || [])
-    .map(id => allNodesMap.get(id))
-    .filter((n): n is EnrichedConceptNode => Boolean(n));
-
-  const downstreamNodes = (chainInfo?.unlockedDownstream || [])
-    .map(id => allNodesMap.get(id))
-    .filter((n): n is EnrichedConceptNode => Boolean(n));
-
-  const unresolvedPrereqs = (chainInfo?.unresolvedPrerequisites || [])
-    .map(id => allNodesMap.get(id))
-    .filter((n): n is EnrichedConceptNode => Boolean(n));
+/** Right panel on desktop, bottom sheet below md. Stays mounted so open and close are the same interruptible transition. */
+export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspector(
+  { node, open, nodes, edges, graphId, topic, onClose, onSelect },
+  ref,
+) {
+  const { t } = useT();
+  const chain = useMemo(() => (node ? prerequisitesWithin(node.id, edges) : null), [node, edges]);
+  const direct = chain ? [...chain.level].filter(([, l]) => l === 1).map(([id]) => id) : [];
+  const deeper = chain ? [...chain.level].filter(([, l]) => l === 2).map(([id]) => id) : [];
+  const unresolved = direct.find((id) => nodes.get(id)?.status !== 'completed');
+  const redirectToPrereq = node?.status === 'locked' && unresolved;
+  const learnId = redirectToPrereq ? unresolved : node?.id;
 
   return (
-    <aside className="w-full md:w-[380px] lg:w-[420px] h-full bg-card/95 backdrop-blur-xl border-l border-border/70 flex flex-col shadow-2xl z-20 animate-fade-in-up">
-      {/* ── Inspector Header ─────────────────────────────────── */}
-      <div className="p-5 border-b border-border/60 flex items-start justify-between gap-3 bg-muted/20">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-0.5 rounded bg-muted">
-              {selectedNode.category}
-            </span>
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                isCompleted
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                  : isGap
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                  : isReady
-                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                  : 'bg-muted text-muted-foreground border border-border/50'
-              }`}
-            >
-              {isCompleted ? (
-                <>
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                  Dikuasai
-                </>
-              ) : isGap ? (
-                <>
-                  <AlertTriangle className="w-3 h-3 text-amber-500" />
-                  Gap Prasyarat
-                </>
-              ) : isReady ? (
-                <>
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  Siap Belajar
-                </>
-              ) : (
-                <>
-                  <Lock className="w-3 h-3 text-muted-foreground" />
-                  Terkunci
-                </>
-              )}
-            </span>
-          </div>
-          <h2 className="text-xl font-bold text-foreground leading-snug">
-            {selectedNode.label}
-          </h2>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          aria-label="Tutup panel inspector"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* ── Scrollable Inspector Content ─────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 text-sm">
-        {/* Description */}
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-            Ikhtisar Konsep
-          </h3>
-          <p className="text-foreground/90 leading-relaxed text-sm">
-            {selectedNode.description}
-          </p>
-          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-500" />
-              Estimasi Waktu: <strong className="text-foreground">{selectedNode.estimated_minutes} Menit</strong>
-            </span>
-          </div>
-        </div>
-
-        {/* ── Root Gap Justification (If Gap Node) ───────────── */}
-        {isGap && (
-          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 relative overflow-hidden">
-            <div className="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400 font-bold text-xs">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              Akar Kesenjangan Pengetahuan (Root Knowledge Gap)
+    <aside
+      ref={ref}
+      tabIndex={-1}
+      inert={!open}
+      aria-hidden={!open}
+      aria-label={t('graph.insp.label')}
+      className={cn(
+        'absolute z-20 flex flex-col overflow-hidden border border-hairline bg-raised outline-none',
+        'inset-x-0 bottom-0 max-h-[78%] rounded-t-card border-b-0',
+        'md:inset-x-auto md:top-3 md:right-3 md:bottom-3 md:max-h-none md:w-[360px] md:rounded-card md:border-b',
+        'transition-[transform,opacity] duration-300 ease-drawer motion-reduce:transition-none',
+        open ? 'translate-y-0 opacity-100 md:translate-x-0' : 'pointer-events-none translate-y-full opacity-0 md:translate-x-4 md:translate-y-0',
+      )}
+    >
+      {node && (
+        <>
+          <div className="flex items-start gap-3 px-5 pt-5">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusChip status={node.status} />
+                {node.estimated_minutes > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{t('graph.node.minutes', { n: node.estimated_minutes })}</span>
+                )}
+              </div>
+              <h2 className="mt-3 font-display text-h4 font-semibold">{node.label}</h2>
+              {node.category && <p className="mt-0.5 text-xs text-muted-foreground">{node.category}</p>}
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {selectedNode.justification ||
-                'Konsep ini teridentifikasi sebagai prasyarat fundamental yang belum dikuasai pada hasil pre-test. Menguasai materi ini wajib dilakukan sebelum mempelajari konsep turunan berikutnya.'}
-            </p>
+            <Button variant="ghost" size="icon-sm" aria-label={t('graph.insp.close')} onClick={onClose}>
+              <X strokeWidth={1.75} aria-hidden />
+            </Button>
           </div>
-        )}
 
-        {/* ── Prerequisite Readiness Status ──────────────────── */}
-        <div className="p-3.5 rounded-xl border border-border bg-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Status Prasyarat
-            </span>
-            {chainInfo?.isBlocked ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                Terblokir Prasyarat
-              </span>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {node.description && <p className="text-sm">{node.description}</p>}
+            {node.justification && (
+              <div className="mt-4">
+                <h3 className="text-xs font-medium text-muted-foreground">{t('graph.insp.why')}</h3>
+                <p className="mt-1 text-sm">{node.justification}</p>
+              </div>
+            )}
+
+            <Separator className="my-4" />
+
+            <h3 className="mb-1 text-xs font-medium text-muted-foreground">{t('graph.insp.prereq')}</h3>
+            {direct.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('graph.insp.prereq.none')}</p>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Prasyarat Terpenuhi
-              </span>
+              <PrereqList ids={direct} nodes={nodes} edges={edges} to={node.id} onSelect={onSelect} />
+            )}
+            {deeper.length > 0 && (
+              <>
+                <h3 className="mt-4 mb-1 text-xs font-medium text-muted-foreground">{t('graph.insp.prereq.deeper')}</h3>
+                <PrereqList ids={deeper} nodes={nodes} edges={edges} to="" onSelect={onSelect} />
+                <p className="mt-2 text-xs text-muted-foreground">{t('graph.insp.prereq.note')}</p>
+              </>
             )}
           </div>
 
-          {chainInfo?.isBlocked ? (
-            <div className="text-xs text-muted-foreground">
-              Ada <strong className="text-rose-500 font-semibold">{unresolvedPrereqs.length} materi prasyarat</strong> yang harus dituntaskan terlebih dahulu sebelum kamu bisa memahami konsep ini dengan baik.
+          <div className="grid gap-2 border-t border-hairline px-5 py-4">
+            {redirectToPrereq && <p className="text-xs text-muted-foreground">{t('graph.insp.blocked')}</p>}
+            <Button render={<Link href={`/learn/${graphId}/${learnId}`} />} nativeButton={false} size="lg" className="w-full">
+              {t(redirectToPrereq ? 'graph.insp.learn.prereq' : 'graph.insp.learn')}
+            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" render={<Link href={`/workspace/${graphId}/${node.id}`} />} nativeButton={false}>
+                <PencilRuler strokeWidth={1.75} aria-hidden />
+                {t('graph.insp.workspace')}
+              </Button>
+              <Button variant="secondary" render={<Link href={`/diagnostic?topic=${encodeURIComponent(topic)}`} />} nativeButton={false}>
+                <RotateCcw strokeWidth={1.75} aria-hidden />
+                {t('graph.insp.retake')}
+              </Button>
             </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">
-              Kamu sudah menguasai seluruh fondasi yang dibutuhkan untuk mempelajari materi ini dengan mudah!
-            </div>
-          )}
-        </div>
-
-        {/* ── Direct Prerequisites List ──────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5" />
-              Prasyarat Langsung ({directPrereqNodes.length})
-            </h3>
-            <span className="text-[10px] text-muted-foreground">Materi Sebelum</span>
           </div>
-
-          {directPrereqNodes.length === 0 ? (
-            <div className="p-3 rounded-xl border border-dashed border-border/80 text-xs text-muted-foreground bg-muted/20">
-              🌱 <strong>Fondasi Awal:</strong> Konsep ini tidak memerlukan prasyarat materi lain dan dapat langsung dipelajari.
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {directPrereqNodes.map(prereq => (
-                <button
-                  key={prereq.id}
-                  onClick={() => onSelectNode(prereq.id)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border/70 bg-card hover:bg-muted/50 transition-colors text-left group"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {prereq.status === 'completed' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    ) : prereq.status === 'prerequisite_gap' ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    ) : (
-                      <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    )}
-                    <span className="text-xs font-semibold text-foreground truncate group-hover:text-amber-500 transition-colors">
-                      {prereq.label}
-                    </span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Unlocked Downstream Concepts ───────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <GitFork className="w-3.5 h-3.5" />
-              Materi Terbuka Berikutnya ({downstreamNodes.length})
-            </h3>
-            <span className="text-[10px] text-muted-foreground">Materi Sesudah</span>
-          </div>
-
-          {downstreamNodes.length === 0 ? (
-            <div className="p-3 rounded-xl border border-dashed border-border/80 text-xs text-muted-foreground bg-muted/20">
-              🎯 <strong>Materi Puncak:</strong> Konsep capaian lanjutan dalam kurikulum ini.
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {downstreamNodes.map(child => (
-                <button
-                  key={child.id}
-                  onClick={() => onSelectNode(child.id)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border/70 bg-card hover:bg-muted/50 transition-colors text-left group"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold text-foreground truncate group-hover:text-amber-500 transition-colors">
-                      {child.label}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground group-hover:text-foreground shrink-0">
-                    ~{child.estimated_minutes}m
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Inspector Bottom Actions ─────────────────────────── */}
-      <div className="p-4 border-t border-border/60 bg-card space-y-2.5">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onFocusNode(selectedNode.id)}
-            className="px-3 py-2 rounded-xl text-xs font-medium border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Compass className="w-3.5 h-3.5 text-muted-foreground" />
-            Pusatkan Graf
-          </button>
-
-          <button
-            onClick={() => onHighlightChain(selectedNode.id)}
-            className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors flex items-center justify-center gap-1.5 ${
-              isChainHighlighted
-                ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : 'border-border hover:bg-muted text-muted-foreground'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            {isChainHighlighted ? 'Reset Sorotan' : 'Sorot Rantai'}
-          </button>
-        </div>
-
-        {/* Start / Learn Action */}
-        <Link
-          href={`/learn/${graphId}/${selectedNode.id}${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`}
-          className="w-full py-3 rounded-xl font-bold text-sm text-white pijar-gradient shadow-md shadow-amber-500/20 hover:shadow-amber-500/35 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
-        >
-          <BookOpen className="w-4 h-4" />
-          {isCompleted ? 'Ulas Kembali Materi' : 'Mulai Belajar Materi Ini'}
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
+        </>
+      )}
     </aside>
   );
-}
+});

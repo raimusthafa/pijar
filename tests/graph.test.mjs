@@ -11,6 +11,7 @@ import {
   getAllAncestors,
   getAllDescendants,
 } from '../src/lib/graph/engine.ts';
+import { prerequisitesWithin } from '../src/lib/graph/prereq.ts';
 
 describe('PIJAR Knowledge Graph & Prerequisite Engine Test Suite', () => {
   const sampleNodes = [
@@ -124,5 +125,18 @@ describe('PIJAR Knowledge Graph & Prerequisite Engine Test Suite', () => {
 
     const descendantsOfMath = getAllDescendants('math', dependentsMap);
     assert.deepEqual(descendantsOfMath.sort(), ['rekursi', 'trees'].sort());
+  });
+  test('Skenario 10: prerequisitesWithin berhenti di dua level', () => {
+    const edges = [
+      { id: 'a', source: 'n1', target: 'n2' },
+      { id: 'b', source: 'n2', target: 'n3' },
+      { id: 'c', source: 'n3', target: 'n4' },
+      { id: 'd', source: 'n0', target: 'n3' },
+    ];
+    const { level, edgeIds } = prerequisitesWithin('n4', edges);
+    assert.deepEqual([...level].sort(), [['n0', 2], ['n2', 2], ['n3', 1]]);
+    assert.deepEqual([...edgeIds].sort(), ['b', 'c', 'd']);
+    assert.equal(prerequisitesWithin('n1', edges).level.size, 0);
+    assert.equal(prerequisitesWithin('n4', edges, 3).level.get('n1'), 3);
   });
 });
