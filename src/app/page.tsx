@@ -1,184 +1,195 @@
 import Link from 'next/link';
-import { ArrowRight, Brain, GitBranch, Sparkles, Zap, BookOpen, Target } from 'lucide-react';
+import { Database, Route, Send, ShieldOff, Trash2, Waypoints, Network } from 'lucide-react';
+import { Logo } from '@/components/brand/Logo';
+import { Button } from '@/components/ui/button';
+import { Footer } from '@/components/shell/Footer';
+import { LocaleSwitch } from '@/components/shell/LocaleSwitch';
+import { MarketingNav } from '@/components/shell/MarketingNav';
+import { ConceptMap } from '@/components/landing/ConceptMap';
+import { HeroObject } from '@/components/landing/HeroObject';
+import { MathDemo } from '@/components/landing/MathDemo';
+import { Particles } from '@/components/landing/Particles';
+import { Reveal } from '@/components/landing/Reveal';
+import { StepCarousel } from '@/components/landing/StepCarousel';
+import { getT } from '@/lib/i18n/server';
 
-export default function LandingPage() {
+const SKY = 'bg-[linear-gradient(180deg,var(--pj-hero-from),var(--pj-hero-to))]';
+const ICON = { strokeWidth: 1.75 } as const;
+
+function Chip({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col min-h-full">
-      {/* ── Navbar ─────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 glass border-b border-border/60">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg pijar-gradient flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+    <span className="inline-flex h-9 w-fit items-center gap-2 rounded-pill border border-hairline bg-raised pr-4 pl-3 text-sm font-medium [&>svg]:size-4">
+      {icon}
+      {children}
+    </span>
+  );
+}
+
+function Title({ a, b, icon, className }: { a: string; b: string; icon?: React.ReactNode; className?: string }) {
+  return (
+    <h2 className={`text-h2 text-center text-balance ${className ?? ''}`}>
+      <span className="text-foreground">{a}</span>
+      {icon && (
+        <span aria-hidden="true" className="mx-2 hidden sm:inline-flex size-[0.95em] translate-y-[0.08em] items-center justify-center rounded-inner bg-surface align-baseline [&>svg]:size-[0.5em]">
+          {icon}
+        </span>
+      )}{' '}
+      <span className="text-foreground/50">{b}</span>
+    </h2>
+  );
+}
+
+export default async function LandingPage() {
+  const { t } = await getT();
+
+  return (
+    <>
+      <MarketingNav revealAfterId="hero" />
+      <main className="flex flex-col">
+        {/* Hero: inset rounded frame with a soft sky (E1) and a decorative 3D node object (E2). */}
+        <section id="hero" className="p-3">
+          <div className={`relative isolate overflow-hidden rounded-card-lg ${SKY}`}>
+            <Particles className="absolute inset-0 -z-10 size-full" />
+            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-5 pt-3 md:px-9">
+              <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill">
+                <Logo size={30} wordmark />
+              </Link>
+              <div className="hidden items-center gap-1 md:flex">
+                <Link href="/#cara-kerja" className="pj-press inline-flex h-9 items-center rounded-pill px-4 text-sm font-medium text-foreground/80 hover:bg-white/50">
+                  {t('shell.nav.howItWorks')}
+                </Link>
+                <Link href="/#fitur" className="pj-press inline-flex h-9 items-center rounded-pill px-4 text-sm font-medium text-foreground/80 hover:bg-white/50">
+                  {t('shell.nav.features')}
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <LocaleSwitch className="hidden md:inline-flex" />
+                <Button variant="ghost" size="sm" render={<Link href="/auth/login" />} nativeButton={false}>
+                  {t('common.action.signIn')}
+                </Button>
+                <Button size="sm" render={<Link href="/auth/register" />} nativeButton={false} className="max-sm:hidden">
+                  {t('common.action.signUp')}
+                </Button>
+              </div>
             </div>
-            <span className="font-bold text-xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Pijar
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/auth/login"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Masuk
-            </Link>
-            <Link
-              href="/auth/register"
-              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-full pijar-gradient text-white hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Mulai Gratis <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      </nav>
 
-      {/* ── Hero ────────────────────────────────────────────── */}
-      <section className="flex-1 pijar-gradient-hero flex items-center justify-center px-6 py-24">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pijar-100 text-pijar-700 text-xs font-semibold mb-6 border border-pijar-200 animate-fade-in-up">
-            <Zap className="w-3.5 h-3.5" />
-            Powered by Gemini AI
-          </div>
-
-          <h1
-            className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight tracking-tight mb-6 animate-fade-in-up"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", animationDelay: '0.1s' }}
-          >
-            Belajar yang{' '}
-            <span className="relative">
-              <span className="relative z-10 text-transparent bg-clip-text pijar-gradient">
-                Benar-benar
-              </span>
-            </span>
-            <br />
-            Personal untukmu
-          </h1>
-
-          <p
-            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up"
-            style={{ animationDelay: '0.2s' }}
-          >
-            Pijar mendiagnosis <em>knowledge gap</em> kamu, lalu membangun jalur belajar visual berbasis AI
-            yang dimulai dari titik <strong className="text-foreground">persis di mana kamu berada</strong> — bukan dari nol.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-            <Link
-              href="/auth/register"
-              id="hero-cta-register"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-full pijar-gradient text-white font-semibold text-base hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-            >
-              Diagnosa Sekarang — Gratis
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/auth/login?demo=true"
-              id="hero-cta-demo"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-full border border-border bg-background/80 font-semibold text-base hover:bg-accent transition-all text-foreground"
-            >
-              <Zap className="w-4 h-4 text-pijar-500" />
-              Coba Demo
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── How it works ────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-background border-t border-border/50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Bagaimana Pijar bekerja?</h2>
-            <p className="text-muted-foreground text-lg">Tiga langkah untuk jalur belajar yang personal</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <Target className="w-6 h-6" />,
-                step: '01',
-                title: 'Diagnosa Pertama',
-                desc: 'Ambil pre-test singkat 5 soal. AI menganalisis pola jawaban kamu untuk menemukan gap konsep yang sebenarnya.',
-              },
-              {
-                icon: <GitBranch className="w-6 h-6" />,
-                step: '02',
-                title: 'Peta Belajarmu',
-                desc: 'AI membangun Knowledge Graph visual — peta konsep interaktif yang menunjukkan urutan belajar optimal untukmu.',
-              },
-              {
-                icon: <Brain className="w-6 h-6" />,
-                step: '03',
-                title: 'Belajar dengan Kopilot',
-                desc: 'Pelajari setiap konsep dengan AI Tutor yang kontekstual. Salah? AI langsung meluruskan pola pikirmu.',
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="group relative p-8 rounded-2xl border border-border/70 bg-card hover:border-pijar-300 hover:shadow-lg transition-all duration-300"
-              >
-                <div className="text-xs font-bold text-pijar-400 tracking-widest mb-4">{item.step}</div>
-                <div className="w-12 h-12 rounded-xl bg-pijar-100 text-pijar-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-                  {item.icon}
-                </div>
-                <h3 className="text-lg font-bold mb-2">{item.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+            <div className="pj-gutter mx-auto flex max-w-[1100px] flex-col items-center gap-8 pt-12 text-center md:pt-16">
+              <h1 className="text-display text-balance text-ink">
+                {t('landing.hero.title.a')} <span className="text-ink/60">{t('landing.hero.title.b')}</span>
+              </h1>
+              <p className="max-w-[34rem] text-lg text-ink/80 md:text-xl">{t('landing.hero.sub')}</p>
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                <Button size="lg" render={<Link href="/auth/register" />} nativeButton={false}>
+                  {t('landing.cta.primary')}
+                </Button>
+                <Button size="lg" variant="ghost" render={<Link href="/auth/login" />} nativeButton={false}>
+                  {t('landing.cta.secondary')}
+                </Button>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </div>
 
-      {/* ── Feature Highlights ──────────────────────────────── */}
-      <section className="py-24 px-6 pijar-gradient-soft border-t border-border/50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Lebih dari sekadar kursus biasa</h2>
+            <div className="pj-gutter pt-10 pb-14 md:pt-12 md:pb-20">
+              <HeroObject />
+            </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-6">
-            {[
-              { icon: <Brain className="w-5 h-5" />, title: 'Misconception Detection', desc: 'AI mendeteksi dan meluruskan pola pikir yang salah saat kamu menjawab kuis, bukan sekadar memberi tahu jawaban benar.' },
-              { icon: <GitBranch className="w-5 h-5" />, title: 'Curriculum Knowledge Graph', desc: 'Lihat jalur belajarmu sebagai graf interaktif. Pahami ketergantungan antar konsep secara visual.' },
-              { icon: <BookOpen className="w-5 h-5" />, title: 'Gaya Belajarmu', desc: 'Pilih format yang cocok — ringkasan teks terstruktur atau video kurasi. Toggle kapan saja.' },
-              { icon: <Sparkles className="w-5 h-5" />, title: 'AI Tutor Kontekstual', desc: 'Tanya apa saja tentang materi yang sedang dipelajari. AI hanya fokus pada konteks pelajaranmu, bukan menjawab hal lain.' },
-            ].map((f) => (
-              <div key={f.title} className="flex gap-4 p-6 rounded-2xl bg-background border border-border/70 hover:shadow-md transition-all">
-                <div className="w-10 h-10 rounded-lg bg-pijar-100 text-pijar-600 flex-shrink-0 flex items-center justify-center">
-                  {f.icon}
+        </section>
+
+        {/* How it works: heading with inline icon tile, then the step carousel. */}
+        <section id="cara-kerja" className="scroll-mt-24 py-30 md:py-44">
+          <div className="flex flex-col gap-14">
+            <Reveal className="pj-gutter">
+              <Title a={t('landing.how.title.a')} b={t('landing.how.title.b')} icon={<Route {...ICON} />} className="mx-auto max-w-[20ch]" />
+            </Reveal>
+            <Reveal delay={80}>
+              <StepCarousel />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Features: two large cards with real product pieces (MathVisual and concept cards). */}
+        <section id="fitur" className="scroll-mt-24 pb-30 md:pb-44">
+          <div className="pj-gutter mx-auto flex max-w-[var(--pj-content-max)] flex-col gap-14">
+            <Reveal>
+              <Title a={t('landing.fitur.title.a')} b={t('landing.fitur.title.b')} className="mx-auto max-w-[22ch]" />
+            </Reveal>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+              <Reveal>
+                <article className="flex h-full flex-col gap-6 rounded-card-lg bg-surface p-6 md:p-9">
+                  <Chip icon={<Waypoints {...ICON} />}>{t('landing.fitur.math.chip')}</Chip>
+                  <h3 className="text-h3 max-w-[18ch]">{t('landing.fitur.math.title')}</h3>
+                  <div className="rounded-inner bg-raised p-3">
+                    <MathDemo />
+                  </div>
+                  <p className="text-base text-foreground/80">{t('landing.fitur.math.body')}</p>
+                </article>
+              </Reveal>
+              <Reveal delay={80}>
+                <article className="flex h-full flex-col gap-6 rounded-card-lg bg-surface p-6 md:p-9">
+                  <Chip icon={<Network {...ICON} />}>{t('landing.fitur.map.chip')}</Chip>
+                  <h3 className="text-h3 max-w-[18ch]">{t('landing.fitur.map.title')}</h3>
+                  <div className="my-auto"><ConceptMap /></div>
+                  <p className="text-base text-foreground/80">{t('landing.fitur.map.body')}</p>
+                </article>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* Privacy: truthful summary of the legal pages, with links. */}
+        <section id="privasi" className="scroll-mt-24 pb-30 md:pb-44">
+          <div className="pj-gutter mx-auto max-w-[var(--pj-content-max)]">
+            <Reveal>
+              <div className="flex flex-col gap-10 rounded-card-lg bg-surface p-6 md:gap-14 md:p-12">
+                <div className="flex max-w-[40rem] flex-col gap-4">
+                  <Title a={t('landing.privacy.title.a')} b={t('landing.privacy.title.b')} className="!text-left" />
+                  <p className="text-base text-foreground/80">{t('landing.privacy.intro')}</p>
                 </div>
-                <div>
-                  <h3 className="font-semibold mb-1">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                <div className="grid gap-4 md:grid-cols-2 md:gap-9">
+                  {(
+                    [
+                      ['store', <Database key="d" {...ICON} />],
+                      ['gemini', <Send key="s" {...ICON} />],
+                      ['never', <ShieldOff key="n" {...ICON} />],
+                      ['delete', <Trash2 key="t" {...ICON} />],
+                    ] as const
+                  ).map(([k, icon]) => (
+                    <div key={k} className="flex flex-col gap-3 rounded-inner border border-hairline bg-raised p-5 md:p-6">
+                      <span className="inline-flex size-10 items-center justify-center rounded-inner bg-surface [&>svg]:size-5">{icon}</span>
+                      <h3 className="text-h4">{t(`landing.privacy.${k}.title`)}</h3>
+                      <p className="text-base text-foreground/80">{t(`landing.privacy.${k}.body`)}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="secondary" render={<Link href="/terms" />} nativeButton={false}>
+                    {t('landing.privacy.link.terms')}
+                  </Button>
+                  <Button variant="secondary" render={<Link href="/privacy" />} nativeButton={false}>
+                    {t('landing.privacy.link.privacy')}
+                  </Button>
                 </div>
               </div>
-            ))}
+            </Reveal>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── CTA Section ─────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-background border-t border-border/50">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Siap mulai belajar dengan cara yang benar?</h2>
-          <p className="text-muted-foreground mb-8">Gratis. Tanpa kartu kredit. Mulai diagnosa dalam 2 menit.</p>
-          <Link
-            href="/auth/register"
-            id="bottom-cta-register"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-full pijar-gradient text-white font-semibold text-base hover:opacity-90 transition-all shadow-lg"
-          >
-            Mulai Gratis Sekarang <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ── Footer ──────────────────────────────────────────── */}
-      <footer className="py-8 px-6 border-t border-border/50 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <div className="w-5 h-5 rounded pijar-gradient flex items-center justify-center">
-            <Sparkles className="w-2.5 h-2.5 text-white" />
+        {/* Closing: one pill button on the sky panel. */}
+        <section className="px-3 pb-3">
+          <div className={`relative overflow-hidden rounded-card-lg ${SKY} py-24 md:py-36`}>
+            <div className="pj-gutter mx-auto flex max-w-[var(--pj-content-max)] flex-col items-center gap-10">
+              <Reveal>
+                <h2 className="text-h1 text-center text-balance text-ink">
+                  {t('landing.close.title.a')} <span className="text-ink/60">{t('landing.close.title.b')}</span>
+                </h2>
+              </Reveal>
+              <Button size="lg" render={<Link href="/auth/register" />} nativeButton={false}>
+                {t('landing.cta.primary')}
+              </Button>
+            </div>
           </div>
-          <span className="font-bold text-sm">Pijar</span>
-        </div>
-        <p className="text-xs text-muted-foreground">Built for JOINTS UGM Hackathon 2026</p>
-      </footer>
-    </div>
+        </section>
+      </main>
+      <Footer />
+    </>
   );
 }

@@ -56,6 +56,9 @@
   /* Decorative panels only (CLAUDE.md 8.3 E1): hero and large panels, soft and low contrast */
   --pj-panel-from: #f6e6c2;
   --pj-panel-to: #fbfaf7;
+  /* Landing hero sky (E1, hero frame only). Light enough that ink text keeps 4.5:1 or better. */
+  --pj-hero-from: #b4cfe7; /* sky top */
+  --pj-hero-to: #e9f2f7;
 
   /* Radius hierarchy. Not one uniform radius. */
   --pj-r-pill: 100px; /* buttons, chips, nav pill, tabs */
