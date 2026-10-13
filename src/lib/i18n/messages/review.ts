@@ -1,8 +1,77 @@
 import { defineMessages } from '../define';
 
-// Owned by the review page agent. Add keys as 'key.name': 'text' in BOTH id and en (the type enforces it).
-// Use as t('review.key.name'). Write each language natively, not as a translation of the other.
+// Owned by the review page agent. Use as t('review.key.name').
 export default defineMessages({
-  id: {},
-  en: {},
+  id: {
+    'title': 'Ulasan harian',
+    'lead': 'Ingatan memudar seiring waktu, dan mengulang tepat sebelum lupa membuatnya bertahan lebih lama.',
+    'loading': 'Menyiapkan pertanyaan',
+    'progress': 'Pertanyaan {current} dari {total}',
+    'concept': 'Konsep: {label}',
+    'recall': 'Ingatanmu sekarang sekitar {pct}%',
+    'options': 'Pilihan jawaban',
+    'correct': 'Benar.',
+    'wrong': 'Belum tepat.',
+    'correctWas': 'Jawaban yang benar: {answer}',
+    'next': 'Pertanyaan berikutnya',
+    'finish': 'Lihat ringkasan',
+    'saving': 'Menyimpan hasil',
+
+    'summary.title': 'Ulasan selesai',
+    'summary.score': '{correct} dari {total} benar',
+    'summary.sooner.title': 'Muncul lebih cepat',
+    'summary.sooner.desc': 'Konsep ini perlu diulang lebih sering.',
+    'summary.later.title': 'Muncul lebih lama',
+    'summary.later.desc': 'Ingatanmu di sini makin kuat.',
+    'summary.in.lt1': 'Kurang dari sehari',
+    'summary.in.days': 'Sekitar {n} hari lagi',
+    'summary.unsaved': 'Hasil belum tersimpan ke akunmu, jadi jadwal ulasan belum berubah.',
+    'summary.home': 'Kembali ke beranda',
+    'summary.map': 'Buka peta belajar',
+
+    'empty.title': 'Belum ada ulasan hari ini',
+    'empty.desc': 'Konsep yang sudah kamu kuasai muncul di sini saat mulai terlupa.',
+    'empty.map': 'Buka peta belajar',
+    'empty.practice': 'Tetap berlatih',
+    'empty.practiceHint': 'Tidak ada yang mendesak, tetapi kamu bisa berlatih {n} konsep terakhir.',
+
+    'error.load': 'Pertanyaan tidak bisa dimuat.',
+    'error.save': 'Hasilmu belum tersimpan.',
+  },
+  en: {
+    'title': 'Daily review',
+    'lead': 'Memory fades with time, and reviewing just before you forget makes it last longer.',
+    'loading': 'Preparing your questions',
+    'progress': 'Question {current} of {total}',
+    'concept': 'Concept: {label}',
+    'recall': 'Your recall is around {pct}% now',
+    'options': 'Answer choices',
+    'correct': 'Correct.',
+    'wrong': 'Not quite.',
+    'correctWas': 'The right answer: {answer}',
+    'next': 'Next question',
+    'finish': 'See summary',
+    'saving': 'Saving your results',
+
+    'summary.title': 'Review finished',
+    'summary.score': '{correct} of {total} correct',
+    'summary.sooner.title': 'Coming back sooner',
+    'summary.sooner.desc': 'These need more frequent practice.',
+    'summary.later.title': 'Coming back later',
+    'summary.later.desc': 'Your memory of these is getting stronger.',
+    'summary.in.lt1': 'Less than a day',
+    'summary.in.days': 'In about {n} days',
+    'summary.unsaved': 'Your results were not saved to your account, so the review schedule has not changed.',
+    'summary.home': 'Back to home',
+    'summary.map': 'Open learning map',
+
+    'empty.title': 'Nothing to review today',
+    'empty.desc': 'Concepts you have mastered show up here once they start to fade.',
+    'empty.map': 'Open learning map',
+    'empty.practice': 'Practice anyway',
+    'empty.practiceHint': 'Nothing is urgent, but you can practice your {n} most recent concepts.',
+
+    'error.load': 'The questions could not be loaded.',
+    'error.save': 'Your results were not saved.',
+  },
 });

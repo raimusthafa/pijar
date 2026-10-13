@@ -2,120 +2,90 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { connection } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import Link from 'next/link';
-import { Sparkles, ArrowRight, BookOpen, GitBranch, Loader2, LogOut } from 'lucide-react';
+import { getT } from '@/lib/i18n/server';
+import { AppShell, PageBody, PageHeader } from '@/components/shell/AppShell';
 import { DashboardTabbedHub } from '@/components/dashboard/DashboardTabbedHub';
-import { MOCK_GRAPH_NODES, MOCK_GRAPH_EDGES } from '@/lib/ai/mock-data';
-
-export const metadata = {
-  title: 'Dashboard — Pijar',
-  description: 'Lihat progres belajar dan lanjutkan kurikulummu',
-};
+import { Skeleton } from '@/components/ui/skeleton';
+import { overlayStatus, type ProgressRow } from '@/lib/dashboard/derive';
+import type { CurriculumEdge, CurriculumNode } from '@/types';
 
 export default function DashboardPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-        </div>
-      }
-    >
+    <Suspense fallback={<AppShell><DashboardSkeleton /></AppShell>}>
       <DashboardContent />
     </Suspense>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="mx-auto w-full max-w-[var(--pj-content-max)] px-5 pt-8 pb-6 md:px-8">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="mt-3 h-4 w-80 max-w-full" />
+      </div>
+      <PageBody className="grid gap-4">
+        <Skeleton className="h-10 w-80 max-w-full rounded-pill" />
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <Skeleton className="h-48 rounded-card" />
+          <Skeleton className="h-48 rounded-card" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-56 rounded-card" />
+          <Skeleton className="h-56 rounded-card" />
+        </div>
+      </PageBody>
+    </>
   );
 }
 
 async function DashboardContent() {
   await connection();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
 
-  // Strict server-side access control: unauthenticated users are rejected
-  if (!user) {
-    redirect('/auth/login');
-  }
+  const [{ t }, { data: profile }, { data: graphs }] = await Promise.all([
+    getT(),
+    supabase.from('profiles').select('name').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('learning_graphs')
+      .select('id, topic, nodes_json, edges_json')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ]);
 
-  // Fetch authenticated user profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle();
+  const ids = (graphs ?? []).map(g => g.id);
+  // select('*') keeps working before the review-columns migration is applied.
+  const { data: rows } = ids.length
+    ? await supabase.from('node_progress').select('*').eq('user_id', user.id).in('graph_id', ids)
+    : { data: [] };
+  const progress = (rows ?? []) as ProgressRow[];
 
-  // Fetch user's active curriculum learning graphs
-  const { data: graphs } = await supabase
-    .from('learning_graphs')
-    .select('id, topic, status, created_at, nodes_json, edges_json')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  const rawName =
-    profile?.name ??
-    user.user_metadata?.full_name ??
-    user.email?.split('@')[0] ??
-    'Pelajar';
-  const firstName = rawName.split(' ')[0] ?? 'Pelajar';
+  const name = profile?.name ?? user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? '';
+  const firstName = String(name).split(' ')[0];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* ── Topbar ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 glass border-b border-border/60">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg pijar-gradient flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span
-              className="font-bold text-lg"
-              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-            >
-              Pijar
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {profile?.name ?? user.email}
-            </span>
-            <div className="w-8 h-8 rounded-full pijar-gradient flex items-center justify-center text-white text-xs font-bold">
-              {firstName[0]?.toUpperCase() || 'P'}
-            </div>
-            <form action="/auth/logout" method="POST">
-              <button
-                type="submit"
-                title="Keluar / Logout"
-                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-muted/60 flex items-center gap-1 cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* ── Greeting ── */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold mb-1">Halo, {firstName}! 👋</h1>
-          <p className="text-muted-foreground">
-            Siap melanjutkan perjalanan belajarmu hari ini?
-          </p>
-        </div>
-
-        {/* ── Active Curriculum Hub ── */}
+    <AppShell user={{ name: profile?.name ?? name, email: user.email }} title={t('dashboard.title')}>
+      <PageHeader
+        title={firstName ? t('dashboard.greeting', { name: firstName }) : t('dashboard.title')}
+        description={t('dashboard.greeting.sub')}
+      />
+      <PageBody>
         <DashboardTabbedHub
-          graphs={graphs || []}
-          userName={profile?.name || rawName}
-          defaultNodes={MOCK_GRAPH_NODES}
-          defaultEdges={MOCK_GRAPH_EDGES}
-          defaultTopicName="Struktur Data & Algoritma"
+          userId={user.id}
+          nowIso={new Date().toISOString()}
+          progress={progress}
+          graphs={(graphs ?? []).map(g => ({
+            id: g.id,
+            topic: g.topic,
+            nodes: overlayStatus((g.nodes_json ?? []) as CurriculumNode[], progress.filter(r => r.graph_id === g.id)),
+            edges: (g.edges_json ?? []) as CurriculumEdge[],
+          }))}
         />
-      </main>
-    </div>
+      </PageBody>
+    </AppShell>
   );
 }

@@ -8,6 +8,8 @@ const PROTECTED_ROUTES = [
   '/diagnostic',
   '/graph',
   '/learn',
+  '/review',
+  '/workspace',
 ];
 
 // Routes accessible only when NOT authenticated

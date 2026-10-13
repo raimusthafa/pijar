@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BookOpen,
   CalendarCheck,
-  ChartNoAxesColumn,
+  House,
   Menu,
   Network,
   PencilRuler,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
@@ -21,17 +19,12 @@ import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import { cn } from '@/lib/utils';
 
-/**
- * The only place that lists app navigation. /learn and /community are provisional: there is no
- * index page for them yet, so point them at the real route when the page agents decide.
- */
+/** The only place that lists app navigation. Community lives inside the dashboard, learning inside the workspace. */
 export const APP_NAV: { href: string; labelKey: MessageKey; icon: LucideIcon }[] = [
+  { href: '/dashboard', labelKey: 'shell.nav.dashboard', icon: House },
   { href: '/graph', labelKey: 'shell.nav.map', icon: Network },
-  { href: '/learn', labelKey: 'shell.nav.learn', icon: BookOpen },
   { href: '/review', labelKey: 'shell.nav.review', icon: CalendarCheck },
   { href: '/workspace', labelKey: 'shell.nav.workspace', icon: PencilRuler },
-  { href: '/dashboard', labelKey: 'shell.nav.progress', icon: ChartNoAxesColumn },
-  { href: '/community', labelKey: 'shell.nav.community', icon: Users },
 ];
 
 function NavList({ onNavigate }: { onNavigate?: boolean }) {
