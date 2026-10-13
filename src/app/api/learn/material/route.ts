@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getOrGenerateMaterial } from '@/lib/learn/generator';
+import { toLessonLanguage } from '@/lib/learn/cache-key';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
       nodeDescription,
       prerequisites = [],
       forceRegenerate = false,
+      language,
     } = body;
 
     if (!nodeId || typeof nodeId !== 'string') {
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
       nodeDescription,
       prerequisites,
       forceRegenerate,
+      language: toLessonLanguage(language),
     });
 
     return NextResponse.json({

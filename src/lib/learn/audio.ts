@@ -16,7 +16,7 @@ export interface AudioCapability {
 /**
  * Probes client browser audio capabilities.
  */
-export function probeAudioCapability(): AudioCapability {
+export function probeAudioCapability(lang: 'id' | 'en' = 'id'): AudioCapability {
   if (typeof window === 'undefined') {
     return {
       mode: 'captions-only',
@@ -37,7 +37,7 @@ export function probeAudioCapability(): AudioCapability {
   }
 
   const voices = window.speechSynthesis.getVoices();
-  const idVoice = voices.find(v => v.lang.toLowerCase().startsWith('id'));
+  const idVoice = voices.find(v => v.lang.toLowerCase().startsWith(lang));
 
   if (idVoice) {
     return {
@@ -62,9 +62,12 @@ export class VideoNarrationController {
   private isMuted: boolean = false;
   private playbackRate: number = 1.0;
   private capability: AudioCapability;
+  private lang: 'id' | 'en';
 
-  constructor() {
-    this.capability = probeAudioCapability();
+  /** `lang` follows the interface locale; `hasIndonesianVoice` means "a voice for that language". */
+  constructor(lang: 'id' | 'en' = 'id') {
+    this.lang = lang;
+    this.capability = probeAudioCapability(lang);
   }
 
   public getCapability(): AudioCapability {
@@ -102,11 +105,11 @@ export class VideoNarrationController {
 
     try {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'id-ID';
+      utterance.lang = this.lang === 'en' ? 'en-US' : 'id-ID';
       utterance.rate = this.playbackRate;
 
       const voices = window.speechSynthesis.getVoices();
-      const idVoice = voices.find(v => v.lang.toLowerCase().startsWith('id'));
+      const idVoice = voices.find(v => v.lang.toLowerCase().startsWith(this.lang));
       if (idVoice) {
         utterance.voice = idVoice;
       }

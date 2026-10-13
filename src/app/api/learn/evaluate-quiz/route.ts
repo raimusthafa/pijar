@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     // 1. Load authoritative questions for this concept
-    const material = await getOrGenerateMaterial({ topic, nodeId });
+    const material = await getOrGenerateMaterial({ topic, nodeId, language: language === 'en' ? 'en' : 'id' });
     const questions: Array<(typeof material.checkpointQuestions)[number]> = postTest
       ? (await getPostTest({ topic, nodeId, label: material.title, language })).map(q => ({
           ...q, conceptTested: q.conceptTested || material.title,

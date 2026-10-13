@@ -7,9 +7,9 @@ import 'mafs/core.css';
 import type { MathSpec } from '@/lib/learn/types';
 import { compileExpr } from '@/lib/learn/math-spec';
 
-const INK = 'var(--pj-ink, var(--foreground, currentColor))';
-const AMBER = 'var(--pj-amber, var(--primary, currentColor))';
-const MUTED = 'var(--muted-foreground, currentColor)';
+const INK = 'var(--pj-ink)';
+const AMBER = 'var(--pj-amber)';
+const MUTED = 'var(--pj-text-muted)';
 const CURVE_COLORS = [INK, AMBER, MUTED];
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));

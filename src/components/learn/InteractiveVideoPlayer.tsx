@@ -1,434 +1,321 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { VideoScriptPlan, VideoScene } from '@/lib/learn/types';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Captions, ChevronLeft, ChevronRight, Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import type { VideoScriptPlan } from '@/lib/learn/types';
 import { VideoNarrationController, probeAudioCapability, type AudioCapability } from '@/lib/learn/audio';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n/client';
+import { cn } from '@/lib/utils';
 import { SceneVisualRenderer } from './visuals/SceneVisualRenderer';
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Volume2,
-  VolumeX,
-  Subtitles,
-  FastForward,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Maximize2,
-  Minimize2,
-} from 'lucide-react';
 
 interface InteractiveVideoPlayerProps {
   script: VideoScriptPlan;
   onFinished?: () => void;
 }
 
+const SPEEDS = [1, 1.25, 1.5];
+const ICON = { strokeWidth: 1.75, 'aria-hidden': true } as const;
+
+const formatTime = (secs: number) => {
+  const s = Math.floor(secs);
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+};
+
 export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoPlayerProps) {
-  const scenes = script.scenes || [];
-  const totalDuration = script.totalDurationSeconds || 45;
+  const { t, locale } = useT();
+  const scenes = useMemo(() => script.scenes ?? [], [script.scenes]);
+  const totalDuration = script.totalDurationSeconds || scenes.reduce((a, s) => a + s.durationSeconds, 0) || 45;
 
-  // Player State
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [showCaptions, setShowCaptions] = useState<boolean>(true);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioCap, setAudioCap] = useState<AudioCapability | null>(null);
-  const playerContainerRef = useRef<HTMLDivElement>(null);
-  const narrationControllerRef = useRef<VideoNarrationController | null>(null);
-  const lastSpokenSceneRef = useRef<number | null>(null);
+  const [seekTick, setSeekTick] = useState(0);
 
-  // Initialize Audio Controller once on mount
+  const containerRef = useRef<HTMLDivElement>(null);
+  const narrationRef = useRef<VideoNarrationController | null>(null);
+  const lastSpokenRef = useRef<number | null>(null);
+  const timeRef = useRef(0);
+  const speedRef = useRef(1);
+  const onFinishedRef = useRef(onFinished);
   useEffect(() => {
-    const controller = new VideoNarrationController();
-    narrationControllerRef.current = controller;
+    onFinishedRef.current = onFinished;
+    speedRef.current = speed;
+  });
+
+  const setTime = useCallback((v: number) => {
+    timeRef.current = v;
+    setCurrentTime(v);
+  }, []);
+
+  // Narration controller follows the interface language.
+  useEffect(() => {
+    const controller = new VideoNarrationController(locale);
+    narrationRef.current = controller;
     setAudioCap(controller.getCapability());
-
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const handleVoicesChanged = () => {
-        setAudioCap(probeAudioCapability());
-      };
-      window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
-      return () => {
-        controller.stop();
-        window.speechSynthesis.onvoiceschanged = null;
-      };
-    }
-
+    const speech = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
+    if (speech) speech.onvoiceschanged = () => setAudioCap(probeAudioCapability(locale));
     return () => {
       controller.stop();
+      if (speech) speech.onvoiceschanged = null;
     };
+  }, [locale]);
+
+  useEffect(() => {
+    narrationRef.current?.setMuted(isMuted);
+    narrationRef.current?.setRate(speed);
+  }, [isMuted, speed, audioCap]);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // Sync mute state
-  useEffect(() => {
-    narrationControllerRef.current?.setMuted(isMuted);
-  }, [isMuted]);
+  const sceneOffsets = useMemo(
+    () =>
+      scenes.map((s, i) => {
+        const start = scenes.slice(0, i).reduce((a, x) => a + x.durationSeconds, 0);
+        return { id: s.id, start, end: start + s.durationSeconds, scene: s };
+      }),
+    [scenes],
+  );
 
-  // Sync playback rate
-  useEffect(() => {
-    narrationControllerRef.current?.setRate(playbackSpeed);
-  }, [playbackSpeed]);
+  const current = sceneOffsets.find(so => currentTime >= so.start && currentTime < so.end) ?? sceneOffsets[sceneOffsets.length - 1] ?? null;
+  const activeScene = current?.scene ?? scenes[0];
+  const activeIndex = Math.max(0, scenes.findIndex(s => s.id === activeScene?.id));
 
-  // Compute scene time offsets
-  const sceneOffsets = React.useMemo(() => {
-    let acc = 0;
-    return scenes.map(s => {
-      const start = acc;
-      acc += s.durationSeconds;
-      return { id: s.id, start, end: acc, scene: s };
-    });
-  }, [scenes]);
-
-  // Determine active scene based on currentTime
-  const currentSceneInfo = React.useMemo(() => {
-    const found = sceneOffsets.find(so => currentTime >= so.start && currentTime < so.end);
-    return found || sceneOffsets[sceneOffsets.length - 1] || null;
-  }, [sceneOffsets, currentTime]);
-
-  const activeScene = currentSceneInfo?.scene || scenes[0];
-  const activeSceneIndex = scenes.findIndex(s => s.id === activeScene?.id);
-
-  // Before first play, show the finished frame as a poster instead of an empty graph.
-  const sceneProgress = currentSceneInfo && (isPlaying || currentTime > 0)
-    ? Math.min(1, Math.max(0, (currentTime - currentSceneInfo.start) / Math.max(0.1, currentSceneInfo.end - currentSceneInfo.start)))
+  // Before the first play, show the finished frame as a poster.
+  const sceneProgress = current && (isPlaying || currentTime > 0)
+    ? Math.min(1, Math.max(0, (currentTime - current.start) / Math.max(0.1, current.end - current.start)))
     : 1;
 
-  // Determine active caption
-  const activeCaption = React.useMemo(() => {
-    if (!activeScene || !showCaptions) return null;
-    const sceneElapsed = currentTime - (currentSceneInfo?.start || 0);
-    const cap = activeScene.captions?.find(
-      c => sceneElapsed >= c.startSeconds && sceneElapsed <= c.endSeconds
-    );
-    return cap?.text || null;
-  }, [activeScene, showCaptions, currentTime, currentSceneInfo]);
+  const caption = showCaptions && activeScene
+    ? activeScene.captions?.find(c => {
+        const e = currentTime - (current?.start ?? 0);
+        return e >= c.startSeconds && e <= c.endSeconds;
+      })?.text
+    : undefined;
 
-  // Narration triggers using VideoNarrationController
-  const speakNarration = useCallback((text: string) => {
-    narrationControllerRef.current?.speak(text);
-  }, []);
+  const stopSpeech = useCallback(() => narrationRef.current?.stop(), []);
 
-  const stopSpeech = useCallback(() => {
-    narrationControllerRef.current?.stop();
-  }, []);
-
-  // Main playback timer loop
+  // Playback clock.
   useEffect(() => {
-    let animationFrameId: number;
-    let lastTimestamp = performance.now();
-
+    if (!isPlaying) return;
+    let raf = 0;
+    let last = performance.now();
     const tick = (now: number) => {
-      if (isPlaying) {
-        const delta = (now - lastTimestamp) / 1000;
-        lastTimestamp = now;
-
-        setCurrentTime(prev => {
-          const next = prev + delta * playbackSpeed;
-          if (next >= totalDuration) {
-            setIsPlaying(false);
-            stopSpeech();
-            onFinished?.();
-            return totalDuration;
-          }
-          return next;
-        });
-      } else {
-        lastTimestamp = now;
+      const next = timeRef.current + ((now - last) / 1000) * speedRef.current;
+      last = now;
+      if (next >= totalDuration) {
+        setTime(totalDuration);
+        setIsPlaying(false);
+        narrationRef.current?.stop();
+        onFinishedRef.current?.();
+        return;
       }
-
-      animationFrameId = requestAnimationFrame(tick);
+      setTime(next);
+      raf = requestAnimationFrame(tick);
     };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, totalDuration, setTime]);
 
-    animationFrameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isPlaying, playbackSpeed, totalDuration, stopSpeech, onFinished]);
-
-  // Trigger narration when scene index transitions
+  // Speak a scene when playback enters it (or after a seek or resume).
   useEffect(() => {
-    if (isPlaying && activeSceneIndex !== lastSpokenSceneRef.current) {
-      lastSpokenSceneRef.current = activeSceneIndex;
-      if (activeScene?.narration) {
-        speakNarration(activeScene.narration);
-      }
-    }
-  }, [isPlaying, activeSceneIndex, activeScene, speakNarration]);
+    if (!isPlaying || lastSpokenRef.current === activeIndex) return;
+    lastSpokenRef.current = activeIndex;
+    if (scenes[activeIndex]?.narration) narrationRef.current?.speak(scenes[activeIndex].narration);
+  }, [isPlaying, activeIndex, seekTick, scenes]);
 
-  // Handle Play/Pause
-  const handleTogglePlay = () => {
-    if (currentTime >= totalDuration) {
-      setCurrentTime(0);
-      lastSpokenSceneRef.current = null;
+  const togglePlay = () => {
+    if (isPlaying) {
+      stopSpeech();
+      lastSpokenRef.current = null;
+      setIsPlaying(false);
+      return;
     }
-
-    setIsPlaying(prev => {
-      const next = !prev;
-      if (!next) {
-        stopSpeech();
-      } else if (activeScene?.narration && lastSpokenSceneRef.current !== activeSceneIndex) {
-        lastSpokenSceneRef.current = activeSceneIndex;
-        speakNarration(activeScene.narration);
-      }
-      return next;
-    });
+    if (timeRef.current >= totalDuration) setTime(0);
+    lastSpokenRef.current = null;
+    setIsPlaying(true);
   };
 
-  // Seek handler
-  const handleSeek = (newTime: number) => {
-    const clamped = Math.max(0, Math.min(newTime, totalDuration));
-    setCurrentTime(clamped);
-    stopSpeech();
-    lastSpokenSceneRef.current = null; // Re-arm speech trigger on seek
-    if (isPlaying && activeScene?.narration) {
-      speakNarration(activeScene.narration);
+  const seek = (v: number, commit = true) => {
+    setTime(Math.max(0, Math.min(v, totalDuration)));
+    if (commit) {
+      stopSpeech();
+      lastSpokenRef.current = null;
+      setSeekTick(n => n + 1);
     }
   };
+  const jumpScene = (i: number) => sceneOffsets[i] && seek(sceneOffsets[i].start);
 
-  // Jump to specific scene
-  const handleJumpScene = (index: number) => {
-    const target = sceneOffsets[index];
-    if (target) {
-      handleSeek(target.start);
-    }
+  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    seek(((e.clientX - r.left) / r.width) * totalDuration, commit);
   };
 
-  // Fullscreen toggle
-  const handleToggleFullscreen = () => {
-    if (!playerContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
-    }
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else containerRef.current?.requestFullscreen().catch(() => {});
   };
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  const voiceLabel = audioCap?.hasIndonesianVoice
+    ? t('learn.player.voice.native')
+    : audioCap?.hasSpeechSynthesis
+      ? t('learn.player.voice.fallback')
+      : t('learn.player.voice.none');
+
+  const iconBtn = 'text-foreground';
 
   return (
     <div
-      ref={playerContainerRef}
-      className={`relative w-full rounded-3xl overflow-hidden border border-border/80 bg-slate-950 text-white flex flex-col shadow-2xl transition-all ${
-        isFullscreen ? 'h-screen' : 'min-h-[460px]'
-      }`}
+      ref={containerRef}
+      className={cn(
+        'flex flex-col overflow-hidden border border-hairline bg-surface',
+        isFullscreen ? 'h-dvh rounded-none' : 'rounded-card',
+      )}
     >
-      {/* ── Scene Navigation Header ─────────────────────────── */}
-      <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between gap-3 z-10 backdrop-blur-md">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <Sparkles className="w-3.5 h-3.5" />
-          </div>
-          <span className="text-xs font-bold text-slate-200 truncate">
-            {script.title}
-          </span>
-          {audioCap?.hasIndonesianVoice ? (
-            <span
-              className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-              title={audioCap.notes}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Voice ID
-            </span>
-          ) : audioCap?.hasSpeechSynthesis ? (
-            <span
-              className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20"
-              title={audioCap.notes}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-              OS Voice
-            </span>
-          ) : (
-            <span
-              className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"
-              title={audioCap?.notes}
-            >
-              Subtitle
-            </span>
-          )}
-        </div>
-
-        {/* Scene Steps Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-[60%] py-1">
-          {scenes.map((s, idx) => (
-            <button
-              key={s.id}
-              onClick={() => handleJumpScene(idx)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all shrink-0 flex items-center gap-1 ${
-                idx === activeSceneIndex
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
-                  : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              <span>{idx + 1}.</span>
-              <span className="hidden sm:inline truncate max-w-[100px]">{s.title}</span>
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-between gap-3 border-b border-hairline bg-raised px-5 py-3">
+        <p className="min-w-0 truncate text-sm font-medium">{script.title}</p>
+        <Badge variant="outline">{voiceLabel}</Badge>
       </div>
 
-      {/* ── Main Stage / Visual Scene Canvas ────────────────── */}
-      <div className="flex-1 relative flex items-center justify-center p-6 bg-slate-950 overflow-hidden">
+      <div className="pj-panel-soft flex min-h-[340px] flex-1 flex-col items-center justify-center gap-4 p-4 md:p-8">
         {activeScene && (
-          <div className="w-full max-w-2xl h-full flex items-center justify-center">
+          <div className="w-full max-w-2xl">
             <SceneVisualRenderer
               type={activeScene.visualType}
               state={activeScene.visualState}
               title={activeScene.title}
               progress={sceneProgress}
-              interactive={!isPlaying || currentTime >= totalDuration}
+              interactive={!isPlaying}
             />
           </div>
         )}
-
-        {/* Floating Closed Captions Overlay */}
-        {activeCaption && showCaptions && (
-          <div className="absolute bottom-6 px-6 max-w-xl text-center pointer-events-none transition-all duration-200">
-            <div className="inline-block bg-slate-950/85 backdrop-blur-md border border-slate-700/80 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-100 shadow-xl">
-              {activeCaption}
-            </div>
-          </div>
-        )}
+        <div className="flex min-h-11 w-full max-w-xl items-center justify-center" aria-live="off">
+          {caption && (
+            <p className="rounded-inner bg-action px-4 py-2 text-center text-sm text-action-foreground">{caption}</p>
+          )}
+        </div>
       </div>
 
-      {/* ── Video Player Controls Bar ───────────────────────── */}
-      <div className="p-4 bg-slate-900/95 border-t border-slate-800/80 space-y-3 z-10 backdrop-blur-md">
-        {/* Timeline Bar with Scene Dividers */}
-        <div className="relative group">
-          <div
-            className="h-2 w-full bg-slate-800 rounded-full cursor-pointer relative overflow-hidden group-hover:h-3 transition-all"
-            onClick={e => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const ratio = (e.clientX - rect.left) / rect.width;
-              handleSeek(ratio * totalDuration);
-            }}
-          >
-            {/* Progress Fill */}
-            <div
-              className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-75 relative"
-              style={{ width: `${(currentTime / totalDuration) * 100}%` }}
-            />
-          </div>
-
-          {/* Scene Marker Pins */}
-          <div className="absolute top-0 left-0 w-full h-full pointer-events-none flex">
-            {sceneOffsets.map((so, i) => (
-              <div
+      <div className="space-y-2 border-t border-hairline bg-raised px-4 pt-3 pb-4 md:px-5">
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label={t('learn.player.timeline')}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(totalDuration)}
+          aria-valuenow={Math.round(currentTime)}
+          aria-valuetext={`${formatTime(currentTime)} / ${formatTime(totalDuration)}`}
+          className="group relative flex h-6 cursor-pointer touch-none items-center"
+          onPointerDown={e => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            seekFromPointer(e, false);
+          }}
+          onPointerMove={e => e.buttons && seekFromPointer(e, false)}
+          onPointerUp={e => seekFromPointer(e, true)}
+          onKeyDown={e => {
+            const step = e.key === 'ArrowRight' ? 5 : e.key === 'ArrowLeft' ? -5 : 0;
+            if (step) {
+              e.preventDefault();
+              seek(timeRef.current + step);
+            } else if (e.key === 'Home') seek(0);
+            else if (e.key === 'End') seek(totalDuration);
+          }}
+        >
+          <div className="relative h-1.5 w-full overflow-hidden rounded-pill bg-surface-strong">
+            <div className="h-full bg-amber" style={{ width: `${(currentTime / totalDuration) * 100}%` }} />
+            {sceneOffsets.slice(1).map(so => (
+              <span
                 key={so.id}
-                className="absolute top-0 w-0.5 h-full bg-slate-950/60"
+                aria-hidden
+                className="absolute inset-y-0 w-0.5 bg-raised"
                 style={{ left: `${(so.start / totalDuration) * 100}%` }}
-                title={`Scene ${i + 1}: ${so.scene.title}`}
               />
             ))}
           </div>
+          <span
+            aria-hidden
+            className="absolute size-3.5 -translate-x-1/2 rounded-pill border-2 border-raised bg-foreground"
+            style={{ left: `${(currentTime / totalDuration) * 100}%` }}
+          />
         </div>
 
-        {/* Control Buttons */}
-        <div className="flex items-center justify-between text-slate-300 text-xs">
-          {/* Left Controls: Play/Pause, Replay, Prev, Next, Time */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={handleTogglePlay}
-              className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 flex items-center justify-center transition-transform active:scale-95 shadow-md shadow-amber-500/20"
-              title={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-            </button>
-
-            <button
-              onClick={() => handleSeek(0)}
-              className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-              title="Ulangi dari Awal"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => handleJumpScene(Math.max(0, activeSceneIndex - 1))}
-              disabled={activeSceneIndex <= 0}
-              className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors disabled:opacity-30"
-              title="Scene Sebelumnya"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => handleJumpScene(Math.min(scenes.length - 1, activeSceneIndex + 1))}
-              disabled={activeSceneIndex >= scenes.length - 1}
-              className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors disabled:opacity-30"
-              title="Scene Berikutnya"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <span className="font-mono text-slate-400 text-[11px] ml-1">
-              <strong className="text-white">{formatTime(currentTime)}</strong> / {formatTime(totalDuration)}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <div className="flex items-center gap-1">
+            <Button size="icon" onClick={togglePlay} aria-label={isPlaying ? t('learn.player.pause') : t('learn.player.play')}>
+              {isPlaying ? <Pause {...ICON} className="fill-current" /> : <Play {...ICON} className="fill-current" />}
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={iconBtn} onClick={() => seek(0)} aria-label={t('learn.player.restart')}>
+              <RotateCcw {...ICON} />
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={cn(iconBtn, 'max-sm:hidden')} disabled={activeIndex <= 0} onClick={() => jumpScene(activeIndex - 1)} aria-label={t('learn.player.prev')}>
+              <ChevronLeft {...ICON} />
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={cn(iconBtn, 'max-sm:hidden')} disabled={activeIndex >= scenes.length - 1} onClick={() => jumpScene(activeIndex + 1)} aria-label={t('learn.player.next')}>
+              <ChevronRight {...ICON} />
+            </Button>
+            <span className="ml-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+              {formatTime(currentTime)} / {formatTime(totalDuration)}
             </span>
           </div>
 
-          {/* Right Controls: Speed, Subtitle CC, Voice Mute, Fullscreen */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Speed Selector */}
-            <button
-              onClick={() => {
-                const nextSpeed = playbackSpeed === 1.0 ? 1.25 : playbackSpeed === 1.25 ? 1.5 : 1.0;
-                setPlaybackSpeed(nextSpeed);
-              }}
-              className="px-2 py-1 rounded-lg hover:bg-slate-800 text-slate-300 font-mono text-[11px] font-bold transition-colors"
-              title="Kecepatan Video"
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="tabular-nums"
+              aria-label={t('learn.player.speed', { s: speed })}
+              onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
             >
-              {playbackSpeed}x
-            </button>
-
-            {/* Captions Toggle */}
-            <button
-              onClick={() => setShowCaptions(prev => !prev)}
-              className={`p-2 rounded-lg transition-colors ${
-                showCaptions ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 hover:text-slate-300'
-              }`}
-              title="Subtitle / Closed Captions"
+              {speed}x
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn(iconBtn, showCaptions && 'bg-surface-strong')}
+              aria-pressed={showCaptions}
+              aria-label={t('learn.player.captions')}
+              onClick={() => setShowCaptions(v => !v)}
             >
-              <Subtitles className="w-4 h-4" />
-            </button>
-
-            {/* Audio Mute Toggle */}
-            <button
-              onClick={() => {
-                setIsMuted(prev => !prev);
-              }}
-              className={`p-2 rounded-lg transition-colors ${
-                isMuted ? 'text-slate-500' : 'text-slate-300 hover:text-white'
-              }`}
-              title={
-                isMuted
-                  ? 'Nyalakan Narasi Suara'
-                  : audioCap?.hasIndonesianVoice
-                  ? `Suara Bahasa Indonesia Aktif (${audioCap.voiceName})`
-                  : audioCap?.hasSpeechSynthesis
-                  ? 'Suara Standar Aktif (Voice ID-ID belum terinstal di OS)'
-                  : 'Mode Teks Subtitle Aktif'
-              }
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-
-            {/* Fullscreen */}
-            <button
-              onClick={handleToggleFullscreen}
-              className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-              title="Layar Penuh"
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
+              <Captions {...ICON} />
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={iconBtn} aria-pressed={isMuted} aria-label={isMuted ? t('learn.player.unmute') : t('learn.player.mute')} onClick={() => setIsMuted(v => !v)}>
+              {isMuted ? <VolumeX {...ICON} /> : <Volume2 {...ICON} />}
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={iconBtn} aria-label={isFullscreen ? t('learn.player.exitFullscreen') : t('learn.player.fullscreen')} onClick={toggleFullscreen}>
+              {isFullscreen ? <Minimize2 {...ICON} /> : <Maximize2 {...ICON} />}
+            </Button>
           </div>
         </div>
+
+        <ul className="flex gap-2 overflow-x-auto pt-1" aria-label={t('learn.player.scenes')}>
+          {scenes.map((s, i) => (
+            <li key={s.id} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => jumpScene(i)}
+                aria-current={i === activeIndex ? 'true' : undefined}
+                aria-label={t('learn.player.scene', { n: i + 1, title: s.title })}
+                className={cn(
+                  'pj-press h-11 max-w-56 truncate rounded-pill border px-4 text-sm transition-colors duration-150 md:h-8',
+                  i === activeIndex
+                    ? 'border-transparent bg-action text-action-foreground'
+                    : 'border-hairline-strong text-foreground hover:bg-hover',
+                )}
+              >
+                {i + 1}. {s.title}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

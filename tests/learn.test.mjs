@@ -197,3 +197,30 @@ describe('PIJAR F4 Learning Journey & Interactive Video Suite', () => {
     assert.equal(CURATED_MATERIALS['rekursi'].examples[0].language, 'typescript');
   });
 });
+
+describe('Lesson cache keys per language', () => {
+  it('id keeps the original keys, en is isolated and skips curated', async () => {
+    const { materialCacheKeys, toLessonLanguage } = await import('../src/lib/learn/cache-key.ts');
+    const id = materialCacheKeys('dsa', 'rekursi', 'id');
+    const en = materialCacheKeys('dsa', 'rekursi', 'en');
+    assert.deepEqual(id, { memoryKey: 'dsa_rekursi', dbTopic: 'dsa', useCurated: true });
+    assert.equal(en.dbTopic, 'dsa [en]');
+    assert.equal(en.useCurated, false);
+    assert.notEqual(en.memoryKey, id.memoryKey);
+    assert.equal(toLessonLanguage('fr'), 'id');
+    assert.equal(toLessonLanguage('en'), 'en');
+  });
+});
+
+describe('Lesson markdown subset', () => {
+  it('parses headings, lists, bold, code and never emits html', async () => {
+    const { parseBlocks } = await import('../src/lib/learn/markdown.ts');
+    const b = parseBlocks('### Prinsip:\n1. **Satu** dan `x`\n2. Dua\n\nParagraf <script>alert(1)</script>\nlanjut\n```ts\nconst a = 1;\n```');
+    assert.deepEqual(b.map(x => x.type), ['h', 'ol', 'p', 'code']);
+    assert.equal(b[0].inline[0].v, 'Prinsip');
+    assert.equal(b[1].items.length, 2);
+    assert.deepEqual(b[1].items[0].map(i => i.t), ['b', 'text', 'code']);
+    assert.equal(b[2].inline[0].v, 'Paragraf <script>alert(1)</script> lanjut'); // plain text, rendered as text by React
+    assert.equal(b[3].code, 'const a = 1;');
+  });
+});

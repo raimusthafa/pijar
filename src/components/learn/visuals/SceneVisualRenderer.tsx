@@ -2,8 +2,10 @@
 
 import React from 'react';
 import type { VisualSceneType, VisualSceneState } from '@/lib/learn/types';
+import { Badge } from '@/components/ui/badge';
+import { useT } from '@/lib/i18n/client';
+import { cn } from '@/lib/utils';
 import { MathVisual } from './MathVisual';
-import { Layers, Sparkles, TrendingDown, GitFork, Terminal, Cpu, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface SceneVisualRendererProps {
   type: VisualSceneType;
@@ -18,329 +20,209 @@ interface SceneVisualRendererProps {
 export function SceneVisualRenderer({ type, state, title, progress = 1, interactive = false }: SceneVisualRendererProps) {
   switch (type) {
     case 'call-stack':
-      return <CallStackVisual state={state} />;
+      if (state.stackItems?.length) return <CallStackVisual state={state} />;
+      break;
     case 'loss-landscape':
       return <LossLandscapeVisual state={state} />;
     case 'tree-structure':
-      return <TreeStructureVisual state={state} />;
+      if (state.treeNodes?.length) return <TreeStructureVisual state={state} />;
+      break;
     case 'code-execution':
-      return <CodeExecutionVisual state={state} />;
+      if (state.variables || state.currentStep || state.highlightedLine) return <CodeExecutionVisual state={state} />;
+      break;
     case 'data-flow':
-      return <DataFlowVisual state={state} />;
+      if (state.flowStages?.length) return <DataFlowVisual state={state} />;
+      break;
     case 'math-visualization':
       if (state.math) return <MathVisual spec={state.math} progress={progress} interactive={interactive} />;
-      return <ConceptIllustrationVisual state={state} title={title} />;
-    case 'concept-illustration':
-    default:
-      return <ConceptIllustrationVisual state={state} title={title} />;
+      break;
   }
+  // No usable data for the requested visual: show the concept overview instead of invented sample data.
+  return <ConceptIllustrationVisual state={state} title={title} />;
 }
 
-// ── 1. Call Stack Visual ──────────────────────────────────────────
+// Shared flat frame: hairline border on a raised tone, header row with label and a plain tag.
+function Frame({ label, meta, notes, children }: { label: string; meta?: React.ReactNode; notes?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[260px] w-full flex-col gap-4 rounded-inner border border-hairline bg-raised p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline pb-3">
+        <span className="shrink-0 text-sm font-medium text-foreground">{label}</span>
+        {meta && <Badge variant="outline" className="max-w-full"><span className="block truncate">{meta}</span></Badge>}
+      </div>
+      <div className="flex flex-1 flex-col justify-center">{children}</div>
+      {notes && <p className="rounded-control bg-surface px-3 py-2 text-xs leading-relaxed text-muted-foreground">{notes}</p>}
+    </div>
+  );
+}
+
+// Amber is the one highlight; everything else sits on surface with a hairline.
+const cell = 'rounded-control border px-3 py-2 font-mono text-xs';
+const cellOn = 'border-transparent bg-amber text-amber-foreground';
+const cellOff = 'border-hairline bg-surface text-foreground';
+
+// ── 1. Call stack ─────────────────────────────────────────────────
 function CallStackVisual({ state }: { state: VisualSceneState }) {
-  const items = state.stackItems || [
-    { label: 'factorial(1)', value: 'Base Case: return 1', isBaseCase: true },
-    { label: 'factorial(2)', value: 'Menunggu 2 * fact(1)' },
-    { label: 'factorial(3)', value: 'Menunggu 3 * fact(2)' },
-  ];
-
+  const { t } = useT();
+  const items = state.stackItems ?? [];
   return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-amber-400">
-          <Layers className="w-4 h-4" /> Call Stack Memory (LIFO)
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-          Depth: {items.length} frame
-        </span>
-      </div>
-
-      <div className="flex-1 flex flex-col-reverse justify-start gap-2.5 my-4 overflow-y-auto">
-        {items.map((item, idx) => {
-          const isTop = idx === 0;
-          return (
-            <div
-              key={idx}
-              className={`p-3 rounded-xl border transition-all duration-300 flex items-center justify-between ${
-                item.isBaseCase
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-500/10'
-                  : isTop
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-200 animate-pulse'
-                  : 'bg-slate-900/90 border-slate-800 text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono bg-slate-800/90 text-slate-400 px-1.5 py-0.5 rounded">
-                  #{items.length - idx}
-                </span>
-                <span className="text-xs font-bold font-mono">{item.label}</span>
-              </div>
-              <div className="text-[11px] font-mono text-slate-400">
-                {item.value}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {state.notes && (
-        <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span>{state.notes}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── 2. Loss Landscape Visual ──────────────────────────────────────
-function LossLandscapeVisual({ state }: { state: VisualSceneState }) {
-  const point = state.lossPoint || { x: 50, y: 15, loss: 1.25, step: 5 };
-
-  return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-rose-400">
-          <TrendingDown className="w-4 h-4" /> Permukaan Loss: L(W) = W²
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2.5 py-0.5 rounded text-slate-300 font-mono">
-          Loss: {point.loss.toFixed(2)} | Step: {point.step}
-        </span>
-      </div>
-
-      <div className="flex-1 relative flex items-center justify-center my-4">
-        {/* Parabolic Loss Curve SVG */}
-        <svg viewBox="0 0 200 100" className="w-full max-w-md h-36 overflow-visible">
-          <defs>
-            <linearGradient id="gradLoss" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
-            </linearGradient>
-          </defs>
-          {/* Curve */}
-          <path
-            d="M 10 15 Q 100 95 190 15"
-            fill="url(#gradLoss)"
-            stroke="#f43f5e"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          {/* Minimum Point Indicator */}
-          <circle cx="100" cy="95" r="4" fill="#10b981" />
-          <text x="100" y="112" fill="#10b981" fontSize="8" textAnchor="middle" fontWeight="bold">
-            Minimum Global
-          </text>
-
-          {/* Active Descent Point */}
-          {(() => {
-            const cx = 10 + (point.x / 100) * 180;
-            const t = (point.x - 50) / 50;
-            const cy = 95 - (1 - Math.abs(t)) * 0 + t * t * 80;
-            return (
-              <g>
-                <circle cx={cx} cy={Math.min(95, cy)} r="6" fill="#fbbf24" stroke="#ffffff" strokeWidth="2">
-                  <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite" />
-                </circle>
-              </g>
-            );
-          })()}
-        </svg>
-      </div>
-
-      <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-amber-300">
-          <ArrowRight className="w-3.5 h-3.5" /> Arah Pembaruan: W = W - α·∇L
-        </span>
-        <span className="text-slate-400 font-mono text-[10px]">
-          {state.notes || 'Melangkah menuruni gradien menuju minimum.'}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── 3. Tree Structure Visual ──────────────────────────────────────
-function TreeStructureVisual({ state }: { state: VisualSceneState }) {
-  const nodes = state.treeNodes || [
-    { id: 'r', label: 'Root [50]', isHighlighted: true },
-    { id: 'l1', label: 'Cabang [20]', isHighlighted: false },
-    { id: 'l2', label: 'Cabang [80]', isHighlighted: true },
-    { id: 'leaf', label: 'Leaf [75, 80]', isHighlighted: true },
-  ];
-
-  return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-blue-400">
-          <GitFork className="w-4 h-4" /> Hierarki B-Tree (O(log N))
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-          Tinggi: 3 tingkat
-        </span>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 my-4">
-        {/* Root */}
-        <div className="p-2.5 px-4 rounded-xl border bg-amber-500/20 border-amber-500/50 text-amber-300 text-xs font-mono font-bold shadow-md">
-          {nodes[0]?.label || 'Root [50]'}
-        </div>
-        <div className="w-0.5 h-3 bg-slate-700" />
-        {/* Child level */}
-        <div className="flex items-center gap-4">
-          <div className="p-2 px-3 rounded-lg border bg-slate-900 border-slate-800 text-slate-400 text-xs font-mono">
-            {nodes[1]?.label || 'Anak [20]'}
-          </div>
-          <div className="p-2 px-3 rounded-lg border bg-amber-500/20 border-amber-500/50 text-amber-300 text-xs font-mono font-bold">
-            {nodes[2]?.label || 'Anak [80]'}
-          </div>
-        </div>
-        <div className="w-0.5 h-3 bg-slate-700" />
-        {/* Leaf */}
-        <div className="p-2 px-4 rounded-lg border bg-emerald-500/20 border-emerald-500/50 text-emerald-300 text-xs font-mono font-bold">
-          {nodes[3]?.label || 'Leaf Data [75, 80]'} ✨
-        </div>
-      </div>
-
-      {state.notes && (
-        <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-          💡 {state.notes}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── 4. Code Execution Visual ──────────────────────────────────────
-function CodeExecutionVisual({ state }: { state: VisualSceneState }) {
-  const line = state.highlightedLine ?? 1;
-  const variables = state.variables || { status: 'Executing', step: 1 };
-
-  return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-emerald-400">
-          <Terminal className="w-4 h-4" /> Runtime Code Stepper
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">
-          Baris: #{line}
-        </span>
-      </div>
-
-      <div className="my-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono space-y-1">
-        <div className={line === 1 ? 'text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded' : 'text-slate-400'}>
-          1: const start = Date.now();
-        </div>
-        <div className={line === 2 ? 'text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded' : 'text-slate-400'}>
-          2: const response = await processConcept();
-        </div>
-        <div className={line >= 3 ? 'text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded font-bold' : 'text-slate-400'}>
-          3: return response.ok ? SUCCESS : RETRY;
-        </div>
-      </div>
-
-      <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs">
-        <span className="text-slate-400">Variabel Aktif:</span>
-        <div className="flex gap-2">
-          {Object.entries(variables).map(([k, v]) => (
-            <span key={k} className="text-[11px] font-mono bg-slate-800 text-amber-300 px-2 py-0.5 rounded">
-              {k}: {String(v)}
+    <Frame label={t('learn.visual.callstack.title')} meta={t('learn.visual.callstack.meta', { n: items.length })} notes={state.notes}>
+      <ol className="flex flex-col-reverse gap-2">
+        {items.map((item, idx) => (
+          <li
+            key={idx}
+            className={cn(cell, 'flex items-center justify-between gap-3', idx === 0 ? cellOn : cellOff)}
+          >
+            <span className="font-medium">{item.label}</span>
+            <span className="flex items-center gap-2">
+              <span className={idx === 0 ? '' : 'text-muted-foreground'}>{item.value}</span>
+              {item.isBaseCase && <Badge variant="success">{t('learn.visual.callstack.basecase')}</Badge>}
             </span>
-          ))}
-        </div>
-      </div>
-    </div>
+          </li>
+        ))}
+      </ol>
+    </Frame>
   );
 }
 
-// ── 5. Data Flow Visual ───────────────────────────────────────────
-function DataFlowVisual({ state }: { state: VisualSceneState }) {
-  const stages = state.flowStages || [
-    { id: '1', label: 'Call Stack', status: 'done' },
-    { id: '2', label: 'Web APIs', status: 'active' },
-    { id: '3', label: 'Microtask Queue', status: 'pending' },
-  ];
-
+// ── 2. Loss landscape ─────────────────────────────────────────────
+// The curve is the quadratic Bezier M10 15 Q100 175 190 15, so a point at fraction u sits at y = 15 + 320u(1-u).
+function LossLandscapeVisual({ state }: { state: VisualSceneState }) {
+  const { t } = useT();
+  const point = state.lossPoint ?? { x: 50, y: 15, loss: 1.25, step: 5 };
+  const u = Math.min(1, Math.max(0, point.x / 100));
+  const cx = 10 + 180 * u;
+  const cy = 15 + 320 * u * (1 - u);
   return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-indigo-400">
-          <Cpu className="w-4 h-4" /> Alur Pemrosesan Asinkron
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-          Non-blocking Pipeline
-        </span>
-      </div>
+    <Frame
+      label={t('learn.visual.loss.title')}
+      meta={t('learn.visual.loss.meta', { loss: point.loss.toFixed(2), step: point.step })}
+      notes={state.notes || t('learn.visual.loss.fallback')}
+    >
+      <svg viewBox="0 0 200 118" className="mx-auto h-40 w-full max-w-md" role="img" aria-label={t('learn.visual.loss.title')}>
+        <path d="M 10 15 Q 100 175 190 15" className="fill-none stroke-foreground" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="10" y1="108" x2="190" y2="108" className="stroke-hairline-strong" strokeWidth="1" />
+        <circle cx="100" cy="95" r="3.5" className="fill-foreground" />
+        <text x="100" y="116" textAnchor="middle" className="fill-muted-foreground" fontSize="8">
+          {t('learn.visual.loss.min')}
+        </text>
+        <circle cx={cx} cy={cy} r="6" className="fill-amber stroke-foreground" strokeWidth="1.5" />
+      </svg>
+      <p className="mt-2 text-center font-mono text-xs text-muted-foreground">{t('learn.visual.loss.rule')}</p>
+    </Frame>
+  );
+}
 
-      <div className="flex-1 flex items-center justify-around my-4 gap-2">
-        {stages.map((stage, idx) => (
-          <React.Fragment key={stage.id}>
-            <div
-              className={`p-3.5 rounded-xl border text-center transition-all ${
-                stage.status === 'active'
-                  ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
-                  : stage.status === 'done'
-                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-400'
-              }`}
-            >
-              <div className="text-xs font-bold">{stage.label}</div>
-              <div className="text-[10px] uppercase font-mono mt-1 opacity-70">
-                {stage.status}
-              </div>
-            </div>
-            {idx < stages.length - 1 && (
-              <ArrowRight className="w-4 h-4 text-slate-600 shrink-0" />
-            )}
-          </React.Fragment>
+// ── 3. Tree ───────────────────────────────────────────────────────
+type TreeNode = NonNullable<VisualSceneState['treeNodes']>[number];
+
+function TreeLevel({ node, byId, on, depth }: { node: TreeNode; byId: Map<string, TreeNode>; on: Set<string>; depth: number }) {
+  const kids = depth < 6 ? (node.children ?? []).map(id => byId.get(id)).filter((n): n is TreeNode => !!n) : [];
+  const active = node.isHighlighted || on.has(node.id);
+  return (
+    <li className="flex flex-col items-center gap-2">
+      <span className={cn(cell, active ? cellOn : cellOff)}>{node.label}</span>
+      {kids.length > 0 && (
+        <>
+          <span className="h-3 w-px bg-hairline-strong" aria-hidden />
+          <ul className="flex flex-wrap items-start justify-center gap-4">
+            {kids.map(k => <TreeLevel key={k.id} node={k} byId={byId} on={on} depth={depth + 1} />)}
+          </ul>
+        </>
+      )}
+    </li>
+  );
+}
+
+function TreeStructureVisual({ state }: { state: VisualSceneState }) {
+  const { t } = useT();
+  const nodes = state.treeNodes ?? [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const childIds = new Set(nodes.flatMap(n => n.children ?? []));
+  const roots = nodes.filter(n => !childIds.has(n.id));
+  const on = new Set(state.activeNodes ?? []);
+  return (
+    <Frame label={t('learn.visual.tree.title')} meta={t('learn.visual.tree.meta', { n: nodes.length })} notes={state.notes}>
+      <ul className="flex flex-wrap items-start justify-center gap-6">
+        {(roots.length ? roots : nodes.slice(0, 1)).map(r => <TreeLevel key={r.id} node={r} byId={byId} on={on} depth={0} />)}
+      </ul>
+    </Frame>
+  );
+}
+
+// ── 4. Code execution: steps and variables only, no invented source code ──
+function CodeExecutionVisual({ state }: { state: VisualSceneState }) {
+  const { t } = useT();
+  const total = Math.max(1, state.totalSteps ?? state.currentStep ?? 1);
+  const step = Math.min(total, Math.max(1, state.currentStep ?? 1));
+  const vars = Object.entries(state.variables ?? {});
+  return (
+    <Frame
+      label={t('learn.visual.code.title')}
+      meta={state.highlightedLine ? t('learn.visual.code.line', { n: state.highlightedLine }) : undefined}
+      notes={state.notes}
+    >
+      <p className="mb-2 text-xs text-muted-foreground">{t('learn.visual.code.step', { n: step, total })}</p>
+      <div className="flex gap-1.5" aria-hidden>
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={cn('h-1.5 flex-1 rounded-pill', i < step ? 'bg-amber' : 'bg-surface-strong')} />
         ))}
       </div>
-
-      {state.notes && (
-        <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-          ⚡ {state.notes}
-        </div>
+      {vars.length > 0 && (
+        <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-control border border-hairline bg-surface p-3 font-mono text-xs">
+          <dt className="col-span-2 font-sans text-xs text-muted-foreground">{t('learn.visual.code.vars')}</dt>
+          {vars.map(([k, v]) => (
+            <React.Fragment key={k}>
+              <dt className="text-muted-foreground">{k}</dt>
+              <dd className="text-foreground">{String(v)}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
       )}
-    </div>
+    </Frame>
   );
 }
 
-// ── 6. Concept Illustration Visual ────────────────────────────────
-function ConceptIllustrationVisual({ state, title }: { state: VisualSceneState; title?: string }) {
-  const activeNodes = state.activeNodes || ['Fondasi Konsep', 'Arsitektur Logika', 'Penerapan Praktis'];
-
+// ── 5. Data flow ──────────────────────────────────────────────────
+function DataFlowVisual({ state }: { state: VisualSceneState }) {
+  const { t } = useT();
+  const stages = state.flowStages ?? [];
   return (
-    <div className="w-full h-full min-h-[260px] p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-400 border-b border-slate-800/80 pb-3">
-        <span className="flex items-center gap-1.5 text-amber-400">
-          <Sparkles className="w-4 h-4" /> Eksplanasi Konseptual
-        </span>
-        <span className="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-          {title || 'Pijar Interactive Visual'}
-        </span>
-      </div>
+    <Frame label={t('learn.visual.flow.title')} notes={state.notes}>
+      <ol className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        {stages.map((s, i) => (
+          <li key={s.id} className="flex flex-1 items-stretch gap-2 sm:flex-col">
+            <div className={cn(cell, 'flex flex-1 flex-col gap-1 text-center', s.status === 'active' ? cellOn : cellOff)}>
+              <span className="font-medium">{s.label}</span>
+              <span className={cn('font-sans text-[11px]', s.status === 'active' ? '' : 'text-muted-foreground')}>
+                {t(`learn.visual.flow.${s.status}` as 'learn.visual.flow.done')}
+              </span>
+            </div>
+            {i < stages.length - 1 && <span className="hidden h-px w-full bg-hairline-strong sm:block" aria-hidden />}
+          </li>
+        ))}
+      </ol>
+    </Frame>
+  );
+}
 
-      <div className="flex-1 flex flex-col items-center justify-center my-4 space-y-3">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2">
-          <Sparkles className="w-7 h-7" />
-        </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          {activeNodes.map((node, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-800 text-slate-200"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              {node}
-            </span>
+// ── 6. Concept overview ───────────────────────────────────────────
+function ConceptIllustrationVisual({ state, title }: { state: VisualSceneState; title?: string }) {
+  const { t } = useT();
+  const nodes = state.activeNodes ?? [];
+  return (
+    <Frame label={t('learn.visual.concept.title')} meta={title} notes={nodes.length ? state.notes : undefined}>
+      {nodes.length > 0 ? (
+        <ol className="flex flex-wrap justify-center gap-2">
+          {nodes.map((n, i) => (
+            <li key={i} className={cn(cell, 'flex items-center gap-2 font-sans text-sm', i === 0 ? cellOn : cellOff)}>
+              <span className="font-mono text-xs">{i + 1}</span>
+              {n}
+            </li>
           ))}
-        </div>
-      </div>
-
-      {state.notes && (
-        <div className="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-          💡 {state.notes}
-        </div>
+        </ol>
+      ) : (
+        <p className="text-center text-base leading-relaxed text-foreground">{state.notes}</p>
       )}
-    </div>
+    </Frame>
   );
 }

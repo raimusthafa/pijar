@@ -8,6 +8,7 @@ import { CURATED_MATERIALS } from './curated-materials';
 import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType, MathSpec, MathTemplate } from './types';
 import { DEFAULT_MATH_SPECS, sanitizeScenesMath } from './math-spec';
 import { createClient } from '@/lib/supabase/server';
+import { materialCacheKeys, type LessonLanguage } from './cache-key';
 
 // In-memory cache for ultra-fast, zero-cost reads during runtime
 const MEMORY_CACHE = new Map<string, DetailedLearningMaterial>();
@@ -25,6 +26,8 @@ export interface MaterialGenerationParams {
   nodeDescription?: string;
   prerequisites?: string[];
   forceRegenerate?: boolean;
+  /** Interface language of the lesson. Default 'id'. */
+  language?: LessonLanguage;
 }
 
 /**
@@ -277,14 +280,14 @@ Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${lab
  * Tiered Cache Architecture: Memory Cache -> Supabase Cloud DB -> AI Generation -> Topic Fallback.
  */
 export async function getOrGenerateMaterial(params: MaterialGenerationParams): Promise<DetailedLearningMaterial> {
-  const { topic, nodeId, forceRegenerate = false } = params;
-  const cacheKey = `${topic}_${nodeId}`;
+  const { topic, nodeId, forceRegenerate = false, language = 'id' } = params;
+  const { memoryKey: cacheKey, dbTopic, useCurated } = materialCacheKeys(topic, nodeId, language);
 
   // 1. Memory Cache Hit
   if (!forceRegenerate && MEMORY_CACHE.has(cacheKey)) {
     return MEMORY_CACHE.get(cacheKey)!;
   }
-  if (!forceRegenerate && MEMORY_CACHE.has(nodeId)) {
+  if (!forceRegenerate && useCurated && MEMORY_CACHE.has(nodeId)) {
     return MEMORY_CACHE.get(nodeId)!;
   }
 
@@ -295,7 +298,7 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
       const { data: cachedRow } = await supabase
         .from('concept_materials')
         .select('material_json')
-        .eq('topic', topic)
+        .eq('topic', dbTopic)
         .eq('node_id', nodeId)
         .maybeSingle();
 
@@ -316,7 +319,9 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
 
   const systemInstruction = `Kamu adalah Principal Curriculum Architect dan Senior Learning Experience Designer di Pijar.
 Tugasmu adalah menghasilkan materi edukasi berbobot ilmiah tinggi, intuitif, ramah pembelajar, dan skrip video visual interaktif untuk konsep teknologi.
-Semua teks harus dalam Bahasa Indonesia edukatif yang profesional, jelas, dan kaya contoh nyata.
+${language === 'en'
+    ? 'Write ALL learner-facing text (titles, explanations, analogy, definitions, code comments, quiz, narration, captions) in clear, natural English. Keep the JSON keys exactly as in the schema.'
+    : 'Semua teks harus dalam Bahasa Indonesia edukatif yang profesional, jelas, dan kaya contoh nyata.'}
 KEMBALIKAN HANYA JSON VALID SESUAI FORMAT SCHEMA.`;
 
   const prompt = `Buatkan materi pembelajaran komprehensif dan skrip video interaktif untuk konsep berikut:
@@ -455,7 +460,7 @@ Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, da
         await supabase
           .from('concept_materials')
           .upsert({
-            topic,
+            topic: dbTopic,
             node_id: nodeId,
             material_json: aiOutput,
             video_scene_json: aiOutput.videoScript,

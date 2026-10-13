@@ -3,12 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { MathSpec } from '@/lib/learn/types';
+import { Skeleton } from '@/components/ui/skeleton';
 import { describeMathSpec } from '@/lib/learn/math-spec';
 
 // Mafs measures the DOM, so it is loaded on the client only.
 const MathCanvas = dynamic(() => import('./MathCanvas'), {
   ssr: false,
-  loading: () => <div className="h-[280px] w-full animate-pulse rounded-md bg-muted" aria-hidden="true" />,
+  loading: () => <Skeleton className="h-[280px] w-full" />,
 });
 
 interface MathVisualProps {
@@ -20,7 +21,7 @@ interface MathVisualProps {
 }
 
 // Mafs sets its variables on .MafsView itself, so they must be overridden there (scoped to this component).
-const THEME_CSS = `.pj-math .MafsView{--mafs-bg:transparent;--mafs-fg:var(--pj-ink,var(--foreground,currentColor));--mafs-line-color:var(--border,currentColor)}`;
+const THEME_CSS = `.pj-math .MafsView{--mafs-bg:transparent;--mafs-fg:var(--pj-ink);--mafs-line-color:var(--pj-hairline-strong)}`;
 
 export function MathVisual({ spec, progress, interactive = false }: MathVisualProps) {
   const [reduced, setReduced] = useState(false);
@@ -34,7 +35,7 @@ export function MathVisual({ spec, progress, interactive = false }: MathVisualPr
 
   const description = describeMathSpec(spec);
   return (
-    <div className="pj-math w-full rounded-lg border border-border bg-card p-3 text-foreground">
+    <div className="pj-math w-full rounded-inner border border-hairline bg-raised p-4 text-foreground">
       <style>{THEME_CSS}</style>
       <div role="img" aria-label={description}>
         <MathCanvas spec={spec} progress={reduced ? 1 : progress} interactive={interactive} />
