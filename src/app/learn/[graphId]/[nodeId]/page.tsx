@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, use, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, PencilRuler, WifiOff } from 'lucide-react';
@@ -79,40 +79,36 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const subscribeNever = () => () => {};
+
 function LearnContent({ params }: LearnPageProps) {
   const { graphId, nodeId } = use(params);
   const searchParams = useSearchParams();
   const { t, locale } = useT();
 
-  const [topic, setTopic] = useState('dsa');
-  const [ready, setReady] = useState(false); // topic resolved, so the first fetch uses the right key
-  const [graph, setGraph] = useState<ReturnType<typeof getActiveGraph>>(null);
-  const [material, setMaterial] = useState<DetailedLearningMaterial | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; failed?: boolean }>();
   const [attempt, setAttempt] = useState(0);
-  const [mastered, setMastered] = useState(false);
+  const [passedKey, setPassedKey] = useState('');
 
-  const paramTopic = searchParams.get('topic');
-  useEffect(() => {
-    const resolved = paramTopic || sessionStorage.getItem('pijar_topic') || 'dsa';
-    setTopic(resolved);
-    setGraph(getActiveGraph(resolved));
-    setMastered(getMasteredNodes(resolved).includes(nodeId));
-    setReady(true);
-  }, [paramTopic, nodeId]);
+  // The stored topic is client-only; the server snapshot (null) keeps `ready` false until it resolves.
+  const stored = useSyncExternalStore(subscribeNever, () => sessionStorage.getItem('pijar_topic') ?? '', () => null);
+  const ready = stored !== null; // topic resolved, so the first fetch uses the right key
+  const topic = searchParams.get('topic') || stored || 'dsa';
+  const graph = useMemo(() => (ready ? getActiveGraph(topic) : null), [ready, topic]);
+  const storedMastered = useMemo(() => ready && getMasteredNodes(topic).includes(nodeId), [ready, topic, nodeId]);
+  const mastered = storedMastered || passedKey === `${topic}/${nodeId}`;
 
   const node = graph?.nodes.find(n => n.id === nodeId);
 
   // One generation per concept and language: the server caches it, so a visit never regenerates.
+  const curated = locale === 'id' ? CURATED_MATERIALS[nodeId] : undefined;
+  const key = `${topic}/${nodeId}/${graphId}/${locale}/${attempt}`;
+  const current = fetched?.key === key ? fetched : undefined;
+  const material = curated ?? current?.material ?? null;
+  const failed = !curated && Boolean(current?.failed);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || curated) return;
     let live = true;
-    setMaterial(null);
-    setFailed(false);
-    if (locale === 'id' && CURATED_MATERIALS[nodeId]) {
-      setMaterial(CURATED_MATERIALS[nodeId]);
-      return;
-    }
     (async () => {
       try {
         const res = await fetch('/api/learn/material', {
@@ -125,9 +121,9 @@ function LearnContent({ params }: LearnPageProps) {
         });
         const data = await res.json();
         if (!data.success || !data.material) throw new Error(data.error || 'material');
-        if (live) setMaterial(data.material);
+        if (live) setFetched({ key, material: data.material });
       } catch {
-        if (live) setFailed(true);
+        if (live) setFetched({ key, failed: true });
       }
     })();
     return () => { live = false; };
@@ -136,7 +132,7 @@ function LearnContent({ params }: LearnPageProps) {
   }, [ready, topic, nodeId, graphId, locale, attempt]);
 
   const handlePassed = useCallback(() => {
-    setMastered(true);
+    setPassedKey(`${topic}/${nodeId}`);
     markNodeMastered(topic, nodeId).catch(() => {});
   }, [topic, nodeId]);
 

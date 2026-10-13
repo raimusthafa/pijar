@@ -76,10 +76,12 @@ export async function runChain<R>(
   now: () => number = Date.now,
 ): Promise<R> {
   let last: unknown = new Error('No AI model available (all exhausted)');
+  const start = now();
   for (const id of models) {
     if ((st.get(id) ?? 0) > now()) continue;
+    if (now() - start > CHAIN_BUDGET_MS) break;
     try {
-      return await call(id);
+      return await withTimeout(call(id), MODEL_TIMEOUT_MS);
     } catch (err) {
       last = err;
       const until = blockedUntil(err, now());
@@ -87,6 +89,18 @@ export async function runChain<R>(
     }
   }
   throw last;
+}
+
+// A hung model must not hold the whole chain: give each model a slice and the walk a total budget.
+const MODEL_TIMEOUT_MS = Number(process.env.AI_MODEL_TIMEOUT_MS ?? 20_000);
+const CHAIN_BUDGET_MS = Number(process.env.AI_CHAIN_BUDGET_MS ?? 45_000);
+
+function withTimeout<R>(p: Promise<R>, ms: number): Promise<R> {
+  let t: ReturnType<typeof setTimeout>;
+  const timer = new Promise<never>((_, rej) => {
+    t = setTimeout(() => rej(new Error(`AI model timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([p, timer]).finally(() => clearTimeout(t));
 }
 
 /** For debugging: every model with its exhausted-until (ISO string or null). */

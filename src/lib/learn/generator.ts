@@ -33,7 +33,7 @@ export interface MaterialGenerationParams {
 /**
  * Validates the runtime structure of generated learning material.
  */
-function validateMaterialContract(data: any): data is DetailedLearningMaterial {
+function validateMaterialContract(data: DetailedLearningMaterial): data is DetailedLearningMaterial {
   if (!data || typeof data !== 'object') return false;
   if (!data.nodeId || !data.title || !data.learningObjective || !data.conceptExplanation) return false;
   if (!Array.isArray(data.examples) || data.examples.length === 0) return false;

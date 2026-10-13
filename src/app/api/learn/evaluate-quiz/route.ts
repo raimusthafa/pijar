@@ -122,10 +122,14 @@ Format output JSON:
   "summary": "Ringkasan motivatif singkat..."
 }`;
 
-        const aiFeedback = await generateStructuredJSON<{
-          feedback_list: Array<{ conceptTested: string; feedback: string }>;
-          summary: string;
-        }>(aiPrompt, 'Kamu adalah AI Pedagogis Pijar yang mengkhususkan diri dalam Cognitive Misconception Debiasing. Berikan umpan balik yang empatik dan jelas.');
+        // Optional extra: never hold the grade for more than 8 s, the deterministic feedback above already stands.
+        const aiFeedback = await Promise.race([
+          generateStructuredJSON<{
+            feedback_list: Array<{ conceptTested: string; feedback: string }>;
+            summary: string;
+          }>(aiPrompt, 'Kamu adalah AI Pedagogis Pijar yang mengkhususkan diri dalam Cognitive Misconception Debiasing. Berikan umpan balik yang empatik dan jelas.'),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]);
 
         if (aiFeedback?.feedback_list) {
           for (const item of aiFeedback.feedback_list) {

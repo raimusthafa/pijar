@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import type { MathSpec } from '@/lib/learn/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,15 +23,16 @@ interface MathVisualProps {
 // Mafs sets its variables on .MafsView itself, so they must be overridden there (scoped to this component).
 const THEME_CSS = `.pj-math .MafsView{--mafs-bg:transparent;--mafs-fg:var(--pj-ink);--mafs-line-color:var(--pj-hairline-strong)}`;
 
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+
+function subscribeReduced(onChange: () => void) {
+  const mq = window.matchMedia(REDUCED_MOTION);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
 export function MathVisual({ spec, progress, interactive = false }: MathVisualProps) {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReduced(mq.matches);
-    const onChange = () => setReduced(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
+  const reduced = useSyncExternalStore(subscribeReduced, () => window.matchMedia(REDUCED_MOTION).matches, () => false);
 
   const description = describeMathSpec(spec);
   return (

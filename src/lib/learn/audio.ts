@@ -92,7 +92,7 @@ export class VideoNarrationController {
     text: string,
     onStart?: () => void,
     onEnd?: () => void,
-    onError?: (err: any) => void
+    onError?: (err: unknown) => void
   ): void {
     if (this.isMuted || typeof window === 'undefined') return;
 

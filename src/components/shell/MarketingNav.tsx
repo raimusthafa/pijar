@@ -35,7 +35,7 @@ export function MarketingNav({
   useEffect(() => {
     if (!revealAfterId) return;
     const hero = document.getElementById(revealAfterId);
-    if (!hero) return setVisible(true);
+    if (!hero) return void queueMicrotask(() => setVisible(true));
     const io = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting));
     io.observe(hero);
     return () => io.disconnect();

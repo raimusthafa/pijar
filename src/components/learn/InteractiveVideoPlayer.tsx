@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Captions, ChevronLeft, ChevronRight, Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import type { VideoScriptPlan } from '@/lib/learn/types';
-import { VideoNarrationController, probeAudioCapability, type AudioCapability } from '@/lib/learn/audio';
+import { VideoNarrationController, probeAudioCapability } from '@/lib/learn/audio';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/lib/i18n/client';
@@ -34,7 +34,9 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const [isMuted, setIsMuted] = useState(false);
   const [showCaptions, setShowCaptions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [audioCap, setAudioCap] = useState<AudioCapability | null>(null);
+  const [audio, setAudio] = useState(() => ({ locale, cap: probeAudioCapability(locale) }));
+  if (audio.locale !== locale) setAudio({ locale, cap: probeAudioCapability(locale) });
+  const audioCap = audio.cap;
   const [seekTick, setSeekTick] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,9 +59,8 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   useEffect(() => {
     const controller = new VideoNarrationController(locale);
     narrationRef.current = controller;
-    setAudioCap(controller.getCapability());
     const speech = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
-    if (speech) speech.onvoiceschanged = () => setAudioCap(probeAudioCapability(locale));
+    if (speech) speech.onvoiceschanged = () => setAudio({ locale, cap: probeAudioCapability(locale) });
     return () => {
       controller.stop();
       if (speech) speech.onvoiceschanged = null;

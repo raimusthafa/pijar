@@ -5,6 +5,10 @@ import { LOCALE_COOKIE, LOCALES, type Locale } from '@/lib/i18n/define';
 import { useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
 
+function setLocaleCookie(locale: Locale) {
+  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`;
+}
+
 /** ID | EN. Sets the pj-locale cookie, then refreshes so server components re-render in the new language. */
 export function LocaleSwitch({ className }: { className?: string }) {
   const { t, locale } = useT();
@@ -12,7 +16,7 @@ export function LocaleSwitch({ className }: { className?: string }) {
 
   function choose(next: Locale) {
     if (next === locale) return;
-    document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    setLocaleCookie(next);
     router.refresh();
   }
 
