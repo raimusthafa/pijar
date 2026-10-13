@@ -2,14 +2,13 @@
 
 import React, { useRef, useState } from 'react';
 import Link from 'next/link';
-import { Check, X } from 'lucide-react';
+import { AnswerOption } from '@/components/ui/answer-option';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InlineText } from './RichText';
 import { useT } from '@/lib/i18n/client';
 import { MASTERY_THRESHOLD } from '@/lib/mastery/engine';
-import { cn } from '@/lib/utils';
 import type { QuizEvaluationResult } from '@/lib/learn/types';
 import type { CurriculumEdge, CurriculumNode } from '@/types';
 
@@ -90,7 +89,7 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
   const nextLabel = graph?.nodes.find(n => n.id === nextId)?.label;
 
   return (
-    <section ref={topRef} aria-labelledby="posttest-title" className="scroll-mt-4 rounded-card bg-surface p-6 md:p-8">
+    <section ref={topRef} aria-labelledby="posttest-title" className="scroll-mt-4 rounded-card bg-surface p-4 sm:p-6 md:p-8">
       <h2 id="posttest-title" className="font-display text-h3">{t('learn.quiz.title')}</h2>
 
       {phase === 'intro' && (
@@ -125,7 +124,7 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
       {(phase === 'answering' || phase === 'submitting' || showResult) && (
         <div className="mt-4 space-y-4">
           {showResult && (
-            <div className="rounded-inner border border-hairline-strong bg-raised p-5 md:p-6" role="status">
+            <div className="rounded-inner border border-hairline-strong bg-raised p-4 sm:p-5 md:p-6" role="status">
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant={result.isPassed ? 'success' : 'warning'}>
                   {result.isPassed ? t('learn.quiz.pass') : t('learn.quiz.fail')}
@@ -187,7 +186,7 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
               const ev = result?.questionResults.find(r => r.questionId === q.id);
               const chosen = answers[q.id];
               return (
-                <li key={q.id} className="rounded-inner border border-hairline bg-raised p-5">
+                <li key={q.id} className="rounded-inner border border-hairline bg-raised p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <p id={`q-${q.id}`} className="text-base leading-snug font-medium">
                       <span className="mr-2 text-muted-foreground tabular-nums">{qi + 1}.</span>
@@ -205,35 +204,19 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
                       const isRight = showResult && ev?.correctIndex === oi;
                       const isWrongPick = showResult && !!ev && isChosen && !ev.isCorrect;
                       return (
-                        <button
+                        <AnswerOption
                           key={oi}
-                          type="button"
                           role="radio"
                           aria-checked={isChosen}
                           disabled={!!showResult || phase === 'submitting'}
                           onClick={() => setAnswers(a => ({ ...a, [q.id]: oi }))}
-                          className={cn(
-                            'pj-press flex min-h-11 w-full items-center justify-between gap-3 rounded-control border px-4 py-2.5 text-left text-sm transition-colors duration-150 disabled:opacity-100',
-                            isRight ? 'border-success bg-surface'
-                              : isWrongPick ? 'border-danger bg-surface'
-                              : isChosen ? 'border-foreground bg-surface'
-                              : 'border-field enabled:hover:bg-hover',
-                          )}
+                          state={isRight ? 'correct' : isWrongPick ? 'wrong' : isChosen ? 'picked' : 'idle'}
+                          className="min-h-11 rounded-control py-2.5 disabled:opacity-100"
                         >
-                          <span><InlineText text={opt} /></span>
-                          {isRight && (
-                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                              <Check className="size-4 text-success" strokeWidth={2} aria-hidden />
-                              {t('learn.quiz.rightAnswer')}
-                            </span>
-                          )}
-                          {isWrongPick && (
-                            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                              <X className="size-4 text-danger" strokeWidth={2} aria-hidden />
-                              {t('learn.quiz.yourAnswer')}
-                            </span>
-                          )}
-                        </button>
+                          <InlineText text={opt} />
+                          {isRight && <span className="ml-2 text-xs text-muted-foreground">{t('learn.quiz.rightAnswer')}</span>}
+                          {isWrongPick && <span className="ml-2 text-xs text-muted-foreground">{t('learn.quiz.yourAnswer')}</span>}
+                        </AnswerOption>
                       );
                     })}
                   </div>
@@ -250,7 +233,7 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
 
           {!showResult && (
             <div className="space-y-3">
-              {submitError && <p role="alert" className="text-sm text-danger">{t('learn.quiz.error.submit')}</p>}
+              {submitError && <p role="alert" className="text-sm">{t('learn.quiz.error.submit')}</p>}
               <Button onClick={submit} disabled={answered < questions.length || phase === 'submitting'}>
                 {phase === 'submitting' ? t('learn.quiz.submitting') : t('learn.quiz.submit')}
               </Button>

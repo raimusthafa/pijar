@@ -48,8 +48,8 @@ export function ConceptMap() {
   const path = selected ? new Set([selected, ...prerequisites(selected)]) : null;
 
   return (
-    <div className="py-2">
-      <div role="group" aria-label={t('landing.fitur.map.label')} className="grid grid-cols-1 gap-y-9 sm:grid-cols-3 sm:gap-x-9">
+    <div className="h-full py-2">
+      <div role="group" aria-label={t('landing.fitur.map.label')} className="grid h-full grid-cols-1 gap-y-9 sm:grid-cols-3 sm:grid-rows-2 sm:gap-x-9">
         {NODES.map((n, i) => {
           const inPath = path?.has(n.id) ?? false;
           // The connector leaving n is lit when both n and the next node are in the selected path.

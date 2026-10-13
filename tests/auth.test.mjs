@@ -404,6 +404,10 @@ describe('onboarding goal helpers', () => {
     assert.equal(startConcept(begin), 'CIA triad');
     assert.equal(startConcept(pro), 'Threat modelling');
     assert.equal(startConcept(null), '');
+    const offline = { canonical_topic: 'x', recommended_first_step: 'Mulailah dengan modul model mental dasar untuk menyingkirkan kebingungan awal sebelum masuk ke materi teknis.', recommended_diagnostic_focus: ['Model Mental & Filosofi Dasar'] };
+    assert.equal(startConcept(offline, 'en'), 'Core mental models');
+    assert.equal(startConcept(offline, 'id'), 'Model mental dasar');
+    assert.equal(startConcept({ canonical_topic: 'x', recommended_first_step: 'a'.repeat(120), recommended_diagnostic_focus: ['Hashing'] }), 'Hashing');
     assert.equal(profileGoal(begin), 'beginner');
     assert.equal(profileGoal(pro), 'practitioner');
     assert.equal(profileGoal({ canonical_topic: 'x', detected_level: 'intermediate' }), 'deepen');

@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, X } from 'lucide-react';
+import { AnswerOption } from '@/components/ui/answer-option';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useT } from '@/lib/i18n/client';
-import { cn } from '@/lib/utils';
 import type { Q } from './types';
 
 /** One question with 1 to 4 key answers and immediate feedback that says nothing about what comes next. */
@@ -59,33 +58,18 @@ export function QuestionPanel({
           <h2 className="font-display text-h4 font-semibold">{q.question}</h2>
 
           <div role="group" aria-label={t('diagnostic.options.label')} className="grid gap-2">
-            {q.options.map((opt, i) => {
-              const isPicked = picked === i;
-              const isRight = answered && i === q.correctIndex;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={answered && !isPicked && !isRight}
-                  aria-disabled={answered}
-                  aria-keyshortcuts={String(i + 1)}
-                  onClick={() => onPick(i)}
-                  className={cn(
-                    'pj-press flex min-h-12 items-center gap-3 rounded-inner border px-4 py-2 text-left text-sm transition-colors duration-150',
-                    !answered && 'border-field bg-raised hover:bg-hover',
-                    isPicked && correct && 'border-transparent bg-success text-success-foreground',
-                    isPicked && !correct && 'border-transparent bg-danger text-danger-foreground',
-                    answered && isRight && !isPicked && 'border-2 border-success bg-raised',
-                    answered && !isPicked && !isRight && 'border-hairline bg-raised text-muted-foreground',
-                  )}
-                >
-                  <kbd aria-hidden className="hidden size-6 shrink-0 place-items-center rounded-control border border-current/30 font-sans text-xs tabular-nums opacity-70 md:grid">{i + 1}</kbd>
-                  <span className="min-w-0 flex-1">{opt}</span>
-                  {isRight && <Check className="size-4 shrink-0" strokeWidth={2} aria-hidden />}
-                  {isPicked && !correct && <X className="size-4 shrink-0" strokeWidth={2} aria-hidden />}
-                </button>
-              );
-            })}
+            {q.options.map((opt, i) => (
+              <AnswerOption
+                key={i}
+                keyHint={i + 1}
+                aria-keyshortcuts={String(i + 1)}
+                state={!answered ? 'idle' : i === q.correctIndex ? 'correct' : i === picked ? 'wrong' : 'dim'}
+                disabled={answered}
+                onClick={() => onPick(i)}
+              >
+                {opt}
+              </AnswerOption>
+            ))}
           </div>
 
           <div role="status" aria-live="polite" className="min-h-6">

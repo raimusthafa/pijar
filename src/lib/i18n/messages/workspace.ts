@@ -3,7 +3,7 @@ import { defineMessages } from '../define';
 // Owned by the workspace page agent.
 export default defineMessages({
   id: {
-    'title': 'Ruang Kerja',
+    'title': 'Ruang belajar',
     'list.desc': 'Tempat berlatih bersama tutor. Pilih konsep, kerjakan di kertas atau layar, lalu tunjukkan hasilnya.',
     'list.ready': 'Konsep yang bisa kamu kerjakan',
     'list.recent': 'Terakhir dibuka',
@@ -13,9 +13,9 @@ export default defineMessages({
     'list.inProgress': 'Sedang dikerjakan',
     'list.ready.label': 'Siap',
     'list.empty.title': 'Belum ada konsep yang siap',
-    'list.empty.desc': 'Ruang kerja terbuka untuk konsep di peta belajarmu. Buat atau buka peta dulu.',
+    'list.empty.desc': 'Ruang belajar terbuka untuk konsep di peta belajarmu. Buat atau buka peta dulu.',
     'list.empty.action': 'Ke peta belajar',
-    'blocked.title': 'Ruang Kerja belum siap',
+    'blocked.title': 'Ruang belajar belum siap',
     'blocked.desc': 'Bagian penyimpanannya masih disiapkan. Coba lagi nanti.',
     'phase.engage': 'Engage',
     'phase.explore': 'Explore',
@@ -61,9 +61,9 @@ export default defineMessages({
     'composer.preview': 'Pratinjau foto',
     'err.invalid_image': 'Gambarnya tidak bisa dipakai. Coba foto lain.',
     'err.upload_failed': 'Gambar gagal diunggah. Coba lagi.',
-    'err.migration_missing': 'Ruang Kerja belum siap. Coba lagi nanti.',
+    'err.migration_missing': 'Ruang belajar belum siap. Coba lagi nanti.',
     'err.generic': 'Pesan belum terkirim. Coba lagi.',
-    'err.load': 'Ruang kerja tidak bisa dibuka.',
+    'err.load': 'Ruang belajar tidak bisa dibuka.',
     'canvas.title': 'Kanvas',
     'canvas.desc': 'Tulis atau gambar langkahmu, lalu kirim ke tutor.',
     'canvas.pen': 'Pena',

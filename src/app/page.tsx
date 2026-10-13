@@ -34,7 +34,7 @@ function Title({ a, b, icon, className }: { a: string; b: string; icon?: React.R
           {icon}
         </span>
       )}{' '}
-      <span className="text-foreground/50">{b}</span>
+      <span className="text-foreground/60">{b}</span>
     </h2>
   );
 }
@@ -74,21 +74,18 @@ export default async function LandingPage() {
             </div>
 
             <div className="pj-gutter mx-auto flex max-w-[1100px] flex-col items-center gap-8 pt-12 text-center md:pt-16">
-              <h1 className="text-display text-balance text-ink">
+              <h1 className="pj-rise text-display text-balance text-ink">
                 {t('landing.hero.title.a')} <span className="text-ink/60">{t('landing.hero.title.b')}</span>
               </h1>
-              <p className="max-w-[34rem] text-lg text-ink/80 md:text-xl">{t('landing.hero.sub')}</p>
-              <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <p style={{ '--pj-i': 1 } as React.CSSProperties} className="pj-rise max-w-[34rem] text-lg text-ink/80 md:text-xl">{t('landing.hero.sub')}</p>
+              <div style={{ '--pj-i': 2 } as React.CSSProperties} className="pj-rise flex flex-col items-center gap-3 sm:flex-row">
                 <Button size="lg" render={<Link href="/auth/register" />} nativeButton={false}>
                   {t('landing.cta.primary')}
-                </Button>
-                <Button size="lg" variant="ghost" render={<Link href="/auth/login" />} nativeButton={false}>
-                  {t('landing.cta.secondary')}
                 </Button>
               </div>
             </div>
 
-            <div className="pj-gutter pt-10 pb-14 md:pt-12 md:pb-20">
+            <div className="pj-gutter pt-10 pb-6 md:pt-12 md:pb-8">
               <HeroObject />
             </div>
           </div>
@@ -127,7 +124,7 @@ export default async function LandingPage() {
                 <article className="flex h-full flex-col gap-6 rounded-card-lg bg-surface p-6 md:p-9">
                   <Chip icon={<Network {...ICON} />}>{t('landing.fitur.map.chip')}</Chip>
                   <h3 className="text-h3 max-w-[18ch]">{t('landing.fitur.map.title')}</h3>
-                  <div className="my-auto"><ConceptMap /></div>
+                  <div className="flex-1"><ConceptMap /></div>
                   <p className="text-base text-foreground/80">{t('landing.fitur.map.body')}</p>
                 </article>
               </Reveal>

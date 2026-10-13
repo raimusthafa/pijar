@@ -127,16 +127,14 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
             <Button render={<Link href={`/learn/${graphId}/${learnId}`} />} nativeButton={false} size="lg" className="w-full">
               {t(redirectToPrereq ? 'graph.insp.learn.prereq' : 'graph.insp.learn')}
             </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="secondary" render={<Link href={`/workspace/${graphId}/${node.id}`} />} nativeButton={false}>
-                <PencilRuler strokeWidth={1.75} aria-hidden />
-                {t('graph.insp.workspace')}
-              </Button>
-              <Button variant="secondary" render={<Link href={`/diagnostic?topic=${encodeURIComponent(topic)}`} />} nativeButton={false}>
-                <RotateCcw strokeWidth={1.75} aria-hidden />
-                {t('graph.insp.retake')}
-              </Button>
-            </div>
+            <Button variant="secondary" render={<Link href={`/workspace/${graphId}/${node.id}`} />} nativeButton={false}>
+              <PencilRuler strokeWidth={1.75} aria-hidden />
+              {t('graph.insp.workspace')}
+            </Button>
+            <Button variant="ghost" render={<Link href={`/diagnostic?topic=${encodeURIComponent(topic)}`} />} nativeButton={false}>
+              <RotateCcw strokeWidth={1.75} aria-hidden />
+              {t('graph.insp.retake')}
+            </Button>
           </div>
         </>
       )}

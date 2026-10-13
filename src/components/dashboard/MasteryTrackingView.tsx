@@ -23,7 +23,7 @@ export function MasteryTrackingView({ graph }: { graph?: DashboardGraph }) {
   ];
 
   return (
-    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <Card className="pj-rise">
         <div className="grid gap-5 px-(--card-spacing)">
           <div>

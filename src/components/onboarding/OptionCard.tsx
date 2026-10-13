@@ -19,7 +19,7 @@ export function OptionCard({
   return (
     <label
       className={cn(
-        'flex cursor-pointer items-start gap-3 rounded-inner border p-4 transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-foreground',
+        'pj-press flex cursor-pointer items-start gap-3 rounded-inner border p-3 md:p-4 transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-foreground',
         checked ? 'border-foreground bg-raised' : 'border-field hover:bg-hover',
       )}
     >

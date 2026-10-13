@@ -161,12 +161,16 @@ function CodeExecutionVisual({ state }: { state: VisualSceneState }) {
       meta={state.highlightedLine ? t('learn.visual.code.line', { n: state.highlightedLine }) : undefined}
       notes={state.notes}
     >
-      <p className="mb-2 text-xs text-muted-foreground">{t('learn.visual.code.step', { n: step, total })}</p>
-      <div className="flex gap-1.5" aria-hidden>
-        {Array.from({ length: total }, (_, i) => (
-          <span key={i} className={cn('h-1.5 flex-1 rounded-pill', i < step ? 'bg-amber' : 'bg-surface-strong')} />
-        ))}
-      </div>
+      {total > 1 && (
+        <>
+          <p className="mb-2 text-xs text-muted-foreground">{t('learn.visual.code.step', { n: step, total })}</p>
+          <div className="flex gap-1.5" aria-hidden>
+            {Array.from({ length: total }, (_, i) => (
+              <span key={i} className={cn('h-1.5 flex-1 rounded-pill', i < step ? 'bg-amber' : 'bg-surface-strong')} />
+            ))}
+          </div>
+        </>
+      )}
       {vars.length > 0 && (
         <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-control border border-hairline bg-surface p-3 font-mono text-xs">
           <dt className="col-span-2 font-sans text-xs text-muted-foreground">{t('learn.visual.code.vars')}</dt>

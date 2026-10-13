@@ -41,7 +41,7 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export function OnboardingFlow() {
-  useT();
+  const { locale } = useT();
   const router = useRouter();
   const [supabase] = useState(createClient);
   const box = useRef<HTMLDivElement>(null);
@@ -121,7 +121,7 @@ export function OnboardingFlow() {
       const r: CognitiveIntakeResult = data.intake;
       setIntake(r);
       setTopic(r.canonical_topic);
-      setUnderstood({ topic: r.canonical_topic, start: startConcept(r), level: r.detected_level ?? null, words: text.trim() });
+      setUnderstood({ topic: r.canonical_topic, start: startConcept(r, locale), level: r.detected_level ?? null, words: text.trim() });
       setCount(defaultDiagnosticCount(r));
       setGoalId(null);
       setStatus('ready');

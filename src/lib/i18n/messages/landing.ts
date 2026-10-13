@@ -9,7 +9,6 @@ export default defineMessages({
     'hero.sub':
       'Pijar mencari konsep dasar yang belum kuat dari jawabanmu, lalu menyusun jalur belajar mulai dari titik itu.',
     'cta.primary': 'Mulai diagnostik',
-    'cta.secondary': 'Masuk',
     'hero.object.label':
       'Empat kartu konsep terhubung dalam bentuk logo Pijar. Persamaan linear ditandai sebagai konsep yang perlu diperkuat.',
 
@@ -94,7 +93,6 @@ export default defineMessages({
     'hero.sub':
       'Pijar finds the foundation concept you have not mastered yet, then builds a learning path from that point.',
     'cta.primary': 'Start the diagnostic',
-    'cta.secondary': 'Sign in',
     'hero.object.label':
       'Four linked concept cards arranged in the shape of the Pijar logo. Linear equations is marked as the concept to strengthen.',
 

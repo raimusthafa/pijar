@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { getT } from '@/lib/i18n/server';
 import { AppShell } from '@/components/shell/AppShell';
 import { requireUser, type GraphRow } from '@/components/workspace/data';
 import { WorkspaceList, WorkspaceListSkeleton, type RecentRow, type ReadyRow } from '@/components/workspace/WorkspaceList';
@@ -13,7 +14,7 @@ export default function WorkspacePage() {
 }
 
 async function Content() {
-  const { supabase, shellUser } = await requireUser();
+  const [{ supabase, shellUser }, { t }] = await Promise.all([requireUser(), getT()]);
   const { data } = await supabase
     .from('learning_graphs')
     .select('id, topic, nodes_json')
@@ -42,7 +43,7 @@ async function Content() {
   });
 
   return (
-    <AppShell user={shellUser}>
+    <AppShell user={shellUser} title={t('workspace.title')}>
       <WorkspaceList ready={ready} recent={recent} blocked={blocked} />
     </AppShell>
   );

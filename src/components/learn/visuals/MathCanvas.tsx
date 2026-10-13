@@ -117,7 +117,7 @@ function FunctionLayer({
         <React.Fragment key={i}>
           <Plot.OfX y={f.fn} domain={[xr[0], Math.max(xr[0] + 1e-6, lerp(xr[0], xr[1], draw))]} color={f.color} weight={3} />
           {f.label && draw > 0.95 && (
-            <Text x={xr[1]} y={Number.isFinite(f.fn(xr[1])) ? f.fn(xr[1]) : 0} attach="sw" size={14} color={f.color}>
+            <Text x={xr[1] - (xr[1] - xr[0]) * 0.015} y={Number.isFinite(f.fn(xr[1])) ? f.fn(xr[1]) : 0} attach="sw" size={14} color={f.color}>
               {f.label}
             </Text>
           )}
@@ -139,7 +139,8 @@ function FunctionLayer({
           ) : (
             <Point x={tx} y={ty} color={AMBER} />
           )}
-          <Text x={tx} y={ty} attach="se" size={13} color={INK}>
+          {/* Beside the point, on the side the line does not run through: below it when the line rises, above it when it falls. */}
+          <Text x={tx + (xr[1] - xr[0]) * 0.03} y={ty} attach={slope < 0 ? 'ne' : 'se'} size={13} color={INK}>
             {`m = ${slope.toFixed(2)}`}
           </Text>
         </>
@@ -153,17 +154,13 @@ function VectorLayer({ spec, progress, interactive }: { spec: MathSpec; progress
   const [drag, setDrag] = useState<[number, number] | null>(null);
 
   // Chain tail-to-head unless a vector names its own start.
-  let cx = 0;
-  let cy = 0;
-  const placed = vecs.map((v, i) => {
-    const from: [number, number] = v.from ?? [cx, cy];
-    let to: [number, number] = v.to;
-    if (i === vecs.length - 1 && drag) to = drag;
-    cx = to[0];
-    cy = to[1];
-    return { from, to, label: v.label };
-  });
-  const resultant = placed.length >= 2 ? ([cx, cy] as [number, number]) : null;
+  const placed = vecs.reduce<{ from: [number, number]; to: [number, number]; label?: string }[]>((acc, v, i) => {
+    const prev = acc[acc.length - 1]?.to ?? [0, 0];
+    const from: [number, number] = v.from ?? [prev[0], prev[1]];
+    const to: [number, number] = i === vecs.length - 1 && drag ? drag : v.to;
+    return [...acc, { from, to, label: v.label }];
+  }, []);
+  const resultant = placed.length >= 2 ? placed[placed.length - 1].to : null;
   const last = placed[placed.length - 1];
 
   return (

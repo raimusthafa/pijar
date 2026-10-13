@@ -50,7 +50,7 @@ export default defineMessages({
     'err.rate': 'Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.',
     'err.disabled': 'Pendaftaran sedang ditutup sementara. Coba lagi nanti.',
     'err.network': 'Tidak bisa terhubung ke layanan masuk. Periksa koneksimu, lalu coba lagi.',
-    'err.unknown': 'Ada yang tidak berjalan. Coba lagi sebentar lagi.',
+    'err.unknown': 'Ada yang tidak berjalan. Coba lagi sebentar.',
     'err.resend': 'Email belum bisa dikirim ulang. Tunggu sebentar, lalu coba lagi.',
   },
   en: {

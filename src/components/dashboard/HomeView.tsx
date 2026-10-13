@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, CalendarCheck, Network, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,22 @@ export function HomeView({
   rows: ReviewRow[];
   now: Date;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
+
+  // Warm the question bank while the reader looks at the dashboard, so the review opens without the long wait.
+  // The server caches what it writes, so this runs at most once per map and language each day.
+  const dueNow = graph ? dueRows(rows, now).length : 0;
+  const graphKey = graph?.id;
+  useEffect(() => {
+    if (!graphKey || dueNow === 0) return;
+    const key = `pj-review-warm:${graphKey}:${locale}:${new Date().toDateString()}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { return; }
+    const idle = (window as unknown as { requestIdleCallback?: (f: () => void) => number }).requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500));
+    idle(() => { fetch(`/api/review/today?${new URLSearchParams({ graphId: graphKey, language: locale })}`).catch(() => {}); });
+  }, [graphKey, dueNow, locale]);
 
   if (!graph) {
     return (

@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
+import { getT } from '@/lib/i18n/server';
 import { AppShell } from '@/components/shell/AppShell';
 import { requireUser } from '@/components/workspace/data';
 import { GraphList, GraphListSkeleton, type GraphCard } from '@/components/graph/GraphList';
@@ -21,7 +22,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const { id } = await searchParams;
   if (id) redirect(`/graph/${encodeURIComponent(id)}`);
 
-  const { supabase, shellUser } = await requireUser();
+  const [{ supabase, shellUser }, { t }] = await Promise.all([requireUser(), getT()]);
   const { data, error } = await supabase
     .from('learning_graphs')
     .select('id, topic, nodes_json, updated_at, created_at')
@@ -48,7 +49,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
   });
 
   return (
-    <AppShell user={shellUser}>
+    <AppShell user={shellUser} title={t('graph.title')}>
       <GraphList graphs={graphs} failed={Boolean(error)} />
     </AppShell>
   );

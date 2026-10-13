@@ -142,15 +142,15 @@ export const MOCK_MATERIAL_REKURSI: LearningMaterial = {
   ],
   text_content: `## Apa itu Rekursi?
 
-Bayangkan kamu berdiri di depan kaca, dan di belakangmu ada kaca lain. Kamu akan melihat pantulan tak terbatas — itulah gambaran rekursi tanpa batas (yang akan menyebabkan *stack overflow*).
+Bayangkan kamu berdiri di depan kaca, dan di belakangmu ada kaca lain. Kamu akan melihat pantulan tak terbatas. Itulah gambaran rekursi tanpa batas (yang akan menyebabkan *stack overflow*).
 
 Rekursi yang **baik** adalah seperti kamu menghitung anak tangga: kamu tahu kapan harus berhenti (lantai dasar = *base case*), dan setiap langkah mendekatkan kamu ke lantai dasar.
 
 ## Anatomi Fungsi Rekursif
 
 Setiap fungsi rekursif WAJIB memiliki dua bagian:
-1. **Base Case** — kondisi untuk berhenti
-2. **Recursive Case** — kondisi di mana fungsi memanggil dirinya sendiri
+1. **Base Case**: kondisi untuk berhenti
+2. **Recursive Case**: kondisi di mana fungsi memanggil dirinya sendiri
 
 ## Contoh: Faktorial
 
@@ -201,5 +201,5 @@ export const MOCK_MISCONCEPTION: MisconceptionFeedback = {
   correct_index: 1,
   misconception_label: 'Salah paham tentang peran base case',
   correction_narrative:
-    'Kamu memilih "Fungsi berjalan normal" — ini adalah kesalahpahaman yang umum. Base case bukan sekadar opsional, melainkan **mekanisme penghenti** yang wajib ada. Tanpanya, fungsi akan terus menambah frame baru ke Call Stack (bayangkan menumpuk piring tanpa batas) hingga memori habis. Ini disebut Stack Overflow.',
+    'Kamu memilih "Fungsi berjalan normal". Ini adalah kesalahpahaman yang umum. Base case bukan sekadar opsional, melainkan **mekanisme penghenti** yang wajib ada. Tanpanya, fungsi akan terus menambah frame baru ke Call Stack (bayangkan menumpuk piring tanpa batas) hingga memori habis. Ini disebut Stack Overflow.',
 };

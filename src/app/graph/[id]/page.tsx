@@ -22,16 +22,15 @@ export default function GraphMapPage({ params }: { params: Params }) {
 
 async function Content({ params }: { params: Params }) {
   const { id } = await params;
-  const { supabase, shellUser } = await requireUser();
+  const [{ supabase, shellUser }, { t }] = await Promise.all([requireUser(), getT()]);
   const isUuid = /^[0-9a-f-]{32,36}$/i.test(id);
   const { data: graph } = isUuid
     ? await supabase.from('learning_graphs').select('id, topic, nodes_json, edges_json').eq('id', id).maybeSingle()
     : { data: null };
 
   if (!graph) {
-    const { t } = await getT();
     return (
-      <AppShell user={shellUser}>
+      <AppShell user={shellUser} title={t('graph.title')}>
         <EmptyState
           icon={Network}
           title={t('graph.notfound.title')}
@@ -46,7 +45,7 @@ async function Content({ params }: { params: Params }) {
   const nodes = overlayStatus((graph.nodes_json ?? []) as CurriculumNode[], (rows ?? []) as ProgressRow[]);
 
   return (
-    <AppShell user={shellUser}>
+    <AppShell user={shellUser} title={t('graph.title')}>
       <GraphWorkspace graphId={graph.id} topic={graph.topic} nodes={nodes} edges={(graph.edges_json ?? []) as CurriculumEdge[]} />
     </AppShell>
   );

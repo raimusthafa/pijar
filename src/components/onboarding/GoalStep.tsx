@@ -92,12 +92,12 @@ export function GoalStep({
             </h2>
             <ul className="mt-3 space-y-2">
               {goals.map((g) => (
-                <li key={g.id} className="flex items-center gap-3 rounded-inner bg-raised p-3 pl-4">
-                  <span className="min-w-0 flex-1 truncate text-sm">{g.topic}</span>
+                <li key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-inner bg-raised p-3 pl-4">
+                  <span className="min-w-0 basis-full truncate text-sm sm:flex-1 sm:basis-0">{g.topic}</span>
                   <Badge variant={g.status === 'active' ? 'success' : g.status === 'done' ? 'neutral' : 'outline'}>
                     {t(`onboarding.history.${g.status}` as MessageKey)}
                   </Badge>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => onUseGoal(g)}>
+                  <Button type="button" variant="ghost" size="sm" className="ml-auto sm:ml-0" onClick={() => onUseGoal(g)}>
                     {t('onboarding.history.use')}
                   </Button>
                 </li>

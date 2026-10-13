@@ -181,7 +181,7 @@ export function buildProceduralIntakeFallback(text: string): CognitiveIntakeResu
 
   const empathy_mentor_note = isPractitioner
     ? `Ambisi yang luar biasa! Untuk menjadi praktisi yang mahir di bidang ${canonical_topic}, kamu membutuhkan lebih dari sekadar teori dasar. Pijar telah mengkalibrasi kurikulum dan studi kasus arsitektural yang menantang standar industri.`
-    : `Sangat wajar merasa bingung ketika memulai ${canonical_topic} karena materinya sering kali berserakan tanpa peta jalan yang jelas. Di Pijar, kamu tidak perlu mencari-cari sumber luar lagi—kami telah mengurasi alur belajar langkah demi langkah dari fondasi paling awal.`;
+    : `Sangat wajar merasa bingung ketika memulai ${canonical_topic} karena materinya sering kali berserakan tanpa peta jalan yang jelas. Di Pijar, kamu tidak perlu mencari-cari sumber luar lagi. Kami telah mengurasi alur belajar langkah demi langkah dari fondasi paling awal.`;
 
   return {
     raw_input: text,

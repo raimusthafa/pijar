@@ -81,7 +81,8 @@ export function GraphWorkspace({ graphId, topic, nodes, edges }: { graphId: stri
 
   const close = useCallback(() => {
     setSelectedId(null);
-    if (viaKeyboard.current && shownId) requestAnimationFrame(() => document.getElementById(`gnode-${shownId}`)?.focus());
+    // The panel turns inert while it holds focus, and the browser moves focus to the page after that. Waiting a beat lets the concept take it back.
+    if (viaKeyboard.current && shownId) setTimeout(() => document.getElementById(`gnode-${shownId}`)?.focus(), 60);
   }, [shownId]);
 
   const done = placed.filter((n) => n.status === 'completed').length;
@@ -100,11 +101,11 @@ export function GraphWorkspace({ graphId, topic, nodes, edges }: { graphId: stri
           {t('graph.back')}
         </Button>
         <h1 className="min-w-0 flex-1 truncate font-display text-h4 font-semibold">{topic}</h1>
-        <div className="flex items-center gap-3 max-sm:order-last max-sm:w-full">
-          <Progress value={pct} aria-label={t('graph.map.progress', { done, total: placed.length })} className="w-28 flex-none max-sm:flex-1" />
-          <span className="text-sm text-muted-foreground tabular-nums">{t('graph.map.progress', { done, total: placed.length })}</span>
+        <div className="flex items-center gap-3 max-sm:order-2 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-end">
+          <Progress value={pct} aria-label={t('graph.map.progress', { done, total: placed.length })} className="w-28 flex-none max-sm:hidden" />
+          <span className="text-sm text-muted-foreground tabular-nums max-sm:text-right max-sm:text-xs">{t('graph.map.progress', { done, total: placed.length })}</span>
         </div>
-        <Tabs value={view ?? 'map'} onValueChange={(v) => setView(v as 'map' | 'list')}>
+        <Tabs value={view ?? 'map'} onValueChange={(v) => setView(v as 'map' | 'list')} className="max-sm:order-1">
           <TabsList aria-label={t('graph.view.label')}>
             <TabsTrigger value="map"><Network strokeWidth={1.75} aria-hidden />{t('graph.view.map')}</TabsTrigger>
             <TabsTrigger value="list"><ListIcon strokeWidth={1.75} aria-hidden />{t('graph.view.list')}</TabsTrigger>

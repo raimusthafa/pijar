@@ -8,7 +8,7 @@ import { retentionBars, weeklyReport } from '@/lib/dashboard/derive';
 import { DUE_RETENTION, type ReviewRow } from '@/lib/scheduler/engine';
 import type { DashboardGraph } from './types';
 
-const BAR_H = 56;
+const BAR_H = 44;
 
 /** Weekly report and retention view. Both come straight from node_progress timestamps. */
 export function ReportView({ graph, rows, now }: { graph?: DashboardGraph; rows: ReviewRow[]; now: Date }) {
@@ -20,7 +20,7 @@ export function ReportView({ graph, rows, now }: { graph?: DashboardGraph; rows:
   const peak = Math.max(1, ...week.days.map(d => Math.max(d.mastered, d.reviewed)));
 
   return (
-    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+    <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
       <Card className="pj-rise">
         <div className="grid gap-4 px-(--card-spacing)">
           <h2 className="font-display text-h4 font-semibold">{t('dashboard.report.week.title')}</h2>
@@ -48,7 +48,7 @@ export function ReportView({ graph, rows, now }: { graph?: DashboardGraph; rows:
                 role="img"
                 aria-label={t('dashboard.report.week.chart')}
                 viewBox={`0 0 210 ${BAR_H + 16}`}
-                className="w-full max-w-md"
+                className="w-full max-w-sm"
               >
                 {week.days.map((d, i) => {
                   const x = i * 30 + 3;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- AI JSON and the Supabase client are untyped here on purpose */
 // ================================================================
 // PIJAR - Question bank (cache first, one AI call for many questions)
 // Order: question_bank table -> AI (3 easy + 3 medium + 3 hard per call) -> mock/generic.
@@ -27,6 +28,11 @@ export interface GetQuestionsParams {
   difficulty: Difficulty;
   count?: number;
   language?: 'id' | 'en';
+}
+
+/** The bank key for a topic in one language, so English users never get cached Indonesian questions (and the reverse). Indonesian keeps the plain topic, so rows saved earlier still match. */
+export function bankTopic(topic: string, language?: 'id' | 'en'): string {
+  return language === 'en' ? `${topic} [en]` : topic;
 }
 
 export function validateQuestion(q: unknown): q is Omit<BankQuestion, 'difficulty'> {
@@ -87,7 +93,8 @@ const memo = new Map<string, BankQuestion[]>();
 
 export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[]> {
   const count = p.count ?? 3;
-  const { topic, nodeId } = p;
+  const { nodeId } = p;
+  const topic = bankTopic(p.topic, p.language);
   let supabase: any = null;
   try {
     const { createClient } = await import('@/lib/supabase/server');

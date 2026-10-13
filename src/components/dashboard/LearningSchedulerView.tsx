@@ -69,10 +69,10 @@ export function LearningSchedulerView({ graph }: { graph: DashboardGraph }) {
   return (
     <Card className="pj-rise" style={{ '--pj-i': 2 } as React.CSSProperties}>
       <div className="grid gap-3 px-(--card-spacing)">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="font-display text-h4 font-semibold">{t('dashboard.tasks.title')}</h2>
           {items.length > 0 && (
-            <p className="text-xs text-muted-foreground tabular-nums">
+            <p className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
               {t('dashboard.tasks.progress', { done: doneCount, total: items.length })}
             </p>
           )}

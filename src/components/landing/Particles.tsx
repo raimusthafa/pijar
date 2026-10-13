@@ -17,6 +17,7 @@ export function Particles({ className }: { className?: string }) {
     if (!canvas || !ctx) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dot = getComputedStyle(canvas).getPropertyValue('--pj-raised').trim() || 'white';
     let w = 0;
     let h = 0;
     const dots = Array.from({ length: COUNT }, () => ({
@@ -35,7 +36,7 @@ export function Particles({ className }: { className?: string }) {
           d.x = Math.random();
         }
         ctx.globalAlpha = d.a;
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = dot;
         ctx.beginPath();
         ctx.arc(d.x * w, d.y * h, d.r, 0, Math.PI * 2);
         ctx.fill();

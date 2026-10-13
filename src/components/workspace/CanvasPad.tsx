@@ -23,7 +23,7 @@ export function CanvasPad({ onExport, busy }: { onExport: (dataUrl: string) => v
   const ref = useRef<HTMLCanvasElement>(null);
   const strokes = useRef<Stroke[]>([]);
   const live = useRef<{ id: number; s: Stroke } | null>(null);
-  const colors = useRef({ ink: '#242d3a', paper: '#ffffff' });
+  const colors = useRef({ ink: 'black', paper: 'white' });
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
   const [count, setCount] = useState(0);
 
@@ -74,8 +74,8 @@ export function CanvasPad({ onExport, busy }: { onExport: (dataUrl: string) => v
     const c = ref.current!;
     const st = getComputedStyle(document.documentElement);
     colors.current = {
-      ink: st.getPropertyValue('--pj-ink').trim() || '#242d3a',
-      paper: st.getPropertyValue('--pj-raised').trim() || '#ffffff',
+      ink: st.getPropertyValue('--pj-ink').trim() || 'black',
+      paper: st.getPropertyValue('--pj-raised').trim() || 'white',
     };
     const fit = () => {
       const dpr = window.devicePixelRatio || 1;

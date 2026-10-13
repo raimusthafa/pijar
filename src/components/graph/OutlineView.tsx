@@ -57,6 +57,7 @@ export function OutlineView({
                     <button
                       type="button"
                       data-row
+                      id={`gnode-${n.id}`}
                       tabIndex={tabStop === n.id ? 0 : -1}
                       aria-pressed={selectedId === n.id}
                       onClick={(e) => onSelect(n.id, e.detail === 0)}

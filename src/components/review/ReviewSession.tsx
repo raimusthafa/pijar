@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarCheck, Check, CircleAlert, X } from 'lucide-react';
+import { CalendarCheck, CircleAlert } from 'lucide-react';
+import { AnswerOption } from '@/components/ui/answer-option';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,7 +12,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/lib/i18n/client';
 import { daysUntilDue } from '@/lib/dashboard/derive';
 import { DUE_RETENTION } from '@/lib/scheduler/engine';
-import { cn } from '@/lib/utils';
 
 interface Question { id: string; question: string; options: string[]; correctIndex: number; explanation: string }
 interface Item { nodeId: string; label: string; retention: number; question?: Question }
@@ -81,13 +81,7 @@ export function ReviewSession({ graphId: requested }: { graphId?: string }) {
 
   switch (phase.kind) {
     case 'loading':
-      return (
-        <div className="grid gap-4" role="status" aria-label={t('review.loading')}>
-          <p className="text-sm text-muted-foreground">{t('review.loading')}</p>
-          <Skeleton className="h-2 w-full rounded-pill" />
-          <Skeleton className="h-72 w-full rounded-card" />
-        </div>
-      );
+      return <Waiting />;
     case 'error':
       return (
         <Card tone="raised">
@@ -139,6 +133,33 @@ export function ReviewSession({ graphId: requested }: { graphId?: string }) {
   }
 }
 
+/** Skeleton shaped like the question card. After a few seconds it says why it is slow, because generating questions can take a while. */
+function Waiting() {
+  const { t } = useT();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(id);
+  }, []);
+  return (
+    <div className="grid gap-5" role="status">
+      <div className="grid gap-2">
+        <p className="text-sm text-muted-foreground">{t(slow ? 'review.loading.slow' : 'review.loading')}</p>
+        <Skeleton className="h-2 w-full rounded-pill" />
+      </div>
+      <Card tone="raised" className="gap-5">
+        <div className="grid gap-5 px-(--card-spacing)">
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-5 w-4/5" />
+          <div className="grid gap-2">
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-inner" />)}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[]) => void }) {
   const { t } = useT();
   const [index, setIndex] = useState(0);
@@ -153,6 +174,19 @@ function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[])
   const last = index === items.length - 1;
 
   useEffect(() => { if (answered) nextRef.current?.focus(); }, [answered]);
+
+  // 1 to 4 pick an answer, so a whole review runs without the mouse.
+  useEffect(() => {
+    if (answered) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const i = Number(e.key) - 1;
+      if (Number.isInteger(i) && i >= 0 && i < q.options.length) choose(i);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answered, index]);
 
   function choose(i: number) {
     if (answered) return;
@@ -184,31 +218,18 @@ function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[])
           <h2 className="font-display text-h4 font-semibold">{q.question}</h2>
 
           <div role="group" aria-label={t('review.options')} className="grid gap-2">
-            {q.options.map((opt, i) => {
-              const isPicked = picked === i;
-              const isRight = answered && i === q.correctIndex;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={answered && !isPicked && !isRight}
-                  aria-disabled={answered}
-                  onClick={() => choose(i)}
-                  className={cn(
-                    'pj-press flex min-h-12 items-center gap-3 rounded-inner border px-4 py-2 text-left text-sm transition-colors duration-150',
-                    !answered && 'border-field bg-raised hover:bg-hover',
-                    isPicked && correct && 'border-transparent bg-success text-success-foreground',
-                    isPicked && !correct && 'border-transparent bg-danger text-danger-foreground',
-                    answered && isRight && !isPicked && 'border-2 border-success bg-raised',
-                    answered && !isPicked && !isRight && 'border-hairline bg-raised text-muted-foreground',
-                  )}
-                >
-                  <span className="min-w-0 flex-1">{opt}</span>
-                  {answered && isRight && <Check className="size-4 shrink-0" strokeWidth={2} aria-hidden />}
-                  {isPicked && !correct && <X className="size-4 shrink-0" strokeWidth={2} aria-hidden />}
-                </button>
-              );
-            })}
+            {q.options.map((opt, i) => (
+              <AnswerOption
+                key={i}
+                keyHint={i + 1}
+                aria-keyshortcuts={String(i + 1)}
+                state={!answered ? 'idle' : i === q.correctIndex ? 'correct' : i === picked ? 'wrong' : 'dim'}
+                disabled={answered}
+                onClick={() => choose(i)}
+              >
+                {opt}
+              </AnswerOption>
+            ))}
           </div>
 
           <div role="status" aria-live="polite" className="min-h-6">

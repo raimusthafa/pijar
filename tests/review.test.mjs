@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { retention, isDue, applyReview, pickDailyReview } from '../src/lib/scheduler/engine.ts';
 import { isMastered, MASTERY_THRESHOLD } from '../src/lib/mastery/engine.ts';
-import { validateQuestion, fallbackQuestions } from '../src/lib/learn/question-bank.ts';
+import { validateQuestion, fallbackQuestions, bankTopic } from '../src/lib/learn/question-bank.ts';
 
 const now = new Date('2026-10-13T00:00:00Z');
 const ago = (d) => new Date(now.getTime() - d * 86400000).toISOString();
@@ -57,5 +57,14 @@ describe('question bank pure parts', () => {
     assert.equal(qs.length, 3);
     assert.ok(qs.every(validateQuestion));
     assert.match(qs[0].question, /Which statement/);
+  });
+});
+
+describe('question bank language key', () => {
+  test('English gets its own bank, Indonesian keeps the legacy key', () => {
+    assert.equal(bankTopic('Front End', 'id'), 'Front End');
+    assert.equal(bankTopic('Front End'), 'Front End');
+    assert.notEqual(bankTopic('Front End', 'en'), bankTopic('Front End', 'id'));
+    assert.equal(bankTopic('Front End', 'en'), 'Front End [en]');
   });
 });

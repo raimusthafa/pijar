@@ -141,7 +141,7 @@ function LearnContent({ params }: LearnPageProps) {
   }, [topic, nodeId]);
 
   const enc = encodeURIComponent;
-  const mapHref = `/graph?id=${enc(graphId)}&topic=${enc(topic)}`;
+  const mapHref = `/graph/${enc(graphId)}`;
   const workspaceHref = `/workspace/${enc(graphId)}/${enc(nodeId)}?topic=${enc(topic)}`;
 
   const minutes = useMemo(() => {
@@ -177,7 +177,9 @@ function LearnContent({ params }: LearnPageProps) {
   }
 
   if (!material) {
-    return <Shell title={backLink}><LessonSkeleton withNote /></Shell>;
+    // Curated lessons load at once, so only generated ones get the "being prepared" note.
+    const instant = locale === 'id' && Boolean(CURATED_MATERIALS[nodeId]);
+    return <Shell title={backLink}><LessonSkeleton withNote={!instant} /></Shell>;
   }
 
   const level = t(`learn.level.${material.targetLevel}` as 'learn.level.beginner');

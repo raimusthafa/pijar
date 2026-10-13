@@ -112,7 +112,7 @@ Format JSON:
         summaryNarrative = `Luar biasa! Kamu berhasil menjawab seluruh ${evaluated.total} soal diagnostik untuk topik "${topic}" dengan akurasi 100%. Fondasi konsepmu sangat kokoh. Kurikulum Knowledge Graph kamu telah diinisialisasi agar kamu dapat langsung melompat ke konsep-konsep tingkat lanjut.`;
       } else {
         const misConceptNote = evaluated.confidenceMatrix.misconceptions > 0
-          ? ` Terdapat ${evaluated.confidenceMatrix.misconceptions} area di mana kamu sangat yakin namun menghasilkan kesimpulan yang kurang tepat—ini adalah miskonsepsi aktif yang akan kita luruskan.`
+          ? ` Terdapat ${evaluated.confidenceMatrix.misconceptions} area di mana kamu sangat yakin namun menghasilkan kesimpulan yang kurang tepat. Ini miskonsepsi aktif yang akan kita luruskan.`
           : '';
 
         summaryNarrative = `Dari hasil pre-test diagnostik topik "${topic}", kamu berhasil menjawab ${evaluated.correctCount} dari ${evaluated.total} soal dengan tepat.${misConceptNote} Pijar telah mengidentifikasi konsep-konsep prasyarat yang perlu diperkuat agar proses belajarmu tidak terhambat di materi lanjutan.`;

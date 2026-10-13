@@ -2,7 +2,7 @@ import { defineMessages } from '../define';
 
 export default defineMessages({
   id: {
-    'nav.map': 'Peta Belajar',
+    'nav.map': 'Peta belajar',
     'nav.learn': 'Belajar',
     'nav.review': 'Ulasan harian',
     'nav.workspace': 'Ruang belajar',
@@ -25,7 +25,7 @@ export default defineMessages({
     consent: 'Dengan melanjutkan, kamu menyetujui {terms} dan {privacy}.',
   },
   en: {
-    'nav.map': 'Learning map',
+    'nav.map': 'Learning maps',
     'nav.learn': 'Learn',
     'nav.review': 'Daily review',
     'nav.workspace': 'Workspace',

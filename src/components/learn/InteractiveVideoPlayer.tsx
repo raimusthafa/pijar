@@ -181,8 +181,8 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
         isFullscreen ? 'h-dvh rounded-none' : 'rounded-card',
       )}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-hairline bg-raised px-5 py-3">
-        <p className="min-w-0 truncate text-sm font-medium">{script.title}</p>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-hairline bg-raised px-5 py-3">
+        <p className="min-w-0 flex-1 basis-48 text-sm font-medium">{script.title}</p>
         <Badge variant="outline">{voiceLabel}</Badge>
       </div>
 

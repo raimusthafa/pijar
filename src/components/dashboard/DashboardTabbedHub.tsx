@@ -21,11 +21,11 @@ export function DashboardTabbedHub(props: DashboardHubProps) {
   return (
     <Tabs defaultValue="home">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <TabsList aria-label={t('dashboard.tabs.label')} className="max-w-full overflow-x-auto">
-          <TabsTrigger value="home">{t('dashboard.tabs.home')}</TabsTrigger>
-          <TabsTrigger value="mastery">{t('dashboard.tabs.mastery')}</TabsTrigger>
-          <TabsTrigger value="report">{t('dashboard.tabs.report')}</TabsTrigger>
-          <TabsTrigger value="community">{t('dashboard.tabs.community')}</TabsTrigger>
+        <TabsList aria-label={t('dashboard.tabs.label')} className="max-sm:grid max-sm:w-full max-sm:grid-cols-4 max-sm:gap-0">
+          <TabsTrigger value="home" className="max-sm:px-1 max-sm:text-[13px]">{t('dashboard.tabs.home')}</TabsTrigger>
+          <TabsTrigger value="mastery" className="max-sm:px-1 max-sm:text-[13px]">{t('dashboard.tabs.mastery')}</TabsTrigger>
+          <TabsTrigger value="report" className="max-sm:px-1 max-sm:text-[13px]">{t('dashboard.tabs.report')}</TabsTrigger>
+          <TabsTrigger value="community" className="max-sm:px-1 max-sm:text-[13px]">{t('dashboard.tabs.community')}</TabsTrigger>
         </TabsList>
         {graphs.length > 1 && (
           <select

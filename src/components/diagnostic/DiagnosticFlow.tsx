@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useT } from '@/lib/i18n/client';
+import { createClient } from '@/lib/supabase/client';
+import { isMissingGoalsTable } from '@/lib/onboarding/goals';
 import { MAX_QUESTIONS, type AdaptiveState } from '@/lib/diagnostic/adaptive';
 import { gapDetail } from '@/lib/diagnostic/adaptive-graph';
 import type { CognitiveIntakeResult, CurriculumNode } from '@/types';
@@ -205,6 +207,14 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
       const gid = data.result.graph_id || '';
       document.cookie = `pijar_active_topic=${encodeURIComponent(ctx.topic)}; path=/; max-age=604800; SameSite=Lax`;
       document.cookie = `pijar_active_graph_id=${encodeURIComponent(gid)}; path=/; max-age=604800; SameSite=Lax`;
+      // Link the onboarding goal to the graph it produced. Non-blocking: a missing learning_goals table just means no history.
+      const goalRow = sessionStorage.getItem('pijar_goal_id');
+      if (goalRow && gid) {
+        try {
+          const { error } = await createClient().from('learning_goals').update({ graph_id: gid, node_id: data.adaptive?.startNodeId ?? null }).eq('id', goalRow);
+          if (error && !isMissingGoalsTable(error)) console.warn('learning_goals', error.message);
+        } catch { /* offline: the result is already saved */ }
+      }
 
       const nodes = data.graph.nodes;
       const a = data.adaptive;
@@ -255,7 +265,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-8 pt-4">
         <div className="pj-rise grid gap-3">
-          <h1 className="font-display text-h2 font-semibold">{t('diagnostic.intro.title')}</h1>
+          <h1 className="font-display text-h3 font-semibold">{t('diagnostic.intro.title')}</h1>
           <p className="max-w-prose text-muted-foreground">{t('diagnostic.intro.lead')}</p>
         </div>
 

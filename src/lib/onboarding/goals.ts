@@ -26,10 +26,26 @@ export function isMissingGoalsTable(error: { code?: string; message?: string } |
   return /learning_goals/.test(m) && /not (find|exist)|does not exist|schema cache/i.test(m);
 }
 
+// The offline reading in diagnostic/engine.ts writes long Indonesian sentences. Show a short label in the learner's language instead.
+const FALLBACK_STEPS = [
+  { prefix: 'Fokus pada evaluasi', id: 'Trade-off arsitektur dan kasus tepi', en: 'Architecture trade-offs and edge cases' },
+  { prefix: 'Mulailah dengan modul model mental', id: 'Model mental dasar', en: 'Core mental models' },
+];
+const FOCUS_FALLBACKS: Record<string, string> = {
+  'Model Mental & Filosofi Dasar': 'Core mental models',
+  'Arsitektur Sistem & Trade-off': 'Architecture trade-offs',
+};
+const LONG = 80;
+
 /** The first concept we will probe, taken from the intake. Empty when the intake gave nothing usable. */
-export function startConcept(intake: IntakeLike | null | undefined): string {
+export function startConcept(intake: IntakeLike | null | undefined, locale: 'id' | 'en' = 'id'): string {
   if (!intake) return '';
-  return (intake.recommended_first_step || intake.recommended_diagnostic_focus?.[0] || '').trim();
+  const step = (intake.recommended_first_step ?? '').trim();
+  const focus = (intake.recommended_diagnostic_focus?.[0] ?? '').trim();
+  const known = FALLBACK_STEPS.find((f) => step.startsWith(f.prefix));
+  if (known) return known[locale];
+  const pick = step && step.length <= LONG ? step : focus || step;
+  return locale === 'en' && FOCUS_FALLBACKS[pick] ? FOCUS_FALLBACKS[pick] : pick;
 }
 
 /** profiles.target_goal keeps its old vocabulary: beginner | practitioner | deepen. */

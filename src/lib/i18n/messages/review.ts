@@ -6,6 +6,7 @@ export default defineMessages({
     'title': 'Ulasan harian',
     'lead': 'Ingatan memudar seiring waktu, dan mengulang tepat sebelum lupa membuatnya bertahan lebih lama.',
     'loading': 'Menyiapkan pertanyaan',
+    'loading.slow': 'Pertanyaan ditulis dulu untuk konsep yang mulai terlupa. Biasanya sampai 30 detik, lain kali sudah siap.',
     'progress': 'Pertanyaan {current} dari {total}',
     'concept': 'Konsep: {label}',
     'recall': 'Ingatanmu sekarang sekitar {pct}%',
@@ -26,7 +27,7 @@ export default defineMessages({
     'summary.in.lt1': 'Kurang dari sehari',
     'summary.in.days': 'Sekitar {n} hari lagi',
     'summary.unsaved': 'Hasil belum tersimpan ke akunmu, jadi jadwal ulasan belum berubah.',
-    'summary.home': 'Kembali ke beranda',
+    'summary.home': 'Kembali ke dasbor',
     'summary.map': 'Buka peta belajar',
 
     'empty.title': 'Belum ada ulasan hari ini',
@@ -42,6 +43,7 @@ export default defineMessages({
     'title': 'Daily review',
     'lead': 'Memory fades with time, and reviewing just before you forget makes it last longer.',
     'loading': 'Preparing your questions',
+    'loading.slow': 'The questions are written first for concepts you are starting to forget. It can take up to 30 seconds, and next time they are ready.',
     'progress': 'Question {current} of {total}',
     'concept': 'Concept: {label}',
     'recall': 'Your recall is around {pct}% now',
@@ -62,7 +64,7 @@ export default defineMessages({
     'summary.in.lt1': 'Less than a day',
     'summary.in.days': 'In about {n} days',
     'summary.unsaved': 'Your results were not saved to your account, so the review schedule has not changed.',
-    'summary.home': 'Back to home',
+    'summary.home': 'Back to dashboard',
     'summary.map': 'Open learning map',
 
     'empty.title': 'Nothing to review today',

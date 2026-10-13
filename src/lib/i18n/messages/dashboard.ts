@@ -3,10 +3,10 @@ import { defineMessages } from '../define';
 // Owned by the dashboard page agent. Use as t('dashboard.key.name').
 export default defineMessages({
   id: {
-    'title': 'Beranda',
+    'title': 'Dasbor',
     'greeting': 'Halo, {name}',
     'greeting.sub': 'Ini yang sebaiknya kamu kerjakan berikutnya.',
-    'tabs.label': 'Bagian beranda',
+    'tabs.label': 'Bagian dasbor',
     'tabs.home': 'Beranda',
     'tabs.mastery': 'Penguasaan',
     'tabs.report': 'Laporan',
@@ -51,8 +51,8 @@ export default defineMessages({
     'graphs.open': 'Buka peta',
     'graphs.new': 'Topik baru',
     'graphs.empty.title': 'Belum ada peta belajar',
-    'graphs.empty.desc': 'Mulai dari tes awal yang singkat. Pijar menyusun peta konsep dari hasilnya.',
-    'graphs.empty.cta': 'Mulai tes awal',
+    'graphs.empty.desc': 'Mulai dari tes diagnostik yang singkat. Pijar menyusun peta konsep dari hasilnya.',
+    'graphs.empty.cta': 'Mulai diagnostik',
     'graphs.pick': 'Pilih peta',
 
     'mastery.title': 'Penguasaan konsep',
@@ -109,10 +109,10 @@ export default defineMessages({
     'community.error.post': 'Diskusi belum terkirim. Coba lagi.',
   },
   en: {
-    'title': 'Home',
+    'title': 'Dashboard',
     'greeting': 'Hi, {name}',
     'greeting.sub': 'Here is what to pick up next.',
-    'tabs.label': 'Home sections',
+    'tabs.label': 'Dashboard sections',
     'tabs.home': 'Home',
     'tabs.mastery': 'Mastery',
     'tabs.report': 'Report',
@@ -157,8 +157,8 @@ export default defineMessages({
     'graphs.open': 'Open map',
     'graphs.new': 'New topic',
     'graphs.empty.title': 'No learning map yet',
-    'graphs.empty.desc': 'Start with a short entry test. Pijar builds your concept map from the result.',
-    'graphs.empty.cta': 'Start the entry test',
+    'graphs.empty.desc': 'Start with a short diagnostic test. Pijar builds your concept map from the result.',
+    'graphs.empty.cta': 'Start the diagnostic',
     'graphs.pick': 'Choose a map',
 
     'mastery.title': 'Concept mastery',

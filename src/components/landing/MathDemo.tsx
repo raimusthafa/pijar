@@ -18,7 +18,6 @@ export function MathDemo() {
   const box = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
   const [progress, setProgress] = useState(1);
-  const [reduced, setReduced] = useState(true);
 
   const play = useCallback(() => {
     cancelAnimationFrame(raf.current);
@@ -34,7 +33,6 @@ export function MathDemo() {
 
   useEffect(() => {
     const isReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    setReduced(isReduced);
     const el = box.current;
     if (isReduced || !el) return;
     const io = new IntersectionObserver(([e]) => {
@@ -53,12 +51,10 @@ export function MathDemo() {
   return (
     <div ref={box} className="flex flex-col gap-3">
       <MathVisual spec={DEFAULT_MATH_SPECS.tangent} progress={progress} interactive={progress === 1} />
-      {!reduced && (
-        <Button variant="secondary" size="sm" className="self-start" onClick={play}>
+      <Button variant="secondary" size="sm" className="self-start motion-reduce:hidden" onClick={play}>
           <RotateCcw strokeWidth={1.75} />
           {t('landing.fitur.math.replay')}
         </Button>
-      )}
     </div>
   );
 }

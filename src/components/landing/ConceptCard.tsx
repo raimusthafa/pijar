@@ -31,7 +31,7 @@ export function ConceptCard({
     <div className={cn('flex flex-col gap-2 rounded-inner border border-hairline bg-raised p-3 text-left', className)}>
       <span className="text-xs font-medium text-muted-foreground">{category}</span>
       <span className="font-display text-base leading-tight font-semibold tracking-[-0.02em] text-foreground">{title}</span>
-      <Badge variant={BADGE[status]}>{statusLabel}</Badge>
+      <Badge variant={BADGE[status]} className="mt-auto">{statusLabel}</Badge>
     </div>
   );
 }

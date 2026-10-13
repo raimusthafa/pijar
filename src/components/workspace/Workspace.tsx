@@ -96,7 +96,6 @@ function Item({ m, onRetry }: { m: Msg; onRetry: () => void }) {
     <li className={cn('flex flex-col gap-1.5', mine ? 'items-end' : 'items-start')}>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {mine ? t('workspace.chat.you') : t('workspace.chat.tutor')}
-        {!mine && <Badge>{t(pk(m.phase))}</Badge>}
       </div>
       <div className={cn('max-w-[min(92%,38rem)] rounded-inner px-4 py-3 text-sm leading-relaxed', mine ? 'bg-surface' : 'border border-hairline bg-raised')}>
         {m.imageUrl && (
