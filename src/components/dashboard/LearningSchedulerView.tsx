@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/client';
@@ -70,7 +71,7 @@ export function LearningSchedulerView({ graph }: { graph: DashboardGraph }) {
     <Card className="pj-rise" style={{ '--pj-i': 2 } as React.CSSProperties}>
       <div className="grid gap-3 px-(--card-spacing)">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="font-display text-h4 font-semibold">{t('dashboard.tasks.title')}</h2>
+          <h2 className="font-display text-h4 font-semibold text-foreground">{t('dashboard.tasks.title')}</h2>
           {items.length > 0 && (
             <p className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
               {t('dashboard.tasks.progress', { done: doneCount, total: items.length })}
@@ -80,33 +81,48 @@ export function LearningSchedulerView({ graph }: { graph: DashboardGraph }) {
 
         {sync === 'loading' ? (
           <div className="grid gap-2" role="status" aria-label={t('dashboard.tasks.loading')}>
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-5/6" />
+            <Skeleton className="h-11 w-full rounded-inner" />
+            <Skeleton className="h-11 w-5/6 rounded-inner" />
           </div>
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('dashboard.tasks.empty')}</p>
+          <p className="text-sm text-muted-foreground py-2">{t('dashboard.tasks.empty')}</p>
         ) : (
-          <ul className="grid gap-1">
-            {items.map(item => (
-              <li key={item.id} className="flex min-h-11 items-center gap-3 rounded-inner px-2 hover:bg-hover">
-                <input
-                  type="checkbox"
-                  checked={done.has(item.id)}
-                  onChange={() => toggle(item.id)}
-                  aria-label={labelOf(item)}
-                  className="size-5 shrink-0 accent-action"
-                />
-                <Link
-                  href={`/learn/${graph.id}/${item.nodeId}?topic=${encodeURIComponent(graph.topic)}`}
-                  className={`min-w-0 flex-1 truncate text-sm ${done.has(item.id) ? 'text-muted-foreground line-through' : 'font-medium'}`}
+          <ul className="grid gap-1.5">
+            {items.map(item => {
+              const isDone = done.has(item.id);
+              return (
+                <li
+                  key={item.id}
+                  className="group flex min-h-12 items-center gap-3 rounded-inner border border-transparent px-3 py-2 transition-colors hover:bg-hover hover:border-hairline"
                 >
-                  {labelOf(item)}
-                </Link>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {t('dashboard.queue.minutes', { n: item.estimatedMinutes })}
-                </span>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isDone}
+                    aria-label={labelOf(item)}
+                    onClick={() => toggle(item.id)}
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-control transition-all ${
+                      isDone
+                        ? 'bg-action text-action-foreground'
+                        : 'border border-field bg-raised group-hover:border-hairline-strong'
+                    }`}
+                  >
+                    {isDone && <Check className="size-3.5 stroke-[2.5]" aria-hidden />}
+                  </button>
+                  <Link
+                    href={`/learn/${graph.id}/${item.nodeId}?topic=${encodeURIComponent(graph.topic)}`}
+                    className={`min-w-0 flex-1 truncate text-sm transition-colors ${
+                      isDone ? 'text-muted-foreground line-through' : 'font-medium text-foreground'
+                    }`}
+                  >
+                    {labelOf(item)}
+                  </Link>
+                  <span className="shrink-0 rounded-pill bg-surface-strong px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+                    {t('dashboard.queue.minutes', { n: item.estimatedMinutes })}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
 

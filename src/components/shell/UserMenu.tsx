@@ -33,6 +33,7 @@ export function UserMenu({ user }: { user?: ShellUser }) {
             <form method="post" action="/auth/logout" className="border-t border-hairline pt-1.5">
               <Menu.Item
                 render={<button type="submit" />}
+                nativeButton
                 className="flex h-11 w-full cursor-default items-center gap-2 rounded-control px-3 text-left outline-none data-highlighted:bg-hover md:h-9"
               >
                 <LogOut className="size-4" strokeWidth={1.75} aria-hidden />

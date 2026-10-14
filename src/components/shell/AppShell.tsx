@@ -40,7 +40,7 @@ function NavList({ onNavigate }: { onNavigate?: boolean }) {
           className: cn(
             'pj-press flex h-11 items-center gap-3 rounded-pill px-3.5 text-sm transition-colors duration-150 md:h-9',
             active
-              ? 'bg-surface-strong font-medium text-foreground'
+              ? 'bg-action text-action-foreground font-medium'
               : 'text-muted-foreground hover:bg-hover hover:text-foreground',
           ),
         };

@@ -42,8 +42,8 @@ async function LocaleBoundary({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${outfit.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="id" className={`${outfit.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Suspense fallback={null}>
           <LocaleBoundary>{children}</LocaleBoundary>
         </Suspense>

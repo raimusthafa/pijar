@@ -89,20 +89,39 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
   const nextLabel = graph?.nodes.find(n => n.id === nextId)?.label;
 
   return (
-    <section ref={topRef} aria-labelledby="posttest-title" className="scroll-mt-4 rounded-card bg-surface p-4 sm:p-6 md:p-8">
-      <h2 id="posttest-title" className="font-display text-h3">{t('learn.quiz.title')}</h2>
+    <section
+      ref={topRef}
+      aria-labelledby="posttest-title"
+      className="scroll-mt-4 relative overflow-hidden rounded-card border border-hairline bg-surface p-6 sm:p-8"
+    >
+      <div className="absolute top-0 left-0 right-0 h-1 bg-amber" aria-hidden />
+
+      <div className="flex items-center gap-2 mb-2">
+        <span className="size-2 rounded-pill bg-amber" aria-hidden />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t('learn.quiz.title')}
+        </span>
+      </div>
+
+      <h2 id="posttest-title" className="font-display text-h3 font-semibold text-foreground">
+        {t('learn.quiz.title')}
+      </h2>
 
       {phase === 'intro' && (
-        <div className="mt-3 space-y-5">
+        <div className="mt-4 space-y-6">
           <p className="max-w-prose text-base leading-relaxed text-muted-foreground">
             {t('learn.quiz.intro', { threshold: MASTERY_THRESHOLD })}
           </p>
-          <Button onClick={load}>{t('learn.quiz.start')}</Button>
+          <div>
+            <Button size="lg" onClick={load}>
+              {t('learn.quiz.start')}
+            </Button>
+          </div>
         </div>
       )}
 
       {phase === 'loading' && (
-        <div className="mt-3 space-y-5" role="status">
+        <div className="mt-4 space-y-4" role="status">
           <p className="text-sm text-muted-foreground">{t('learn.quiz.loading')}</p>
           {[0, 1].map(i => (
             <div key={i} className="space-y-3 rounded-inner border border-hairline bg-raised p-5">
@@ -115,41 +134,51 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
       )}
 
       {phase === 'loadError' && (
-        <div className="mt-3 space-y-4" role="alert">
-          <p className="text-base">{t('learn.quiz.error.load')}</p>
+        <div className="mt-4 space-y-4" role="alert">
+          <p className="text-base text-foreground">{t('learn.quiz.error.load')}</p>
           <Button variant="secondary" onClick={load}>{t('common.action.retry')}</Button>
         </div>
       )}
 
       {(phase === 'answering' || phase === 'submitting' || showResult) && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-5 space-y-5">
           {showResult && (
-            <div className="rounded-inner border border-hairline-strong bg-raised p-4 sm:p-5 md:p-6" role="status">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge variant={result.isPassed ? 'success' : 'warning'}>
+            <div className="rounded-card border border-hairline-strong bg-raised p-6 md:p-8 space-y-4" role="status">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Badge variant={result.isPassed ? 'success' : 'danger'} className="text-xs">
                   {result.isPassed ? t('learn.quiz.pass') : t('learn.quiz.fail')}
                 </Badge>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   {t('learn.quiz.score.threshold', { threshold: MASTERY_THRESHOLD })}
                 </span>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">{t('learn.quiz.score.label')}</p>
-              <p className="font-display text-h1 leading-none tabular-nums text-foreground">{result.score}%</p>
-              <p className="mt-3 max-w-prose text-base leading-relaxed">
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('learn.quiz.score.label')}
+                </p>
+                <p className="font-display text-h1 md:text-[52px] font-bold tracking-tight text-foreground tabular-nums leading-none mt-1">
+                  {result.score}%
+                </p>
+              </div>
+
+              <p className="max-w-prose text-base leading-relaxed text-muted-foreground">
                 {t(result.isPassed ? 'learn.quiz.pass.body' : 'learn.quiz.fail.body', {
                   correct: result.questionResults.filter(r => r.isCorrect).length,
                   total: result.totalQuestions,
                 })}
               </p>
+
               {!!result.weakConcepts?.length && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium">{t('learn.quiz.weak.title')}</p>
+                <div className="pt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('learn.quiz.weak.title')}</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {result.weakConcepts.map(c => <li key={c}><Badge variant="outline">{c}</Badge></li>)}
                   </ul>
                 </div>
               )}
-              <div className="mt-5 flex flex-wrap gap-2">
+
+              <div className="pt-3 flex flex-wrap gap-3">
                 {result.isPassed ? (
                   <>
                     <Button render={<Link href={nextId ? nextHref(nextId) : mapHref} />} nativeButton={false}>
@@ -176,9 +205,10 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
           )}
 
           {!showResult && (
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {t('learn.quiz.answered', { n: answered, total: questions.length })}
-            </p>
+            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground pb-1" aria-live="polite">
+              <span>{t('learn.quiz.answered', { n: answered, total: questions.length })}</span>
+              <span className="tabular-nums">{Math.round((answered / (questions.length || 1)) * 100)}%</span>
+            </div>
           )}
 
           <ol className="space-y-4">

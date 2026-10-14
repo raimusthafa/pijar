@@ -3,10 +3,18 @@
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { useT } from '@/lib/i18n/client';
 import { computeMasteryMetrics } from '@/lib/mastery/engine';
 import type { DashboardGraph } from './types';
 import { MathText } from '@/components/ui/math-text';
+import type { MessageKey } from '@/lib/i18n/messages';
+
+type Fact = {
+  labelKey: MessageKey;
+  value: number;
+  variant: 'success' | 'neutral' | 'danger' | 'outline';
+};
 
 export function MasteryTrackingView({ graph }: { graph?: DashboardGraph }) {
   const { t } = useT();
@@ -16,33 +24,43 @@ export function MasteryTrackingView({ graph }: { graph?: DashboardGraph }) {
     return <p className="mt-6 text-sm text-muted-foreground">{t('dashboard.mastery.empty')}</p>;
   }
 
-  const facts = [
-    { label: t('dashboard.mastery.mastered'), value: m.completedConcepts },
-    { label: t('dashboard.mastery.ready'), value: m.readyConcepts },
-    { label: t('dashboard.mastery.gap'), value: m.gapConcepts },
-    { label: t('dashboard.mastery.locked'), value: m.lockedConcepts },
+  const facts: Fact[] = [
+    { labelKey: 'dashboard.mastery.mastered', value: m.completedConcepts, variant: 'success' },
+    { labelKey: 'dashboard.mastery.ready', value: m.readyConcepts, variant: 'outline' },
+    { labelKey: 'dashboard.mastery.gap', value: m.gapConcepts, variant: 'danger' },
+    { labelKey: 'dashboard.mastery.locked', value: m.lockedConcepts, variant: 'neutral' },
   ];
 
   return (
     <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <Card className="pj-rise">
-        <div className="grid gap-5 px-(--card-spacing)">
+        <div className="grid gap-6 px-(--card-spacing)">
           <div>
             <h2 className="font-display text-h4 font-semibold">{t('dashboard.mastery.title')}</h2>
             <p className="text-sm text-muted-foreground">{graph.topic}</p>
           </div>
-          <div className="grid gap-2">
-            <p className="font-display text-h2 font-semibold tabular-nums">{m.completionPercentage}%</p>
+
+          {/* Big percentage with progress bar */}
+          <div className="grid gap-3">
+            <div className="flex items-baseline gap-3">
+              <p className="font-display text-h1 font-semibold tabular-nums leading-none">{m.completionPercentage}%</p>
+              <p className="text-sm text-muted-foreground">
+                {t('dashboard.mastery.of', { done: m.completedConcepts, total: m.totalConcepts })}
+              </p>
+            </div>
             <Progress value={m.completionPercentage} aria-label={t('dashboard.mastery.title')} />
-            <p className="text-sm text-muted-foreground">
-              {t('dashboard.mastery.of', { done: m.completedConcepts, total: m.totalConcepts })}
-            </p>
           </div>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+
+          {/* Stats row with badges for visual weight */}
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {facts.map(f => (
-              <div key={f.label}>
-                <dd className="font-display text-h4 font-semibold tabular-nums">{f.value}</dd>
-                <dt className="text-xs text-muted-foreground">{f.label}</dt>
+              <div key={f.labelKey} className="grid gap-1.5">
+                <dt className="text-xs text-muted-foreground">{t(f.labelKey)}</dt>
+                <dd className="flex items-center gap-1.5">
+                  <Badge variant={f.variant === 'outline' ? 'neutral' : f.variant} className="tabular-nums">
+                    {f.value}
+                  </Badge>
+                </dd>
               </div>
             ))}
           </dl>

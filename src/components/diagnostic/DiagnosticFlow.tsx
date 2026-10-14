@@ -278,8 +278,9 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
           <p className="max-w-prose text-muted-foreground">{t('diagnostic.intro.lead')}</p>
         </div>
 
-        <Card tone="raised" className="pj-rise" style={{ '--pj-i': 1 } as React.CSSProperties}>
-          <dl className="grid gap-4 px-(--card-spacing) text-sm">
+        <Card tone="raised" className="pj-rise overflow-hidden" style={{ '--pj-i': 1 } as React.CSSProperties}>
+          <div className="h-1 w-full bg-amber" aria-hidden />
+          <dl className="grid divide-y divide-hairline px-(--card-spacing) text-sm">
             <IntroRow k={t('diagnostic.intro.row.topic')} v={ctx.topic} />
             <IntroRow k={t('diagnostic.intro.row.length')} v={t('diagnostic.intro.row.length.value', { n: ctx.cap })} />
             <IntroRow k={t('diagnostic.intro.row.stakes')} v={t('diagnostic.intro.row.stakes.value')} />
@@ -287,7 +288,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
         </Card>
 
         {ctx.intake?.empathy_mentor_note && (
-          <figure className="pj-rise grid gap-1 border-l border-hairline-strong pl-4" style={{ '--pj-i': 2 } as React.CSSProperties}>
+          <figure className="pj-rise grid gap-1 pl-4" style={{ '--pj-i': 2, borderLeft: '2px solid var(--pj-hairline-strong)' } as React.CSSProperties}>
             <figcaption className="text-xs text-muted-foreground">{t('diagnostic.intro.note.title')}</figcaption>
             <blockquote className="text-sm">{ctx.intake.empathy_mentor_note}</blockquote>
           </figure>
@@ -366,9 +367,9 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
 
 function IntroRow({ k, v }: { k: string; v: string }) {
   return (
-    <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:gap-4">
+    <div className="flex items-baseline justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd>{v}</dd>
+      <dd className="font-medium text-right">{v}</dd>
     </div>
   );
 }

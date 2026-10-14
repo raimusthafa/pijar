@@ -192,122 +192,206 @@ function LearnContent({ params }: LearnPageProps) {
 
   return (
     <Shell title={backLink}>
-      <article id="lesson-top" className={`${frame} space-y-10 pt-10 pb-24`}>
-        <header className="space-y-5">
-          <h1 className="font-display text-h2 max-w-3xl"><MathText text={material.title} /></h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-            {node?.category && <span>{node.category}</span>}
-            {node?.category && <span aria-hidden>·</span>}
-            <span>{level}</span>
-            <span aria-hidden>·</span>
-            <span>{t('learn.byline.minutes', { n: minutes })}</span>
-            {mastered && <Badge variant="success">{t('learn.byline.mastered')}</Badge>}
+      <article id="lesson-top" className={`${frame} space-y-12 pt-8 pb-24`}>
+        {/* Lesson Header */}
+        <header className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {node?.category && (
+              <Badge variant="outline" className="font-medium">
+                {node.category}
+              </Badge>
+            )}
+            <Badge variant="neutral" className="font-normal">
+              {level}
+            </Badge>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs font-medium text-muted-foreground tabular-nums">
+              {t('learn.byline.minutes', { n: minutes })}
+            </span>
+            {mastered && (
+              <Badge variant="success" className="ml-1">
+                {t('learn.byline.mastered')}
+              </Badge>
+            )}
           </div>
-          <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground"><MathText text={material.summary} /></p>
-          <Button variant="secondary" render={<Link href={workspaceHref} />} nativeButton={false}>
-            <PencilRuler strokeWidth={1.75} aria-hidden />
-            {t('learn.action.workspace')}
-          </Button>
+
+          <h1 className="font-display text-h2 md:text-[40px] font-bold tracking-tight text-foreground max-w-3xl leading-[1.15]">
+            <MathText text={material.title} />
+          </h1>
+
+          <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
+            <MathText text={material.summary} />
+          </p>
+
+          <div className="pt-2">
+            <Button variant="secondary" render={<Link href={workspaceHref} />} nativeButton={false}>
+              <PencilRuler strokeWidth={1.75} aria-hidden />
+              {t('learn.action.workspace')}
+            </Button>
+          </div>
         </header>
 
+        {/* Video Player */}
         <InteractiveVideoPlayer script={material.videoScript} />
 
+        {/* Interactive Board */}
         {board && (
           <section className="mx-auto w-full max-w-3xl space-y-4">
-            <h2 className="font-display text-h3">{t('learn.board.title')}</h2>
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-pill bg-amber" aria-hidden />
+              <h2 className="font-display text-h3 font-semibold">{t('learn.board.title')}</h2>
+            </div>
             <InteractiveBoard spec={board} />
           </section>
         )}
 
-        <div className="mx-auto max-w-2xl space-y-10">
-          <div className="rounded-inner bg-surface p-5">
-            <p className="text-sm font-medium">{t('learn.objective.label')}</p>
-            <p className="mt-1 text-base leading-relaxed"><MathText text={material.learningObjective} /></p>
+        {/* Content Body */}
+        <div className="mx-auto max-w-2xl space-y-12">
+          {/* Objective Callout Card */}
+          <div className="relative overflow-hidden rounded-card border border-hairline bg-surface p-6">
+            <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-amber" aria-hidden />
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              {t('learn.objective.label')}
+            </p>
+            <p className="mt-2 text-base font-medium leading-relaxed text-foreground">
+              <MathText text={material.learningObjective} />
+            </p>
           </div>
 
+          {/* Main Concept Explanation */}
           <Section title={t('learn.section.concept')}>
             <RichText text={material.conceptExplanation} />
           </Section>
 
+          {/* Analogy Card */}
           {material.analogy && (
             <Section title={t('learn.section.analogy')}>
-              <p className="rounded-inner bg-surface p-5 text-base leading-[1.75]"><MathText text={material.analogy} /></p>
+              <div className="rounded-card border border-hairline bg-surface p-6">
+                <p className="text-base leading-[1.8] text-foreground">
+                  <MathText text={material.analogy} />
+                </p>
+              </div>
             </Section>
           )}
 
+          {/* Key Definitions */}
           {!!material.keyDefinitions?.length && (
             <Section title={t('learn.section.definitions')}>
-              <dl className="divide-y divide-hairline rounded-inner border border-hairline">
+              <div className="grid gap-3">
                 {material.keyDefinitions.map((d, i) => (
-                  <div key={i} className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr] sm:gap-6">
-                    <dt className="text-base font-medium"><MathText text={d.term} /></dt>
-                    <dd className="text-base leading-relaxed text-muted-foreground"><MathText text={d.definition} /></dd>
-                  </div>
-                ))}
-              </dl>
-            </Section>
-          )}
-
-          {!!material.examples?.length && (
-            <Section title={t('learn.section.examples')}>
-              <div className="space-y-8">
-                {material.examples.map((ex, i) => (
-                  <div key={i} className="space-y-3">
-                    <h3 className="font-display text-h4"><MathText text={ex.title} /></h3>
-                    <CodeBlock code={ex.code} language={ex.language} />
-                    {ex.output && <CodeBlock code={ex.output} language={t('learn.example.output')} />}
-                    <p className="text-base leading-relaxed text-muted-foreground"><MathText text={ex.explanation} /></p>
+                  <div key={i} className="rounded-inner border border-hairline bg-surface p-4 transition-colors">
+                    <dt className="font-display text-base font-semibold text-foreground">
+                      <MathText text={d.term} />
+                    </dt>
+                    <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      <MathText text={d.definition} />
+                    </dd>
                   </div>
                 ))}
               </div>
             </Section>
           )}
 
+          {/* Code Examples */}
+          {!!material.examples?.length && (
+            <Section title={t('learn.section.examples')}>
+              <div className="space-y-8">
+                {material.examples.map((ex, i) => (
+                  <div key={i} className="space-y-3">
+                    <h3 className="font-display text-h4 font-semibold text-foreground">
+                      <MathText text={ex.title} />
+                    </h3>
+                    <CodeBlock code={ex.code} language={ex.language} />
+                    {ex.output && <CodeBlock code={ex.output} language={t('learn.example.output')} />}
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      <MathText text={ex.explanation} />
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Common Misconceptions */}
           {!!material.commonMisconceptions?.length && (
             <Section title={t('learn.section.misconceptions')}>
-              <ul className="space-y-3">
+              <div className="space-y-4">
                 {material.commonMisconceptions.map((m, i) => (
-                  <li key={i} className="space-y-3 rounded-inner border border-hairline p-5">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('learn.misconception.wrong')}</p>
-                      <p className="text-base leading-relaxed"><MathText text={m.misconception} /></p>
+                  <div key={i} className="overflow-hidden rounded-card border border-hairline bg-surface">
+                    {/* Misconception */}
+                    <div className="border-b border-hairline p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="danger" className="text-xs">
+                          {t('learn.misconception.wrong')}
+                        </Badge>
+                      </div>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        <MathText text={m.misconception} />
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('learn.misconception.right')}</p>
-                      <p className="text-base leading-relaxed"><MathText text={m.correction} /></p>
+                    {/* Correction */}
+                    <div className="bg-raised p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="success" className="text-xs">
+                          {t('learn.misconception.right')}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium leading-relaxed text-foreground">
+                        <MathText text={m.correction} />
+                      </p>
                     </div>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </Section>
           )}
 
+          {/* Real World Application */}
           {material.realWorldApplication && (
             <Section title={t('learn.section.application')}>
-              <p className="text-base leading-[1.75]"><MathText text={material.realWorldApplication} /></p>
+              <div className="rounded-card border border-hairline bg-surface p-6">
+                <p className="text-base leading-[1.8] text-foreground">
+                  <MathText text={material.realWorldApplication} />
+                </p>
+              </div>
             </Section>
           )}
 
+          {/* Key Takeaways */}
           {!!material.keyTakeaways?.length && (
             <Section title={t('learn.section.takeaways')}>
-              <ol className="list-decimal space-y-2 pl-6 text-base leading-relaxed marker:text-muted-foreground">
-                {material.keyTakeaways.map((k, i) => <li key={i}><MathText text={k} /></li>)}
-              </ol>
+              <div className="rounded-card border border-hairline bg-surface p-6">
+                <ul className="space-y-3">
+                  {material.keyTakeaways.map((k, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-pill bg-action text-xs font-semibold text-action-foreground tabular-nums">
+                        {i + 1}
+                      </span>
+                      <span className="text-base leading-relaxed text-foreground">
+                        <MathText text={k} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </Section>
           )}
         </div>
 
-        <PostTest
-          key={`${topic}:${nodeId}:${locale}`}
-          topic={topic}
-          nodeId={nodeId}
-          graphId={graphId}
-          label={material.title}
-          graph={graph ? { nodes: graph.nodes, edges: graph.edges } : null}
-          onPassed={handlePassed}
-          mapHref={mapHref}
-          nextHref={id => `/learn/${enc(graphId)}/${enc(id)}?topic=${enc(topic)}`}
-        />
+        {/* Post Test / Kuis Evaluasi */}
+        <div className="mx-auto max-w-2xl pt-6">
+          <PostTest
+            key={`${topic}:${nodeId}:${locale}`}
+            topic={topic}
+            nodeId={nodeId}
+            graphId={graphId}
+            label={material.title}
+            graph={graph ? { nodes: graph.nodes, edges: graph.edges } : null}
+            onPassed={handlePassed}
+            mapHref={mapHref}
+            nextHref={id => `/learn/${enc(graphId)}/${enc(id)}?topic=${enc(topic)}`}
+          />
+        </div>
       </article>
 
       <TutorChat nodeId={nodeId} title={material.title} topic={topic} />

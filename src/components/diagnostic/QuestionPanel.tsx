@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { AnswerOption } from '@/components/ui/answer-option';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -48,14 +49,23 @@ export function QuestionPanel({
 
   return (
     <div className="grid gap-5">
+      {/* Progress header */}
       <div className="grid gap-2">
-        <p className="text-sm text-muted-foreground tabular-nums">{progress}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium tabular-nums">{progress}</p>
+          <p className="hidden text-xs text-muted-foreground md:block">{t('diagnostic.keys.hint')}</p>
+        </div>
         <Progress value={((number - 1 + (answered ? 1 : 0)) / max) * 100} aria-label={progress} />
       </div>
 
-      <Card key={q.id + number} tone="raised" className="pj-rise gap-5">
+      <Card key={q.id + number} tone="raised" className="pj-rise overflow-hidden gap-5">
+        {/* Concept label - amber accent strip */}
+        <div className="flex items-center gap-3 border-b border-hairline bg-surface px-(--card-spacing) py-3">
+          <span className="h-2 w-2 shrink-0 rounded-pill bg-amber" aria-hidden />
+          <p className="text-xs font-medium text-muted-foreground">{t('diagnostic.question.concept', { label: q.label })}</p>
+        </div>
+
         <div className="grid gap-5 px-(--card-spacing)">
-          <p className="text-xs text-muted-foreground">{t('diagnostic.question.concept', { label: q.label })}</p>
           <h2 className="font-display text-h4 font-semibold"><MathText text={q.question} /></h2>
 
           <div role="group" aria-label={t('diagnostic.options.label')} className="grid gap-2">
@@ -74,14 +84,24 @@ export function QuestionPanel({
           </div>
 
           <div role="status" aria-live="polite" className="min-h-6">
-            {answered ? (
-              <div className="pj-rise grid gap-1 text-sm">
-                <p className="font-medium">{correct ? t('diagnostic.feedback.correct') : t('diagnostic.feedback.wrong')}</p>
-                {!correct && <p><MathText text={t('diagnostic.feedback.correctWas', { answer: q.options[q.correctIndex] })} /></p>}
-                {q.explanation && <p className="text-muted-foreground"><MathText text={q.explanation} /></p>}
+            {answered && (
+              <div className="pj-rise rounded-inner border border-hairline bg-surface p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant={correct ? 'success' : 'danger'}>
+                    {correct ? t('diagnostic.feedback.correct') : t('diagnostic.feedback.wrong')}
+                  </Badge>
+                </div>
+                {!correct && (
+                  <p className="text-sm font-medium text-foreground">
+                    <MathText text={t('diagnostic.feedback.correctWas', { answer: q.options[q.correctIndex] })} />
+                  </p>
+                )}
+                {q.explanation && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    <MathText text={q.explanation} />
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="hidden text-xs text-muted-foreground md:block">{t('diagnostic.keys.hint')}</p>
             )}
           </div>
 
