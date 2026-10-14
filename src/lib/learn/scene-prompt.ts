@@ -6,9 +6,11 @@ import { RECIPE_NAMES } from './scene-recipes';
 export const SCENE_PROMPT_GUIDE = `
 VIDEO PENJELASAN (gaya 3Blue1Brown): 3 sampai 5 scene. SETIAP scene wajib punya panggung animasi nyata, bukan kartu teks.
 Kamu menulis JSON deklaratif (bukan kode). Panggung gelap berukuran 16:9 dengan koordinat x dari -6.5 sampai 6.5 dan y dari -3.4 sampai 3.4 (0,0 = tengah).
+Warna di panggung: kurva fungsi berwarna kuning keemasan (amber), garis singgung dan kurva turunan putih. Jangan menyebut warna lain (biru, merah) di narasi atau caption.
 Judul scene tampil otomatis di kiri atas pada resep; pada stage kustom taruh sendiri di sekitar [-6.4, 3.25].
 Narasi ("narration") dan teks pada panggung ditulis dalam bahasa pengguna. Rumus ditulis dalam LaTeX di objek "mathtex" dan boleh memakai $...$ di caption.
 Pada setiap scene pilih SATU: "recipe" (nama resep + params) ATAU "stage" kustom {objects, timeline}.
+"title" setiap scene WAJIB berupa frasa 2 sampai 6 kata yang menyebut isi scene (contoh: "Garis singgung bergeser"), jangan angka. Jangan memakai resep yang sama dua kali kecuali "expr"-nya berbeda; resep derivative-tangent sudah menampilkan kurva turunan di bawah kurva fungsi.
 
 RESEP (paling aman, pilih bila cocok): {"recipe":{"name":"...","params":{...}}}. Nama: ${RECIPE_NAMES.join(', ')}.
 Params (semua opsional): function-plot {expr,label,note,xRange,yRange}; derivative-tangent {expr,label,derivative,from,to,xRange,yRange}; area-riemann {expr,a,b,xRange,yRange,label};

@@ -125,25 +125,29 @@ export function buildProceduralIntakeFallback(text: string): CognitiveIntakeResu
   const lower = (text || '').toLowerCase();
   let canonical_topic = 'Teknologi & Komputasi';
   let domain_category = 'Ilmu Komputer';
+  // Whole-word match: "ai" must not hit "selesaikan", "ml" must not hit "html".
+  const has = (...words: string[]) => new RegExp(`\\b(${words.join('|')})\\b`).test(lower);
 
   // Topic detection
-  if (lower.includes('cyber') || lower.includes('security') || lower.includes('keamanan') || lower.includes('hacker') || lower.includes('pentest') || lower.includes('infosec')) {
+  if (has('cyber\\w*', 'security', 'keamanan', 'hacker', 'pentest', 'infosec')) {
     canonical_topic = 'Cybersecurity';
     domain_category = 'Keamanan Informasi & Jaringan';
-  } else if (lower.includes('ml') || lower.includes('machine learning') || lower.includes('ai') || lower.includes('artificial') || lower.includes('deep learning')) {
+  } else if (has('ml', 'ai', 'machine learning', 'artificial', 'deep learning')) {
     canonical_topic = 'Machine Learning & AI';
     domain_category = 'Kecerdasan Buatan';
-  } else if (lower.includes('web') || lower.includes('frontend') || lower.includes('react') || lower.includes('next') || lower.includes('fullstack')) {
+  } else if (has('web', 'frontend', 'react', 'next', 'fullstack')) {
     canonical_topic = 'Web & Fullstack Development';
     domain_category = 'Pengembangan Web Modern';
-  } else if (lower.includes('docker') || lower.includes('devops') || lower.includes('kubernetes') || lower.includes('cloud') || lower.includes('terraform')) {
+  } else if (has('docker', 'devops', 'kubernetes', 'cloud', 'terraform')) {
     canonical_topic = 'DevOps & Cloud Systems';
     domain_category = 'Infrastruktur Cloud & DevOps';
-  } else if (lower.includes('data') && lower.includes('base') || lower.includes('sql') || lower.includes('postgres')) {
+  } else if (has('database', 'sql', 'postgres')) {
     canonical_topic = 'Database & SQL Architecture';
     domain_category = 'Arsitektur Data & Basis Data';
-  } else if (text.trim().length > 0 && text.trim().length <= 50 && !text.includes('\n')) {
-    canonical_topic = text.trim();
+  } else if (text.trim().length > 0) {
+    // No known keyword: keep the learner's own words instead of a wrong tech label.
+    canonical_topic = text.trim().split(/[\n:]/)[0].slice(0, 60).trim() || text.trim().slice(0, 60);
+    domain_category = 'Umum';
   }
 
   // Ambition / practitioner detection

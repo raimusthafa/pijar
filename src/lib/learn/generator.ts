@@ -84,7 +84,7 @@ function pickMathRecipe(text: string): string {
 
 // --- interactive board prompt (board-spec.ts is the contract) ---
 const BOARD_PROMPT_GUIDE = `
-PAPAN INTERAKTIF (opsional, hanya topik matematika): tambahkan field "interactiveBoard" di level atas materi, berupa JSON deklaratif (bukan kode).
+PAPAN INTERAKTIF (WAJIB untuk topik matematika ini): tambahkan field "interactiveBoard" di level atas materi (sejajar dengan "videoScript"), berupa JSON deklaratif (bukan kode). Fungsi pada papan harus fungsi yang dibahas pelajaran ini (misalnya sin(x) untuk turunan sinus), bukan contoh lain.
 Cara singkat, pakai resep: {"recipe":"derivative-tangent","params":{"expr":"x^2","x0":1},"instruction":"...","learningGoal":"..."}
 Resep: derivative-tangent, secant-tangent, riemann-sum, vector-addition, unit-circle, function-transform, quadratic-explorer.
 Atau kustom: {"learningGoal":"...","instruction":"...","viewBox":{"x":[-6,6],"y":[-4,8]},"sliders":[{"name":"a","min":-3,"max":3,"step":0.1,"initial":1}],"curves":[{"expr":"a*x^2"}],"gliders":[{"on":"f","x":1}],"tangents":[{"at":"P"}],"readouts":[{"label":"Kemiringan","kind":"slope","ref":"P"}]}
@@ -216,6 +216,9 @@ Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${lab
     videoScript: buildFallbackVideo({ nodeId, label, topic, category, desc, mathy, visual: baseVisual, mathRecipe: pickMathRecipe(`${label} ${nodeId} ${desc}`), language: params.language ?? 'id' }),
   };
 }
+
+/** The lesson is the heaviest call (long JSON plus scene DSL), so it gets a longer walk of the model chain than the global 45 s. */
+const LESSON_BUDGET_MS = Number(process.env.AI_LESSON_BUDGET_MS ?? 90_000);
 
 /**
  * Retrieves or generates rich structured learning material and video script.
@@ -355,7 +358,7 @@ Isi "scenes" dengan 3 sampai 5 scene sesuai aturan VIDEO PENJELASAN di bawah (re
 Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan caption tiap scene berurutan dalam waktu relatif scene. ${MATH_FORMAT_NOTE}${mathGuide}`;
 
   try {
-    const aiOutput = await generateStructuredJSON<DetailedLearningMaterial>(prompt, systemInstruction);
+    const aiOutput = await generateStructuredJSON<DetailedLearningMaterial>(prompt, systemInstruction, undefined, { budgetMs: LESSON_BUDGET_MS });
 
     if (validateMaterialContract(aiOutput)) {
       // Save in memory cache

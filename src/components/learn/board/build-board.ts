@@ -52,6 +52,10 @@ export function buildBoard(
     defaultAxes: {},
   } as any);
 
+  // JSXGraph locks the whole board against touch scrolling. Hand the vertical swipe back to the page and
+  // keep the lock only on the handles (see halo below), so a finger on empty board still scrolls.
+  el.style.touchAction = 'pan-y';
+  const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const common = { fixed: true, highlight: false, withLabel: false };
   board.create('grid', [], { ...common, strokeColor: tk.grid, strokeOpacity: 1, strokeWidth: 1, majorStep: 1, minorElements: 0 } as any);
   const axisAttrs = {
@@ -102,6 +106,13 @@ export function buildBoard(
       fillColor: p.draggable ? tk.amber : tk.ink,
       highlight: Boolean(p.draggable),
     }));
+  }
+  // A soft ring around each draggable handle: it shows where to grab, and is the one place that blocks page scroll.
+  for (const h of [...spec.gliders.map((g) => objs[g.id]), ...spec.points.filter((p) => p.draggable).map((p) => objs[p.id])]) {
+    const ring = board.create('point', [() => h.X(), () => h.Y()], {
+      ...common, name: '', size: coarse ? SLIDER_HIT.touch : 11, fillColor: tk.amber, fillOpacity: 0.28, strokeWidth: 0, layer: 6, showInfobox: false,
+    });
+    if (ring.rendNode) (ring.rendNode as SVGElement).style.touchAction = 'none';
   }
   const endpoint = (r: string | [number, number]) => (typeof r === 'string' ? objs[r] : r);
 

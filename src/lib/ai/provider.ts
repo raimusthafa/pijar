@@ -65,6 +65,8 @@ function blockedUntil(err: unknown, now: number): number {
     return now + (retry ? Math.ceil(Number(retry[1])) * 1000 : 65_000);
   }
   if (status === 404 || /NOT_FOUND|not supported/i.test(msg)) return now + 3_600_000;
+  // A model that hangs (seen with gemini-3.5-flash-lite) would otherwise cost 20 s on every request.
+  if (/timed out/i.test(msg)) return now + 120_000;
   return 0;
 }
 
@@ -74,12 +76,13 @@ export async function runChain<R>(
   call: (id: string) => Promise<R>,
   st: ChainState = state,
   now: () => number = Date.now,
+  budgetMs: number = CHAIN_BUDGET_MS,
 ): Promise<R> {
   let last: unknown = new Error('No AI model available (all exhausted)');
   const start = now();
   for (const id of models) {
     if ((st.get(id) ?? 0) > now()) continue;
-    if (now() - start > CHAIN_BUDGET_MS) break;
+    if (now() - start > budgetMs) break;
     try {
       return await withTimeout(call(id), MODEL_TIMEOUT_MS);
     } catch (err) {
@@ -138,6 +141,7 @@ export async function generateStructuredJSON<T>(
   prompt: string,
   systemInstruction?: string,
   images?: AiImage[],
+  opts?: { budgetMs?: number },
 ): Promise<T> {
   if (DEMO_MODE) {
     throw new Error('DEMO_MODE_ACTIVE'); // Tangkap di caller, gunakan mock data
@@ -145,7 +149,7 @@ export async function generateStructuredJSON<T>(
   if (AI_PROVIDER !== 'gemini') return generateWithOpenAI<T>(prompt, systemInstruction);
 
   try {
-    return await runChain(chain().map((m) => m.id), (id) => generateWithGemini<T>(byId(id), prompt, systemInstruction, images));
+    return await runChain(chain().map((m) => m.id), (id) => generateWithGemini<T>(byId(id), prompt, systemInstruction, images), state, Date.now, opts?.budgetMs);
   } catch (geminiErr) {
     if (hasOpenAI()) {
       console.warn('Gemini chain exhausted, failover to OpenAI:', (geminiErr as Error).message?.slice(0, 200));

@@ -39,9 +39,9 @@ export default defineMessages({
     'fitur.title.b': 'lihat konsep mana yang menahanmu',
     'fitur.math.chip': 'Animasi penjelasan',
     'fitur.math.title': 'Grafik yang bisa kamu tonton, jeda, dan geser',
+    'fitur.math.stage': 'Kemiringan di setiap titik',
     'fitur.math.body':
-      'Ini komponen yang sama dengan yang ada di ruang belajar. Setelah animasinya selesai, tarik titiknya dan lihat garisnya mengikuti.',
-    'fitur.math.replay': 'Putar ulang',
+      'Ini potongan dari panggung animasi di ruang belajar. Di sana kamu bisa menjeda, memundurkan, dan memilih adegan, lalu menggeser titik di papan latihan.',
     'fitur.map.chip': 'Peta prasyarat',
     'fitur.map.title': 'Tunjukkan konsep yang perlu dibereskan dulu',
     'fitur.map.body':
@@ -123,9 +123,9 @@ export default defineMessages({
     'fitur.title.b': 'see which concept holds you back',
     'fitur.math.chip': 'Animated explanation',
     'fitur.math.title': 'A graph you can watch, pause, and drag',
+    'fitur.math.stage': 'The slope at every point',
     'fitur.math.body':
-      'This is the same component used in the study workspace. Once the animation ends, drag the point and the line follows.',
-    'fitur.math.replay': 'Replay',
+      'This is a clip of the animation stage in the study workspace. There you can pause, rewind, and pick a scene, then drag the point on the practice board.',
     'fitur.map.chip': 'Prerequisite map',
     'fitur.map.title': 'Point at the concept to fix first',
     'fitur.map.body':

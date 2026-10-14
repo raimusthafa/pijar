@@ -19,7 +19,7 @@ import { ResultView } from './ResultView';
 import type { Graph, Q, ResultData } from './types';
 
 type Stage = 'intro' | 'preparing' | 'quiz' | 'analyzing' | 'result';
-interface Ctx { topic: string; goal: string; practitioner: boolean; intake: CognitiveIntakeResult | null }
+interface Ctx { topic: string; goal: string; practitioner: boolean; intake: CognitiveIntakeResult | null; cap: number }
 interface Asked { q: Q; picked: number }
 interface NextRes { adaptive_state: AdaptiveState; done: boolean; next: { nodeId: string; question: ApiQ } | null }
 interface ApiQ { id: string; question: string; options: string[]; correctIndex: number; explanation?: string }
@@ -44,6 +44,8 @@ function readContext(topicParam?: string): Ctx | null {
     goal: sessionStorage.getItem('pijar_goal') || 'Persiapan Komprehensif',
     practitioner: sessionStorage.getItem('pijar_is_practitioner') === 'true' || Boolean(intake?.is_practitioner_track),
     intake,
+    // Length chosen in onboarding (5 or 10); the adaptive test never asks more than that.
+    cap: Number(sessionStorage.getItem('pijar_diagnostic_count')) === 5 ? 5 : MAX_QUESTIONS,
   };
 }
 
@@ -140,7 +142,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
     lastCorrect.current = correct;
     setNextError(false);
     const p = post<NextRes>('/api/diagnostic/next', {
-      adaptive_state: adaptiveRef.current, correct, nodes: graph.nodes, edges: graph.edges, topic: ctx.topic, language,
+      adaptive_state: adaptiveRef.current, correct, nodes: graph.nodes, edges: graph.edges, topic: ctx.topic, language, max_questions: ctx.cap,
     });
     pendingRef.current = p;
     p.then(
@@ -279,7 +281,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
         <Card tone="raised" className="pj-rise" style={{ '--pj-i': 1 } as React.CSSProperties}>
           <dl className="grid gap-4 px-(--card-spacing) text-sm">
             <IntroRow k={t('diagnostic.intro.row.topic')} v={ctx.topic} />
-            <IntroRow k={t('diagnostic.intro.row.length')} v={t('diagnostic.intro.row.length.value')} />
+            <IntroRow k={t('diagnostic.intro.row.length')} v={t('diagnostic.intro.row.length.value', { n: ctx.cap })} />
             <IntroRow k={t('diagnostic.intro.row.stakes')} v={t('diagnostic.intro.row.stakes.value')} />
           </dl>
         </Card>
@@ -346,7 +348,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
         <QuestionPanel
           q={current}
           number={number}
-          max={fixed ? fixedList!.length : MAX_QUESTIONS}
+          max={fixed ? fixedList!.length : ctx.cap}
           fixed={fixed}
           picked={picked}
           onPick={onPick}

@@ -13,9 +13,10 @@ export async function POST(request: Request) {
     const {
       topic = 'dsa',
       nodeId,
-      nodeLabel,
-      nodeCategory,
-      nodeDescription,
+      nodeLabel: bodyLabel,
+      nodeCategory: bodyCategory,
+      nodeDescription: bodyDescription,
+      graphId,
       prerequisites = [],
       forceRegenerate = false,
       language,
@@ -26,6 +27,15 @@ export async function POST(request: Request) {
         { success: false, error: 'Parameter nodeId wajib diisi' },
         { status: 400 }
       );
+    }
+
+    // The browser only knows the concept when the graph sits in local storage (a direct link or a new device has none),
+    // so fall back to the stored graph. Without the label the model would write about a slug.
+    let { nodeLabel, nodeCategory, nodeDescription } = { nodeLabel: bodyLabel, nodeCategory: bodyCategory, nodeDescription: bodyDescription };
+    if (!nodeLabel && user && typeof graphId === 'string') {
+      const { data } = await supabase.from('learning_graphs').select('nodes_json').eq('id', graphId).maybeSingle();
+      const n = (data?.nodes_json as { id: string; label?: string; category?: string; description?: string }[] | null)?.find((x) => x.id === nodeId);
+      if (n) ({ label: nodeLabel, category: nodeCategory, description: nodeDescription } = n);
     }
 
     // 2. Fetch or generate rich material & video script

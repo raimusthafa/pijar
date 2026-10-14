@@ -103,7 +103,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Features: two large cards with real product pieces (MathVisual and concept cards). */}
+        {/* Features: two large cards with real product pieces (the animation stage and the concept map). */}
         <section id="fitur" className="scroll-mt-24 pb-30 md:pb-44">
           <div className="pj-gutter mx-auto flex max-w-[var(--pj-content-max)] flex-col gap-14">
             <Reveal>

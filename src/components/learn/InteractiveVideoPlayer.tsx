@@ -61,9 +61,8 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const [isMuted, setIsMuted] = useState(false);
   const [showCaptions, setShowCaptions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [audio, setAudio] = useState(() => ({ locale, cap: probeAudioCapability(locale) }));
-  if (audio.locale !== locale) setAudio({ locale, cap: probeAudioCapability(locale) });
-  const audioCap = audio.cap;
+  // Voices only exist in the browser, so the first (server-matching) render has none and the effect below fills them in.
+  const [audioCap, setAudioCap] = useState<ReturnType<typeof probeAudioCapability> | null>(null);
   const [seekTick, setSeekTick] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,7 +86,9 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     const controller = new VideoNarrationController(locale);
     narrationRef.current = controller;
     const speech = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
-    if (speech) speech.onvoiceschanged = () => setAudio({ locale, cap: probeAudioCapability(locale) });
+    const probe = () => setAudioCap(probeAudioCapability(locale));
+    probe();
+    if (speech) speech.onvoiceschanged = probe;
     return () => {
       controller.stop();
       if (speech) speech.onvoiceschanged = null;
@@ -195,11 +196,13 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     else containerRef.current?.requestFullscreen().catch(() => {});
   };
 
-  const voiceLabel = audioCap?.hasIndonesianVoice
-    ? t('learn.player.voice.native')
-    : audioCap?.hasSpeechSynthesis
-      ? t('learn.player.voice.fallback')
-      : t('learn.player.voice.none');
+  const voiceLabel = !audioCap
+    ? null
+    : audioCap.hasIndonesianVoice
+      ? t('learn.player.voice.native')
+      : audioCap.hasSpeechSynthesis
+        ? t('learn.player.voice.fallback')
+        : t('learn.player.voice.none');
 
   const iconBtn = 'text-foreground';
 
@@ -213,11 +216,11 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-hairline bg-raised px-5 py-3">
         <p className="min-w-0 flex-1 basis-48 text-sm font-medium">{playable.title}</p>
-        <Badge variant="outline">{voiceLabel}</Badge>
+        {voiceLabel && <Badge variant="outline">{voiceLabel}</Badge>}
       </div>
 
       <div className="bg-action">
-        <div className="relative mx-auto aspect-video max-h-[70dvh] w-full">
+        <div className="relative mx-auto aspect-video max-h-[70dvh] w-full cursor-pointer" onClick={togglePlay}>
           {activeScene && current && (
             <StageView
               scene={activeScene}
@@ -237,6 +240,18 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
           {stageStatus === 'loading' && (
             <div className="pj-skeleton pointer-events-none absolute inset-0 bg-action" aria-hidden />
           )}
+          {/* A paused stage looks like a picture, so say it plays. The Play button below stays the keyboard route. */}
+          <span
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
+              isPlaying || stageStatus !== 'ready' ? 'opacity-0' : 'opacity-100',
+            )}
+          >
+            <span className="flex size-16 items-center justify-center rounded-pill bg-raised text-foreground">
+              <Play {...ICON} className="size-6 translate-x-0.5 fill-current" />
+            </span>
+          </span>
         </div>
         <div className="flex min-h-14 w-full items-center justify-center px-4 pb-3 pt-1 md:px-8" aria-live="off">
           {caption && <p className="max-w-2xl text-center text-sm leading-relaxed text-action-foreground"><MathText text={caption} /></p>}

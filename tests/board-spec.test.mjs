@@ -193,3 +193,14 @@ describe('board-spec: keyword fallback', () => {
     assert.ok(fallbackBoardSpec('Turunan', 'en').instruction.startsWith('Drag'));
   });
 });
+
+describe('board follows the lesson function', () => {
+  it('a derivative board for sin(x) gets a window that frames sin(x)', async () => {
+    const { exprFromScript } = await import('../src/lib/learn/board-spec.ts');
+    const expr = exprFromScript({ scenes: [{ recipe: { name: 'function-plot', params: { expr: 'sin(x)' } } }] });
+    assert.equal(expr, 'sin(x)');
+    const b = fallbackBoardSpec('Turunan fungsi sinus', 'id', expr);
+    assert.equal(b.curves[0].expr, 'sin(x)');
+    assert.ok(b.viewBox.y[1] <= 3 && b.viewBox.y[0] >= -3, `y window ${b.viewBox.y}`);
+  });
+});

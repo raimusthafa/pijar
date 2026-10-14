@@ -6,6 +6,7 @@
 // ================================================================
 
 import { compileExpr } from './math-spec.ts';
+import { defaultX, fitRange } from './scene-recipes.ts';
 
 export const BOARD_RECIPES = [
   'derivative-tangent', 'secant-tangent', 'riemann-sum', 'vector-addition', 'unit-circle', 'function-transform', 'quadratic-explorer',
@@ -243,6 +244,12 @@ const T = (id: string, en: string): Text2 => ({ id, en });
 const numParam = (p: Record<string, unknown>, k: string, d: number) => num(p[k]) ?? d;
 const exprParam = (p: Record<string, unknown>, d: string) => (typeof p.expr === 'string' && compileExpr(p.expr) ? p.expr.trim() : d);
 
+/** Window for a curve the lesson named, so sin(x) is not squeezed into a box made for x^2. */
+function viewFor(expr: string, x: [number, number]): { x: [number, number]; y: [number, number] } {
+  const f = compileExpr(expr);
+  return { x, y: f ? fitRange((v) => f(v), x) : [-2, 9] };
+}
+
 function recipeBoard(name: BoardRecipe, p: Record<string, unknown>, lang: 'id' | 'en'): Record<string, unknown> {
   const L = (t: Text2) => t[lang];
   const x0 = numParam(p, 'x0', 1);
@@ -252,7 +259,7 @@ function recipeBoard(name: BoardRecipe, p: Record<string, unknown>, lang: 'id' |
       return {
         learningGoal: L(T('Memahami turunan sebagai kemiringan garis singgung di satu titik.', 'See the derivative as the slope of the tangent line at one point.')),
         instruction: L(T('Geser titik P sepanjang kurva dan amati kemiringan garis singgung.', 'Drag point P along the curve and watch the slope of the tangent line.')),
-        viewBox: { x: [-4, 4], y: [-2, 9] },
+        viewBox: typeof p.expr === 'string' && expr === p.expr.trim() ? viewFor(expr, defaultX(expr)) : { x: [-4, 4], y: [-2, 9] },
         curves: [{ expr, label: 'f(x)' }],
         gliders: [{ id: 'P', on: 'f', x: x0 }],
         tangents: [{ at: 'P' }],
@@ -266,7 +273,7 @@ function recipeBoard(name: BoardRecipe, p: Record<string, unknown>, lang: 'id' |
       return {
         learningGoal: L(T('Melihat garis potong mendekati garis singgung ketika h mengecil.', 'Watch the secant line approach the tangent line as h shrinks.')),
         instruction: L(T('Kecilkan h dan amati garis potong berubah menjadi garis singgung.', 'Make h smaller and watch the secant line turn into the tangent line.')),
-        viewBox: { x: [-1, 5], y: [-2, 12] },
+        viewBox: typeof p.expr === 'string' && expr === p.expr.trim() ? viewFor(expr, /sin|cos|tan/.test(expr) ? [-6, 6] : [-1, 5]) : { x: [-1, 5], y: [-2, 12] },
         sliders: [{ name: 'h', label: 'h', min: 0.05, max: 3, step: 0.05, initial: 2 }],
         curves: [{ expr, label: 'f(x)' }],
         gliders: [{ id: 'P', on: 'f', x: x0 }],
@@ -284,7 +291,7 @@ function recipeBoard(name: BoardRecipe, p: Record<string, unknown>, lang: 'id' |
       return {
         learningGoal: L(T('Memahami integral sebagai jumlah luas persegi panjang yang makin rapat.', 'See the integral as the total area of ever thinner rectangles.')),
         instruction: L(T('Naikkan n dan amati jumlah luas mendekati luas di bawah kurva.', 'Raise n and watch the total area approach the area under the curve.')),
-        viewBox: { x: [Math.min(-1, from - 1), Math.max(4, to + 1)], y: [-1, 6] },
+        viewBox: typeof p.expr === 'string' && expr === p.expr.trim() ? viewFor(expr, [Math.min(-1, from - 1), Math.max(4, to + 1)]) : { x: [Math.min(-1, from - 1), Math.max(4, to + 1)], y: [-1, 6] },
         sliders: [{ name: 'n', label: 'n', min: 1, max: 50, step: 1, initial: 4 }],
         curves: [{ expr, label: 'f(x)' }],
         riemann: { curve: 'f', from, to, n: 'n', kind: 'left' },
@@ -394,7 +401,19 @@ export function pickBoardRecipe(text: string): BoardRecipe | null {
   return /matematika|mathematics|\bmath\b/i.test(text) && /fungsi|function|aljabar|algebra/i.test(text) ? 'function-transform' : null;
 }
 
-export function fallbackBoardSpec(text: string, lang: 'id' | 'en' = 'id'): BoardSpec | null {
+/** The first curve the video scenes plot, so the board studies the same function the lesson is about. */
+export function exprFromScript(script: unknown): string | undefined {
+  const scenes = isObj(script) && Array.isArray(script.scenes) ? script.scenes : [];
+  for (const sc of scenes) {
+    const params = isObj(sc) && isObj(sc.recipe) && isObj(sc.recipe.params) ? sc.recipe.params : null;
+    if (params && typeof params.expr === 'string' && compileExpr(params.expr)) return params.expr.trim();
+  }
+  return undefined;
+}
+
+export function fallbackBoardSpec(text: string, lang: 'id' | 'en' = 'id', expr?: string): BoardSpec | null {
   const r = pickBoardRecipe(text);
-  return r ? boardFromRecipe(r, {}, lang) : null;
+  if (!r) return null;
+  // Only the function recipes take an expression; the others ignore it.
+  return boardFromRecipe(r, expr && ['derivative-tangent', 'secant-tangent', 'riemann-sum'].includes(r) ? { expr } : {}, lang);
 }

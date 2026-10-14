@@ -236,7 +236,7 @@ function MapCanvas({
       style: {
         stroke: 'var(--pj-text)',
         strokeWidth: active ? 2 : 1,
-        opacity: active ? 0.9 : selectedId ? 0.1 : 0.25,
+        opacity: active ? 0.9 : selectedId ? 0.1 : 0.4,
         transition: 'opacity 200ms cubic-bezier(0.23, 1, 0.32, 1)',
       },
       markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: active ? 'var(--pj-text)' : 'var(--pj-text-muted)' },

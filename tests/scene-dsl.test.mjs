@@ -167,3 +167,29 @@ describe('normalization and backward compatibility', () => {
     assert.equal(runtimeSeconds({ durationSeconds: 14, narration: 'singkat' }, 'id'), 14);
   });
 });
+
+describe('review fixes', () => {
+  it('a numeric or missing scene title is replaced by words from the narration', () => {
+    const s = normalizeScene({ title: '1', narration: 'Mari kita amati kurva sinus. Perhatikan garis singgungnya.', recipe: { name: 'function-plot', params: {} } }, 0, 0, 'id');
+    assert.equal(s.title, 'Mari kita amati kurva sinus');
+    assert.equal(normalizeScene({ title: 'Garis singgung', narration: 'x y z' }, 1, 0, 'id').title, 'Garis singgung');
+  });
+
+  it('function-plot frames sin(x) instead of using the x^2 window', () => {
+    const frag = buildRecipe('function-plot', { expr: 'sin(x)' }, { d: 12, title: 'x', language: 'id' });
+    const ax = validateStage(frag, 12).objects.find((o) => o.type === 'axes');
+    assert.ok(ax.yRange[1] <= 2 && ax.yRange[0] >= -2, `y range ${ax.yRange}`);
+  });
+
+  it('derivative-tangent draws the slope on a second pair of axes', () => {
+    const frag = buildRecipe('derivative-tangent', { expr: 'sin(x)' }, { d: 14, title: 'x', language: 'id' });
+    const s = validateStage(frag, 14);
+    assert.equal(s.objects.filter((o) => o.type === 'axes').length, 2);
+    assert.ok(s.objects.some((o) => o.type === 'function-graph' && o.derivative));
+  });
+
+  it('code lines keep their indentation', () => {
+    const s = validateStage({ objects: [{ id: 'c', type: 'text', text: '  return 1;', at: [0, 0], mono: true }], timeline: [] }, 10);
+    assert.equal(s.objects[0].text, '  return 1;');
+  });
+});

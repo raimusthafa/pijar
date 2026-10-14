@@ -40,10 +40,14 @@ const pPair = (p: Raw, k: string, def: [number, number], lo = -1000, hi = 1000):
 };
 const fmt = (n: number) => (Math.abs(n - Math.round(n)) < 1e-9 ? String(Math.round(n)) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 const SAFE_LATEX_CHARS = /^[\w\s\\{}^_+\-*/=().,|<>[\]!:;'&%]+$/;
+/** Bare function names the model writes as plain text ("cos(x)") become LaTeX operators so they are not set in italic letters. */
+const fixTex = (v: string) => v.replace(/(?<![\\a-zA-Z])(sin|cos|tan|cot|sec|csc|ln|log|exp)(?![a-zA-Z])/g, '\\$1').replace(/(?<![\\a-zA-Z])pi(?![a-zA-Z])/g, '\\pi');
 const pTex = (p: Raw, k: string, def: string) => {
   const v = cleanText(p[k], 150);
-  return v && SAFE_LATEX_CHARS.test(v) ? v : def;
+  return v && SAFE_LATEX_CHARS.test(v) ? fixTex(v) : def;
 };
+/** "cos(x)" alone is a right-hand side: give it the left-hand side the stage shows beside it. */
+const withLhs = (tex: string, lhs: string) => (tex.includes('=') ? tex : `${lhs} = ${tex}`);
 
 /** Convert a function expression for display ("x^2" -> "x^{2}") in a LaTeX label. */
 function exprToTex(expr: string): string {
@@ -70,21 +74,69 @@ const boxW = (label: string, min: number) => clamp(label.length * 0.15 + 0.9, mi
 const titleObj = (ctx: RecipeCtx): Raw => ({ id: 'ttl', type: 'text', text: ctx.title.slice(0, 60), at: [-6.4, 3.25], size: 'md', color: 'muted', align: 'left' });
 const titleIn = (ctx: RecipeCtx): Raw => ({ do: 'write', target: 'ttl', at: 0.1, dur: Math.min(1.2, ctx.d * 0.1) });
 
-function plotFrame(p: Raw, ctx: RecipeCtx, defaults: { x: [number, number]; y: [number, number] }) {
+const stepOf = (a: number, b: number) => {
+  const raw = (b - a) / 6;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const n = raw / mag;
+  return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
+};
+
+/** Slope of f by central differences (what a function-graph with derivative:true plots). */
+const slopeOf = (f: (x: number) => number) => (x: number) => (f(x + 1e-3) - f(x - 1e-3)) / 2e-3;
+
+/**
+ * A y range that frames the curve: sampled over x, outliers (tan near its poles) trimmed,
+ * zero kept in view when it is close, padded and rounded to a clean tick step.
+ */
+export function fitRange(f: (x: number) => number, xr: [number, number]): [number, number] {
+  const ys: number[] = [];
+  for (let i = 0; i <= 160; i++) {
+    const y = f(xr[0] + ((xr[1] - xr[0]) * i) / 160);
+    if (Number.isFinite(y)) ys.push(y);
+  }
+  if (ys.length < 8) return [-1, 1];
+  ys.sort((u, v) => u - v);
+  let lo = ys[Math.floor(ys.length * 0.02)];
+  let hi = ys[Math.ceil(ys.length * 0.98) - 1];
+  if (hi - lo < 1e-6) {
+    lo -= 1;
+    hi += 1;
+  }
+  const span = hi - lo;
+  if (lo > 0 && lo < span * 0.6) lo = 0;
+  if (hi < 0 && -hi < span * 0.6) hi = 0;
+  lo -= span * 0.12;
+  hi += span * 0.12;
+  const step = stepOf(lo, hi);
+  return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step];
+}
+
+/** Default x range: two periods for trig, a plain window otherwise. */
+export const defaultX = (expr: string): [number, number] => (/sin|cos|tan/.test(expr) ? [-6, 6] : [-4, 4]);
+
+// The plot sits on the left, a notes column on the right (x from 2.7 to 6.6).
+const PLOT_AT: [number, number] = [-2.1, -0.1];
+const PLOT_SIZE: [number, number] = [8.5, 5.0];
+const COL_X = 4.7;
+const COL_W = 3.7;
+
+function plotFrame(
+  p: Raw,
+  ctx: RecipeCtx,
+  defaults: { x: [number, number]; y?: [number, number] },
+  opts: { expr?: string; at?: [number, number]; size?: [number, number]; id?: string; yOf?: (f: (x: number) => number) => (x: number) => number } = {},
+) {
   const [x0, x1] = pPair(p, 'xRange', defaults.x, -100, 100);
-  const [y0, y1] = pPair(p, 'yRange', defaults.y, -100, 100);
   const xr: [number, number] = x0 < x1 ? [x0, x1] : defaults.x;
-  const yr: [number, number] = y0 < y1 ? [y0, y1] : defaults.y;
-  const at: [number, number] = [-1.7, -0.25];
-  const size: [number, number] = [8.2, 4.7];
-  const stepOf = (a: number, b: number) => {
-    const raw = (b - a) / 6;
-    const mag = 10 ** Math.floor(Math.log10(raw));
-    const n = raw / mag;
-    return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
-  };
+  const [y0, y1] = pPair(p, 'yRange', [0, 0], -100, 100);
+  let yr: [number, number] = y0 < y1 ? [y0, y1] : defaults.y ?? [-1, 1];
+  const f = opts.expr ? compileExpr(opts.expr) : null;
+  // The model rarely knows the right window, so fit it to the curve unless the caller pinned one.
+  if (f && !(y0 < y1)) yr = fitRange(opts.yOf ? opts.yOf((x) => f(x)) : (x) => f(x), xr);
+  const at = opts.at ?? PLOT_AT;
+  const size = opts.size ?? PLOT_SIZE;
   const axes: Raw = {
-    id: 'ax', type: 'axes', at, size, xRange: [xr[0], xr[1], stepOf(xr[0], xr[1])], yRange: [yr[0], yr[1], stepOf(yr[0], yr[1])],
+    id: opts.id ?? 'ax', type: 'axes', at, size, xRange: [xr[0], xr[1], stepOf(xr[0], xr[1])], yRange: [yr[0], yr[1], stepOf(yr[0], yr[1])],
     numbers: true, color: 'muted',
   };
   void ctx;
@@ -95,61 +147,80 @@ function plotFrame(p: Raw, ctx: RecipeCtx, defaults: { x: [number, number]; y: [
 
 const functionPlot: Recipe = (p, ctx) => {
   const expr = pExpr(p, 'expr', 'x^2');
-  const { axes, xr } = plotFrame(p, ctx, { x: [-4, 4], y: [-1, 9] });
+  const { axes, xr } = plotFrame(p, ctx, { x: defaultX(expr) }, { expr });
   const label = pTex(p, 'label', `f(x) = ${exprToTex(expr)}`);
   const d = ctx.d;
+  const x1 = xr[0] + (xr[1] - xr[0]) * 0.18;
+  const x2 = xr[0] + (xr[1] - xr[0]) * 0.82;
   return {
     objects: [
       titleObj(ctx), axes,
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
-      { id: 'lbl', type: 'mathtex', latex: label, at: [4.6, 1.6], size: 'lg', color: 'amber' },
-      { id: 'note', type: 'text', text: pStr(p, 'note', ''), at: [4.6, 0.4], size: 'sm', color: 'off-white', align: 'center' },
+      { id: 'pt', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: x1 }, color: 'off-white', radius: 0.13 },
+      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'amber' },
+      { id: 'note', type: 'text', text: pStr(p, 'note', '', 90), at: [COL_X, 0.2], size: 'sm', color: 'off-white', align: 'center' },
     ].filter((o) => o.type !== 'text' || o.text),
     timeline: [
       titleIn(ctx),
       { do: 'create', target: 'ax', at: d * 0.08, dur: d * 0.18 },
       { do: 'draw-graph', target: 'g', at: d * 0.28, dur: d * 0.3 },
       { do: 'write', target: 'lbl', at: d * 0.4, dur: d * 0.18 },
-      { do: 'fade-in', target: 'note', at: d * 0.62, dur: d * 0.12 },
-      { do: 'indicate', target: 'lbl', at: d * 0.8, dur: d * 0.12 },
+      { do: 'fade-in', target: 'note', at: d * 0.6, dur: d * 0.12 },
+      { do: 'fade-in', target: 'pt', at: d * 0.62, dur: d * 0.06 },
+      { do: 'move-along', target: 'pt', fromX: x1, toX: x2, at: d * 0.68, dur: d * 0.28 },
+      { do: 'indicate', target: 'lbl', at: d * 0.9, dur: d * 0.08 },
     ],
   };
 };
 
 const derivativeTangent: Recipe = (p, ctx) => {
   const expr = pExpr(p, 'expr', 'x^2');
-  const { axes, xr } = plotFrame(p, ctx, { x: [-3, 3], y: [-1, 9] });
+  const xr0 = pPair(p, 'xRange', defaultX(expr), -100, 100);
+  const xr: [number, number] = xr0[0] < xr0[1] ? xr0 : defaultX(expr);
+  // Two plots that share x: the curve above, its slope below, so the tangent's slope is read straight onto the lower curve.
+  const top = plotFrame({ xRange: xr }, ctx, { x: xr }, { expr, at: [-2.1, 1.2], size: [8.5, 2.9] });
+  const low = plotFrame({ xRange: xr }, ctx, { x: xr }, { expr, id: 'ax2', at: [-2.1, -2.15], size: [8.5, 1.7], yOf: slopeOf });
   const a = pNum(p, 'from', xr[0] + (xr[1] - xr[0]) * 0.15, xr[0], xr[1]);
   const b = pNum(p, 'to', xr[0] + (xr[1] - xr[0]) * 0.85, xr[0], xr[1]);
-  const fl = pTex(p, 'label', `f(x) = ${exprToTex(expr)}`);
-  const dl = pTex(p, 'derivative', "f'(x) = \\text{slope}");
+  const fl = withLhs(pTex(p, 'label', `f(x) = ${exprToTex(expr)}`), 'f(x)');
+  const dl = withLhs(pTex(p, 'derivative', "f'(x) = \\text{slope}"), "f'(x)");
   const d = ctx.d;
+  const t0 = d * 0.58;
+  const win = d * 0.38;
   return {
     objects: [
-      titleObj(ctx), axes,
+      titleObj(ctx), top.axes, low.axes,
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
-      { id: 'fl', type: 'mathtex', latex: fl, at: [4.7, 1.9], size: 'lg', color: 'amber' },
-      { id: 'dl', type: 'mathtex', latex: dl, at: [4.7, 1.9], size: 'lg', color: 'off-white' },
-      { id: 'tg', type: 'tangent', graph: 'g', x: a, length: 3.4, color: 'off-white', dot: true },
-      { id: 'hint', type: 'text', text: pStr(p, 'hint', ctx.language === 'en' ? 'The slope changes as the point moves' : 'Kemiringan berubah saat titik bergerak', 60), at: [4.7, 0.4], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'g2', type: 'function-graph', axes: 'ax2', expr, color: 'off-white', xRange: [a, b], derivative: true },
+      { id: 'tg', type: 'tangent', graph: 'g', x: a, length: 2.7, color: 'off-white', dot: false },
+      { id: 'pp', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: a }, color: 'amber', radius: 0.14 },
+      { id: 'pq', type: 'dot', axes: 'ax2', onGraph: { graph: 'g2', x: a }, color: 'off-white', radius: 0.12 },
+      { id: 'con', type: 'line', from: 'pp', to: 'pq', color: 'muted', dashed: true },
+      { id: 'fl', type: 'mathtex', latex: fl, at: [COL_X, 1.9], size: 'lg', color: 'amber' },
+      { id: 'dl', type: 'mathtex', latex: dl, at: [COL_X, 0.7], size: 'lg', color: 'off-white' },
+      { id: 'hint', type: 'text', text: pStr(p, 'hint', ctx.language === 'en' ? 'The height of the lower curve is the slope of the tangent above' : 'Tinggi kurva bawah sama dengan kemiringan garis singgung di atas', 90), at: [COL_X, -0.9], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
-      { do: 'create', target: 'ax', at: d * 0.07, dur: d * 0.16 },
-      { do: 'draw-graph', target: 'g', at: d * 0.24, dur: d * 0.26 },
-      { do: 'write', target: 'fl', at: d * 0.32, dur: d * 0.16 },
-      { do: 'fade-in', target: 'tg', at: d * 0.5, dur: d * 0.08 },
-      { do: 'trace-tangent', target: 'tg', fromX: a, toX: b, at: d * 0.56, dur: d * 0.3 },
-      { do: 'transform', target: 'fl', to: 'dl', at: d * 0.58, dur: d * 0.14 },
-      { do: 'fade-in', target: 'hint', at: d * 0.72, dur: d * 0.1 },
-      { do: 'trace-tangent', target: 'tg', fromX: b, toX: (a + b) / 2, at: d * 0.88, dur: d * 0.1 },
+      { do: 'create', target: 'ax', at: d * 0.06, dur: d * 0.14 },
+      { do: 'draw-graph', target: 'g', at: d * 0.2, dur: d * 0.2 },
+      { do: 'write', target: 'fl', at: d * 0.28, dur: d * 0.14 },
+      { do: 'fade-in', target: ['tg', 'pp'], at: d * 0.4, dur: d * 0.06 },
+      { do: 'create', target: 'ax2', at: d * 0.44, dur: d * 0.1 },
+      { do: 'fade-in', target: ['pq', 'con'], at: d * 0.54, dur: d * 0.04 },
+      { do: 'trace-tangent', target: 'tg', fromX: a, toX: b, at: t0, dur: win, linear: true },
+      { do: 'move-along', target: 'pp', fromX: a, toX: b, at: t0, dur: win, linear: true },
+      { do: 'move-along', target: 'pq', fromX: a, toX: b, at: t0, dur: win, linear: true },
+      { do: 'draw-graph', target: 'g2', at: t0, dur: win, linear: true },
+      { do: 'write', target: 'dl', at: t0 + win * 0.25, dur: d * 0.1 },
+      { do: 'fade-in', target: 'hint', at: t0 + win * 0.5, dur: d * 0.08 },
     ],
   };
 };
 
 const areaRiemann: Recipe = (p, ctx) => {
   const expr = pExpr(p, 'expr', 'sqrt(x)');
-  const { axes, xr } = plotFrame(p, ctx, { x: [-0.5, 5], y: [-0.5, 3] });
+  const { axes, xr } = plotFrame(p, ctx, { x: [-0.5, 5] }, { expr });
   const a = pNum(p, 'a', Math.max(0, xr[0] + 0.5), xr[0], xr[1]);
   const b = pNum(p, 'b', xr[1] - 1, xr[0], xr[1]);
   const lo = Math.min(a, b);
@@ -164,10 +235,10 @@ const areaRiemann: Recipe = (p, ctx) => {
       { id: 'r2', type: 'riemann', graph: 'g', range: [lo, hi], n: 12, color: 'off-white' },
       { id: 'r3', type: 'riemann', graph: 'g', range: [lo, hi], n: 40, color: 'off-white' },
       { id: 'ar', type: 'area', graph: 'g', range: [lo, hi], color: 'amber' },
-      { id: 'lbl', type: 'mathtex', latex: label, at: [4.7, 1.6], size: 'lg', color: 'off-white' },
-      { id: 'n1', type: 'text', text: pStr(p, 'n1', ctx.language === 'en' ? '4 slices' : '4 irisan', 30), at: [4.7, 0.3], size: 'sm', color: 'muted', align: 'center' },
-      { id: 'n2', type: 'text', text: pStr(p, 'n2', ctx.language === 'en' ? '12 slices' : '12 irisan', 30), at: [4.7, 0.3], size: 'sm', color: 'muted', align: 'center' },
-      { id: 'n3', type: 'text', text: pStr(p, 'n3', ctx.language === 'en' ? 'Thinner and thinner' : 'Makin tipis', 30), at: [4.7, 0.3], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'n1', type: 'text', text: pStr(p, 'n1', ctx.language === 'en' ? '4 slices' : '4 irisan', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
+      { id: 'n2', type: 'text', text: pStr(p, 'n2', ctx.language === 'en' ? '12 slices' : '12 irisan', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
+      { id: 'n3', type: 'text', text: pStr(p, 'n3', ctx.language === 'en' ? 'Thinner and thinner' : 'Makin tipis', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -177,10 +248,12 @@ const areaRiemann: Recipe = (p, ctx) => {
       { do: 'fade-in', target: 'r1', at: d * 0.46, dur: d * 0.1 },
       { do: 'fade-in', target: 'n1', at: d * 0.48, dur: d * 0.08 },
       { do: 'fade-out', target: 'n1', at: d * 0.6, dur: d * 0.04 },
-      { do: 'transform', target: 'r1', to: 'r2', at: d * 0.62, dur: d * 0.12 },
+      { do: 'fade-out', target: 'r1', at: d * 0.6, dur: d * 0.04 },
+      { do: 'fade-in', target: 'r2', at: d * 0.64, dur: d * 0.1 },
       { do: 'fade-in', target: 'n2', at: d * 0.66, dur: d * 0.06 },
       { do: 'fade-out', target: 'n2', at: d * 0.76, dur: d * 0.04 },
-      { do: 'transform', target: 'r1', to: 'r3', at: d * 0.78, dur: d * 0.1 },
+      { do: 'fade-out', target: 'r2', at: d * 0.76, dur: d * 0.04 },
+      { do: 'fade-in', target: 'r3', at: d * 0.8, dur: d * 0.08 },
       { do: 'fade-in', target: 'n3', at: d * 0.82, dur: d * 0.06 },
       { do: 'fade-in', target: 'ar', at: d * 0.9, dur: d * 0.08 },
     ],
@@ -196,27 +269,45 @@ const vectorAdd: Recipe = (p, ctx) => {
   const pad = 1;
   const xr: [number, number] = [Math.floor(Math.min(...xs) - pad), Math.ceil(Math.max(...xs) + pad)];
   const yr: [number, number] = [Math.floor(Math.min(...ys) - pad), Math.ceil(Math.max(...ys) + pad)];
-  const { axes, map } = plotFrame({ xRange: xr, yRange: yr }, ctx, { x: [-1, 7], y: [-1, 6] });
+  const { axes, map } = plotFrame({ xRange: xr, yRange: yr }, ctx, { x: xr, y: yr });
   const d = ctx.d;
-  const near = (v: [number, number], dx: number, dy: number): [number, number] => {
-    const q = map(v[0], v[1]);
-    return [q[0] + dx, q[1] + dy];
+  // Each label sits beside its arrow, on the side facing away from the triangle the three arrows make.
+  const o = map(0, 0);
+  const sa = map(a[0], a[1]);
+  const ss = map(sum[0], sum[1]);
+  const cen: [number, number] = [(o[0] + sa[0] + ss[0]) / 3, (o[1] + sa[1] + ss[1]) / 3];
+  const beside = (from: [number, number], to: [number, number], gap: number): [number, number] => {
+    const u = map(from[0], from[1]);
+    const v = map(to[0], to[1]);
+    const m: [number, number] = [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2];
+    const len = Math.hypot(v[0] - u[0], v[1] - u[1]) || 1;
+    let nx = -(v[1] - u[1]) / len;
+    let ny = (v[0] - u[0]) / len;
+    if (nx * (m[0] - cen[0]) + ny * (m[1] - cen[1]) < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    // A label that would land on the x axis goes to the other side of its arrow.
+    if (Math.abs(m[1] + ny * gap - o[1]) < 0.3) {
+      nx = -nx;
+      ny = -ny;
+    }
+    return [m[0] + nx * gap, m[1] + ny * gap];
   };
-  const mid = (u: [number, number], v: [number, number]): [number, number] => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2];
   const la = pStr(p, 'labelA', 'a', 12);
   const lb = pStr(p, 'labelB', 'b', 12);
   return {
     objects: [
       titleObj(ctx), axes,
+      { id: 'vb0', type: 'vector', from: [0, 0], to: b, axes: 'ax', color: 'ink' },
       { id: 'va', type: 'vector', from: [0, 0], to: a, axes: 'ax', color: 'off-white' },
       { id: 'vb', type: 'vector', from: a, to: sum, axes: 'ax', color: 'muted' },
-      { id: 'vb0', type: 'vector', from: [0, 0], to: b, axes: 'ax', color: 'muted' },
       { id: 'vs', type: 'vector', from: [0, 0], to: sum, axes: 'ax', color: 'amber' },
-      { id: 'la', type: 'mathtex', latex: `\\vec{${la}}`, at: near(mid([0, 0], a), 0.15, -0.4), size: 'md', color: 'off-white' },
-      { id: 'lb', type: 'mathtex', latex: `\\vec{${lb}}`, at: near(mid(a, sum), 0.4, 0.15), size: 'md', color: 'muted' },
-      { id: 'ls', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}}`, at: near(mid([0, 0], sum), -0.9, 0.3), size: 'md', color: 'amber' },
-      { id: 'eq', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}} = \\begin{pmatrix}${fmt(sum[0])}\\\\${fmt(sum[1])}\\end{pmatrix}`, at: [4.9, 1.2], size: 'lg', color: 'amber' },
-      { id: 'tip', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Tip to tail' : 'Ujung ke pangkal', 40), at: [4.9, 0.1], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'la', type: 'mathtex', latex: `\\vec{${la}}`, at: beside([0, 0], a, 0.42), size: 'md', color: 'off-white' },
+      { id: 'lb', type: 'mathtex', latex: `\\vec{${lb}}`, at: beside(a, sum, 0.42), size: 'md', color: 'muted' },
+      { id: 'ls', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}}`, at: beside([0, 0], sum, 0.62), size: 'md', color: 'amber' },
+      { id: 'eq', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}} = \\begin{pmatrix}${fmt(sum[0])}\\\\${fmt(sum[1])}\\end{pmatrix}`, at: [COL_X, 1.4], size: 'lg', color: 'amber' },
+      { id: 'tip', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Place the tail of one arrow on the tip of the other' : 'Letakkan pangkal satu panah di ujung panah yang lain', 80), at: [COL_X, 0.1], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -225,12 +316,13 @@ const vectorAdd: Recipe = (p, ctx) => {
       { do: 'write', target: 'la', at: d * 0.3, dur: d * 0.08 },
       { do: 'grow-arrow', target: 'vb', at: d * 0.4, dur: d * 0.14 },
       { do: 'write', target: 'lb', at: d * 0.48, dur: d * 0.08 },
-      { do: 'fade-in', target: 'tip', at: d * 0.5, dur: d * 0.08 },
-      { do: 'grow-arrow', target: 'vs', at: d * 0.62, dur: d * 0.16 },
-      { do: 'write', target: 'ls', at: d * 0.72, dur: d * 0.1 },
-      { do: 'write', target: 'eq', at: d * 0.8, dur: d * 0.14 },
-      { do: 'indicate', target: 'vs', at: d * 0.92, dur: d * 0.06 },
-    ].map((e) => e),
+      { do: 'fade-in', target: 'tip', at: d * 0.5, dur: d * 0.1 },
+      { do: 'grow-arrow', target: 'vb0', at: d * 0.58, dur: d * 0.1 },
+      { do: 'grow-arrow', target: 'vs', at: d * 0.66, dur: d * 0.16 },
+      { do: 'write', target: 'ls', at: d * 0.76, dur: d * 0.08 },
+      { do: 'write', target: 'eq', at: d * 0.82, dur: d * 0.12 },
+      { do: 'indicate', target: 'vs', at: d * 0.93, dur: d * 0.05 },
+    ],
   };
 };
 
@@ -275,7 +367,7 @@ const unitCircle: Recipe = (p, ctx) => {
 
 const limitApproach: Recipe = (p, ctx) => {
   const expr = pExpr(p, 'expr', 'x^2');
-  const { axes, xr } = plotFrame(p, ctx, { x: [-1, 5], y: [-1, 9] });
+  const { axes, xr } = plotFrame(p, ctx, { x: [-1, 5] }, { expr });
   const a = pNum(p, 'a', 2, xr[0] + 0.3, xr[1] - 0.3);
   const label = pTex(p, 'label', `\\lim_{x \\to ${fmt(a)}} f(x)`);
   const d = ctx.d;
@@ -287,8 +379,8 @@ const limitApproach: Recipe = (p, ctx) => {
       { id: 'hole', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: a }, color: 'off-white', radius: 0.12, hollow: true },
       { id: 'dl', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.max(xr[0], a - span) }, color: 'danger', radius: 0.1 },
       { id: 'dr', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.min(xr[1], a + span) }, color: 'success', radius: 0.1 },
-      { id: 'lbl', type: 'mathtex', latex: label, at: [4.7, 1.6], size: 'lg', color: 'off-white' },
-      { id: 'res', type: 'text', text: pStr(p, 'result', ctx.language === 'en' ? 'Both sides meet at the same value' : 'Dua sisi bertemu di nilai yang sama', 48), at: [4.7, 0.4], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'res', type: 'text', text: pStr(p, 'result', ctx.language === 'en' ? 'Both sides meet at the same value' : 'Dua sisi bertemu di nilai yang sama', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -307,17 +399,21 @@ const limitApproach: Recipe = (p, ctx) => {
 const matrixTransform: Recipe = (p, ctx) => {
   const m = pList(p, 'matrix', 4).map((v) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, -3, 3) : 0));
   const [a, b, c, e] = m.length === 4 ? m : [1, 1, 0, 1];
-  const G: [number, number] = [-2.0, -0.2];
+  const G: [number, number] = [-2.4, -0.3];
   const u = 0.6; // grid cell (stage units), fixed in the engine in stage units
   const d = ctx.d;
+  // Fewer cells when the matrix stretches a lot, so the result still fits between the title and the bottom edge.
+  const reachX = Math.max(Math.abs(a) + Math.abs(c), 1);
+  const reachY = Math.max(Math.abs(b) + Math.abs(e), 1);
+  const cells = Math.max(1, Math.min(3, Math.floor(4.2 / (u * reachX)), Math.floor(3.0 / (u * reachY))));
   const mat = `\\begin{pmatrix}${fmt(a)}&${fmt(c)}\\\\${fmt(b)}&${fmt(e)}\\end{pmatrix}`;
   return {
     objects: [
       titleObj(ctx),
-      { id: 'gr', type: 'grid', at: G, extent: 3, color: 'muted' },
-      { id: 'i', type: 'vector', from: G, to: [G[0] + u * 3, G[1]], color: 'success' },
-      { id: 'j', type: 'vector', from: G, to: [G[0], G[1] + u * 3], color: 'danger' },
-      { id: 'sq', type: 'polygon', points: [G, [G[0] + u * 3, G[1]], [G[0] + u * 3, G[1] + u * 3], [G[0], G[1] + u * 3]], color: 'amber', fill: true },
+      { id: 'gr', type: 'grid', at: G, extent: cells, color: 'muted' },
+      { id: 'i', type: 'vector', from: G, to: [G[0] + u * cells, G[1]], color: 'success' },
+      { id: 'j', type: 'vector', from: G, to: [G[0], G[1] + u * cells], color: 'danger' },
+      { id: 'sq', type: 'polygon', points: [G, [G[0] + u * cells, G[1]], [G[0] + u * cells, G[1] + u * cells], [G[0], G[1] + u * cells]], color: 'amber', fill: true },
       { id: 'mt', type: 'mathtex', latex: `A = ${mat}`, at: [4.5, 1.5], size: 'lg', color: 'amber' },
       { id: 'cols', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'The columns say where the arrows land' : 'Kolom matriks menunjukkan arah panah mendarat', 56), at: [4.5, 0.3], size: 'sm', color: 'muted', align: 'center' },
     ],
@@ -335,7 +431,7 @@ const matrixTransform: Recipe = (p, ctx) => {
 
 const gradientDescent: Recipe = (p, ctx) => {
   const expr = pExpr(p, 'expr', 'x^2');
-  const { axes, xr } = plotFrame(p, ctx, { x: [-4, 4], y: [-1, 10] });
+  const { axes, xr } = plotFrame(p, ctx, { x: [-4, 4] }, { expr });
   const start = pNum(p, 'start', xr[0] + (xr[1] - xr[0]) * 0.1, xr[0], xr[1]);
   const lr = pNum(p, 'rate', 0.3, 0.02, 0.9);
   const steps = Math.round(pNum(p, 'steps', 5, 2, 7));
@@ -367,8 +463,8 @@ const gradientDescent: Recipe = (p, ctx) => {
       titleObj(ctx), axes,
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
       { id: 'pt', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: start }, color: 'off-white', radius: 0.13 },
-      { id: 'rule', type: 'mathtex', latex: pTex(p, 'rule', 'x_{new} = x - \\alpha\\, f\'(x)'), at: [4.7, 1.7], size: 'lg', color: 'off-white' },
-      { id: 'lowest', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Steps shrink near the minimum' : 'Langkah mengecil dekat titik minimum', 48), at: [4.7, 0.4], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'rule', type: 'mathtex', latex: pTex(p, 'rule', 'x_{new} = x - \\alpha\\, f\'(x)'), at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'lowest', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Steps shrink near the minimum' : 'Langkah mengecil dekat titik minimum', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: tl,
   };
@@ -392,44 +488,48 @@ const callStack: Recipe = (p, ctx) => {
           for (let j = 2; j <= k; j++) r *= j;
           return {
             label: `${fn}(${k})`,
-            sub: k === 1 ? (ctx.language === 'en' ? 'base case' : 'base case') : `${k} * ${fn}(${k - 1})`,
+            sub: k === 1 ? 'base case' : `${k} * ${fn}(${k - 1})`,
             ret: String(r),
           };
         });
   const d = ctx.d;
+  const m = frames.length;
   const objs: Raw[] = [titleObj(ctx)];
   const tl: Raw[] = [titleIn(ctx)];
-  const x0 = -2.2;
-  const h = 0.95;
-  const gap = 0.16;
-  const y0 = -2.35;
+  const h = m > 4 ? 0.7 : 0.95;
+  const gap = m > 4 ? 0.12 : 0.16;
+  const x0 = -2.9;
+  const total = m * h + (m - 1) * gap;
+  const y0 = -total / 2 + h / 2 - 0.25; // centre of the bottom frame; the stack grows upward
+  const yAt = (i: number) => y0 + i * (h + gap);
   objs.push({ id: 'floor', type: 'line', from: [x0 - 2.6, y0 - h / 2 - 0.12], to: [x0 + 2.6, y0 - h / 2 - 0.12], color: 'muted' });
   objs.push({ id: 'stk', type: 'text', text: pStr(p, 'stackLabel', 'call stack', 20), at: [x0, y0 - h / 2 - 0.5], size: 'sm', color: 'muted' });
   const rule = cleanText(p.rule, 48) ?? (given.length < 2 ? `${fn}(n) = n * ${fn}(n - 1)` : null);
   if (rule) {
-    objs.push({ id: 'rule', type: 'text', text: rule, at: [3.9, 2.1], size: 'sm', color: 'off-white', align: 'center', mono: true });
+    objs.push({ id: 'rule', type: 'text', text: rule, at: [3.4, Math.min(3.0, yAt(m - 1) + h / 2 + 0.6)], size: 'sm', color: 'off-white', align: 'center', mono: true });
     tl.push({ do: 'write', target: 'rule', at: d * 0.12, dur: d * 0.14 });
   }
   tl.push({ do: 'create', target: 'floor', at: d * 0.07, dur: d * 0.08 });
   tl.push({ do: 'fade-in', target: 'stk', at: d * 0.1, dur: d * 0.08 });
-  const pushSpan = d * 0.42;
-  const per = pushSpan / frames.length;
+  const pushSpan = d * 0.4;
+  const per = pushSpan / m;
   frames.forEach((f, i) => {
-    const isBase = i === frames.length - 1;
-    const y = y0 + i * (h + gap);
-    objs.push({ id: `f${i}`, type: 'box', at: [x0, y], size: [5.2, h], label: f.label, sub: f.sub, color: isBase ? 'amber' : 'off-white', fill: isBase, round: true });
+    const isBase = i === m - 1;
+    objs.push({ id: `f${i}`, type: 'box', at: [x0, yAt(i)], size: [5.0, h], label: f.label, sub: f.sub, color: isBase ? 'amber' : 'off-white', fill: isBase, round: true });
     tl.push({ do: 'fade-in', target: `f${i}`, at: d * 0.18 + i * per, dur: Math.min(per * 0.9, 1.2) });
   });
-  // Unwinding: top frame returns first.
+  // Unwinding: the top frame returns first and its value travels out to the right-hand column.
   const unStart = d * 0.62;
-  const unPer = (d * 0.34) / frames.length;
-  for (let i = frames.length - 1, k = 0; i >= 0; i--, k++) {
+  const unPer = (d * 0.34) / m;
+  for (let i = m - 1, k = 0; i >= 0; i--, k++) {
     const f = frames[i];
-    const y = y0 + i * (h + gap);
-    tl.push({ do: 'highlight', target: `f${i}`, color: 'success', at: unStart + k * unPer, dur: unPer * 0.35 });
+    const t = unStart + k * unPer;
+    tl.push({ do: 'highlight', target: `f${i}`, color: 'success', at: t, dur: unPer * 0.35 });
     if (f.ret) {
-      objs.push({ id: `r${i}`, type: 'text', text: `return ${f.ret}`, at: [x0 + 3.2, y], size: 'md', color: 'success', align: 'left', mono: true });
-      tl.push({ do: 'fade-in', target: `r${i}`, at: unStart + k * unPer + unPer * 0.2, dur: unPer * 0.4 });
+      objs.push({ id: `a${i}`, type: 'vector', from: [x0 + 2.6, yAt(i)], to: [2.05, yAt(i)], color: 'success' });
+      objs.push({ id: `r${i}`, type: 'box', at: [4.1, yAt(i)], size: [3.8, h * 0.82], label: `return ${f.ret}`, color: 'success', round: true });
+      tl.push({ do: 'grow-arrow', target: `a${i}`, at: t + unPer * 0.1, dur: unPer * 0.35 });
+      tl.push({ do: 'fade-in', target: `r${i}`, at: t + unPer * 0.35, dur: unPer * 0.4 });
     }
   }
   return { objects: objs, timeline: tl };
@@ -468,53 +568,64 @@ const pipeline: Recipe = (p, ctx) => {
   const subs = pList(p, 'notes', 5).map((s) => cleanText(s, 34) ?? undefined);
   const d = ctx.d;
   const n = stages.length;
-  const w = Math.min(2.5, 11.4 / n - 0.55);
-  const step = (12.2 - w) / Math.max(1, n - 1);
-  const x = (i: number): number => (n === 1 ? 0 : -6.1 + w / 2 + i * step);
+  const w = Math.min(2.8, 11.8 / n - 0.75);
+  const h = 1.9;
+  const y = 0.5;
+  const yTok = y - h / 2 - 0.5; // the packet rides under the boxes so it never covers a label
+  const x = (i: number): number => (n === 1 ? 0 : -5.9 + w / 2 + (i * (11.8 - w)) / (n - 1));
   const objs: Raw[] = [titleObj(ctx)];
   const tl: Raw[] = [titleIn(ctx)];
   stages.forEach((s, i) => {
-    objs.push({ id: `s${i}`, type: 'box', at: [x(i), 0.2], size: [w, 1.2], label: s, sub: subs[i], color: 'off-white', round: true });
-    if (i > 0) objs.push({ id: `a${i}`, type: 'vector', from: [x(i - 1) + w / 2 + 0.05, 0.2], to: [x(i) - w / 2 - 0.05, 0.2], color: 'muted' });
+    objs.push({ id: `s${i}`, type: 'box', at: [x(i), y], size: [w, h], label: s, sub: subs[i], color: 'off-white', round: true });
+    if (i > 0) objs.push({ id: `a${i}`, type: 'vector', from: [x(i - 1) + w / 2 + 0.05, y], to: [x(i) - w / 2 - 0.05, y], color: 'muted' });
   });
-  objs.push({ id: 'tok', type: 'dot', at: [x(0), -1.3], color: 'amber', radius: 0.17 });
-  const per = (d * 0.7) / n;
+  // A packet of data rides along the row, so the order of the stages is something you watch rather than read.
+  const startX = x(0) - w / 2 - 0.1;
+  objs.push({ id: 'tok', type: 'dot', at: [startX, yTok], color: 'amber', radius: 0.2 });
+  const per = (d * 0.5) / n;
   stages.forEach((_, i) => {
-    tl.push({ do: 'fade-in', target: `s${i}`, at: d * 0.1 + i * per * 0.55, dur: per * 0.5 });
-    if (i > 0) tl.push({ do: 'grow-arrow', target: `a${i}`, at: d * 0.1 + i * per * 0.55 - per * 0.1, dur: per * 0.4 });
+    tl.push({ do: 'fade-in', target: `s${i}`, at: d * 0.08 + i * per * 0.55, dur: per * 0.5 });
+    if (i > 0) tl.push({ do: 'grow-arrow', target: `a${i}`, at: d * 0.08 + i * per * 0.55 - per * 0.1, dur: per * 0.4 });
   });
-  const tokStart = d * 0.1 + n * per * 0.55 + 0.2;
-  const tokPer = Math.max(0.5, (d * 0.95 - tokStart) / n);
+  const tokStart = d * 0.08 + n * per * 0.55 + 0.3;
+  const tokPer = Math.max(0.6, (d * 0.94 - tokStart) / n);
   tl.push({ do: 'fade-in', target: 'tok', at: tokStart, dur: 0.4 });
   stages.forEach((_, i) => {
-    if (i > 0) tl.push({ do: 'move-to', target: 'tok', point: [x(i), -1.3], at: tokStart + (i - 1) * tokPer + 0.3, dur: tokPer * 0.8 });
-    tl.push({ do: 'highlight', target: `s${i}`, color: 'amber', at: tokStart + i * tokPer + (i ? 0.5 : 0.3), dur: tokPer * 0.5 });
+    tl.push({ do: 'move-to', target: 'tok', point: [x(i), yTok], at: tokStart + i * tokPer + 0.2, dur: tokPer * 0.75 });
+    tl.push({ do: 'highlight', target: `s${i}`, color: 'amber', at: tokStart + i * tokPer + tokPer * 0.7, dur: tokPer * 0.4 });
   });
   return { objects: objs, timeline: tl };
 };
 
 const codeWalk: Recipe = (p, ctx) => {
-  const lines = pList(p, 'code', 8).map((l) => (typeof l === 'string' ? l.replace(/\t/g, '  ').slice(0, 48) : '')).filter(Boolean);
+  const lines = pList(p, 'code', 8).map((l) => (typeof l === 'string' ? l.replace(/\t/g, '  ').replace(/\s+$/, '').slice(0, 44) : '')).filter(Boolean);
   const code = lines.length >= 2 ? lines : ['function f(n) {', '  if (n <= 1) return 1;', '  return n * f(n - 1);', '}'];
-  const vars = pList(p, 'steps', 6).map((s) => cleanText(s, 40)).filter((s): s is string => !!s);
+  const vars = pList(p, 'steps', 6).map((s) => cleanText(s, 60)).filter((s): s is string => !!s);
   const steps = vars.length ? vars : ctx.language === 'en' ? ['Start here', 'Check the condition', 'Do the work', 'Return the result'] : ['Mulai di sini', 'Periksa kondisi', 'Kerjakan', 'Kembalikan hasil'];
   const d = ctx.d;
-  const lh = 0.55;
-  const top = 1.5;
+  const longest = Math.max(...code.map((l) => l.length));
+  const big = longest <= 26; // larger type when the lines are short enough
+  const lh = big ? 0.78 : 0.62;
+  const charW = big ? 0.27 : 0.2;
+  const W = Math.min(8.2, Math.max(5.6, longest * charW + 1.0));
+  const cx = -6.4 + W / 2;
+  const mid = 0.1;
+  const top = mid + ((code.length - 1) * lh) / 2;
   const objs: Raw[] = [
     titleObj(ctx),
-    { id: 'panel', type: 'rectangle', at: [-2.4, top - ((code.length - 1) * lh) / 2], size: [7.2, code.length * lh + 0.5], color: 'muted' },
-    { id: 'bar', type: 'rectangle', at: [-2.4, top], size: [7.0, lh], color: 'amber', fill: true },
+    { id: 'panel', type: 'rectangle', at: [cx, mid], size: [W, code.length * lh + 0.6], color: 'muted' },
+    { id: 'bar', type: 'rectangle', at: [cx, top], size: [W - 0.2, lh], color: 'amber', fill: true },
   ];
-  code.forEach((l, i) => objs.push({ id: `c${i}`, type: 'text', text: l, at: [-5.8, top - i * lh], size: 'sm', color: 'off-white', align: 'left', mono: true }));
+  code.forEach((l, i) => objs.push({ id: `c${i}`, type: 'text', text: l, at: [cx - W / 2 + 0.4, top - i * lh], size: big ? 'md' : 'sm', color: 'off-white', align: 'left', mono: true }));
+  const rightX = (cx + W / 2 + 6.6) / 2;
   const tl: Raw[] = [titleIn(ctx), { do: 'create', target: 'panel', at: d * 0.07, dur: d * 0.12 }, { do: 'fade-in', target: code.map((_, i) => `c${i}`), at: d * 0.14, dur: d * 0.2 }];
   const n = Math.min(steps.length, code.length);
   const per = (d * 0.6) / n;
   for (let i = 0; i < n; i++) {
-    objs.push({ id: `t${i}`, type: 'text', text: steps[i], at: [4.4, top - ((code.length - 1) * lh) / 2], size: 'md', color: 'off-white', align: 'center' });
+    objs.push({ id: `t${i}`, type: 'text', text: steps[i], at: [rightX, mid], size: 'md', color: 'off-white', align: 'center' });
     const at = d * 0.36 + i * per;
     if (i === 0) tl.push({ do: 'fade-in', target: 'bar', at, dur: per * 0.4 });
-    else tl.push({ do: 'move-to', target: 'bar', point: [-2.4, top - i * lh], at, dur: per * 0.4 });
+    else tl.push({ do: 'move-to', target: 'bar', point: [cx, top - i * lh], at, dur: per * 0.4 });
     tl.push({ do: 'fade-in', target: `t${i}`, at: at + per * 0.1, dur: per * 0.35 });
     if (i < n - 1) tl.push({ do: 'fade-out', target: `t${i}`, at: at + per * 0.8, dur: per * 0.18 });
   }
@@ -527,14 +638,26 @@ const conceptMap: Recipe = (p, ctx) => {
   const items = satellites.length >= 2 ? satellites : ctx.language === 'en' ? ['Idea', 'Example', 'Use'] : ['Gagasan', 'Contoh', 'Penerapan'];
   const d = ctx.d;
   const n = items.length;
-  const objs: Raw[] = [titleObj(ctx), { id: 'hub', type: 'box', at: [0, 0], size: [boxW(center, 3.4), 1.15], label: center, color: 'amber', fill: true, round: true }];
+  const hubW = boxW(center, 3.4);
+  const hubH = 1.15;
+  const objs: Raw[] = [titleObj(ctx), { id: 'hub', type: 'box', at: [0, -0.1], size: [hubW, hubH], label: center, color: 'amber', fill: true, round: true }];
   const tl: Raw[] = [titleIn(ctx), { do: 'fade-in', target: 'hub', at: d * 0.1, dur: d * 0.12 }];
+  // Distance from a box centre to its edge along a direction, so each arrow runs edge to edge.
+  const edge = (hw: number, hh: number, dx: number, dy: number) => Math.min(hw / Math.max(1e-6, Math.abs(dx)), hh / Math.max(1e-6, Math.abs(dy)));
   items.forEach((s, i) => {
     const ang = Math.PI / 2 + ((i + 0.5) / n) * Math.PI * 2 + Math.PI / n;
-    const px = Math.cos(ang) * 4.1;
-    const py = Math.sin(ang) * 2.0;
-    objs.push({ id: `k${i}`, type: 'box', at: [px, py], size: [boxW(s, 2.7), 0.9], label: s, color: 'off-white', round: true });
-    objs.push({ id: `l${i}`, type: 'vector', from: [px * 0.43, py * 0.43], to: [px * 0.7, py * 0.7], color: 'muted' });
+    const px = Math.cos(ang) * 4.3;
+    const py = Math.sin(ang) * 2.15 - 0.1;
+    const w = boxW(s, 2.7);
+    objs.push({ id: `k${i}`, type: 'box', at: [px, py], size: [w, 0.9], label: s, color: 'off-white', round: true });
+    const dx = px;
+    const dy = py + 0.1;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const a = edge(hubW / 2, hubH / 2, ux, uy) + 0.12;
+    const b = len - edge(w / 2, 0.45, ux, uy) - 0.12;
+    objs.push({ id: `l${i}`, type: 'vector', from: [ux * a, uy * a - 0.1], to: [ux * b, uy * b - 0.1], color: 'muted' });
     const at = d * 0.28 + i * ((d * 0.6) / n);
     tl.push({ do: 'grow-arrow', target: `l${i}`, at, dur: d * 0.1 });
     tl.push({ do: 'fade-in', target: `k${i}`, at: at + d * 0.06, dur: d * 0.1 });

@@ -28,7 +28,7 @@ export type StageObject =
   | (Base & { type: 'text'; text: string; at: Pt; size?: TextSize; color?: StageColor; align?: 'left' | 'center' | 'right'; mono?: boolean })
   | (Base & { type: 'mathtex'; latex: string; at: Pt; size?: TextSize; color?: StageColor })
   | (Base & { type: 'axes'; at: Pt; size: [number, number]; xRange: Range3; yRange: Range3; xLabel?: string; yLabel?: string; numbers?: boolean; color?: StageColor })
-  | (Base & { type: 'function-graph'; axes: string; expr: string; color?: StageColor; xRange?: [number, number] })
+  | (Base & { type: 'function-graph'; axes: string; expr: string; color?: StageColor; xRange?: [number, number]; /** Plot the slope of expr instead of expr itself. */ derivative?: boolean })
   | (Base & { type: 'vector'; from: Pt | string; to: Pt | string; axes?: string; color?: StageColor })
   | (Base & { type: 'dot'; at?: Pt; axes?: string; onGraph?: { graph: string; x: number }; color?: StageColor; radius?: number; hollow?: boolean })
   | (Base & { type: 'line'; from: Pt | string; to: Pt | string; axes?: string; color?: StageColor; dashed?: boolean })
@@ -121,10 +121,11 @@ const ID_RE = /^[A-Za-z][A-Za-z0-9_-]{0,23}$/;
 const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 /** Plain text only (drawn on a canvas or escaped by React, never parsed as HTML). Control characters are removed, length is capped. */
-export function cleanText(v: unknown, max: number = LIMITS.text): string | null {
+export function cleanText(v: unknown, max: number = LIMITS.text, keepIndent = false): string | null {
   if (typeof v !== 'string') return null;
-  const s = v.replace(CONTROL_RE, '').trim();
-  return s ? s.slice(0, max) : null;
+  const clean = v.replace(CONTROL_RE, '');
+  const s = keepIndent ? clean.trimEnd() : clean.trim();
+  return s.trim() ? s.slice(0, max) : null;
 }
 
 // Macros that read files, make links, run raw HTML or redefine the language.
@@ -196,7 +197,7 @@ function validateObject(raw: unknown, known: Map<string, StageObjectType>): Stag
 
   switch (type) {
     case 'text': {
-      const text = cleanText(raw.text);
+      const text = cleanText(raw.text, LIMITS.text, raw.mono === true); // code keeps its indentation
       const at = stagePt(raw.at);
       if (!text || !at) return null;
       const align: 'left' | 'right' | 'center' | undefined = raw.align === 'left' || raw.align === 'right' || raw.align === 'center' ? raw.align : undefined;
@@ -225,7 +226,7 @@ function validateObject(raw: unknown, known: Map<string, StageObjectType>): Stag
       if (!isType(raw.axes, 'axes') || !compileExpr(raw.expr)) return null;
       const xr = Array.isArray(raw.xRange) && raw.xRange.length === 2 ? [num(raw.xRange[0]), num(raw.xRange[1])] : null;
       const xRange = xr && xr[0] !== null && xr[1] !== null && xr[0] < xr[1] ? ([xr[0], xr[1]] as [number, number]) : undefined;
-      return dropUndef({ id, type, axes: raw.axes as string, expr: (raw.expr as string).trim(), color: col, xRange });
+      return dropUndef({ id, type, axes: raw.axes as string, expr: (raw.expr as string).trim(), color: col, xRange, derivative: bool(raw.derivative) });
     }
     case 'vector': {
       const axes = isType(raw.axes, 'axes') ? (raw.axes as string) : undefined;

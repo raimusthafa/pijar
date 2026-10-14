@@ -226,4 +226,5 @@ export function speakable(text: string, lang: Lang = 'id'): string {
 }
 
 /** One sentence appended to every prompt whose output the learner reads. The renderer supports exactly this. */
-export const MATH_FORMAT_NOTE = 'Write math inside $...$ using LaTeX (for example $\frac{\pi}{4}$ or $x^2$), with no other markup.';
+export const MATH_FORMAT_NOTE =
+  String.raw`Write every formula inside $...$ using LaTeX, in every text field including captions (for example $\frac{\pi}{4}$, $x^2$ or $f(x)=\sin(x)$), with no other markup. In JSON, write each backslash twice.`;

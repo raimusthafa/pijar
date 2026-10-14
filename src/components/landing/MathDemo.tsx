@@ -1,60 +1,79 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
-import { MathVisual } from '@/components/learn/visuals/MathVisual';
-import { Button } from '@/components/ui/button';
-import { DEFAULT_MATH_SPECS } from '@/lib/learn/math-spec';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { normalizeScene } from '@/lib/learn/scene-normalize';
 import { useT } from '@/lib/i18n/client';
+import type { StageStatus } from '@/components/learn/video/StageView';
 
-const DURATION = 4500;
+// three.js and manim-web load only when this block is on the page, and never on the server.
+const StageView = dynamic(() => import('@/components/learn/video/StageView'), { ssr: false });
+
+const DURATION = 12; // seconds of animation
+const HOLD = 2.5; // seconds the finished frame stays before the loop restarts
 
 /**
- * The real MathVisual with a valid MathSpec. Plays once when it scrolls into view (progress 0 to 1),
- * can be replayed, and becomes draggable when it finishes. Under reduced motion it shows the final frame.
+ * The lesson stage with one short scene on a loop: the curve, a tangent that slides along it, and the slope
+ * drawn on the lower axes. It starts when it scrolls into view, stops when it leaves, and under reduced motion
+ * shows the finished frame and never moves.
  */
 export function MathDemo() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const box = useRef<HTMLDivElement>(null);
-  const raf = useRef(0);
-  const [progress, setProgress] = useState(1);
+  const [time, setTime] = useState(DURATION); // the finished frame is the poster until playback begins
+  const [status, setStatus] = useState<StageStatus>('loading');
 
-  const play = useCallback(() => {
-    cancelAnimationFrame(raf.current);
-    const start = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min((now - start) / DURATION, 1);
-      setProgress(p);
-      if (p < 1) raf.current = requestAnimationFrame(tick);
-    };
-    setProgress(0);
-    raf.current = requestAnimationFrame(tick);
-  }, []);
+  const scene = useMemo(
+    () =>
+      normalizeScene(
+        {
+          id: 'demo',
+          title: t('landing.fitur.math.stage'),
+          durationSeconds: DURATION,
+          narration: '',
+          recipe: { name: 'derivative-tangent', params: { expr: 'sin(x)', label: 'f(x) = \\sin x', derivative: "f'(x) = \\cos x" } },
+        },
+        0,
+        0,
+        locale === 'en' ? 'en' : 'id',
+      ),
+    [t, locale],
+  );
 
   useEffect(() => {
-    const isReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const el = box.current;
-    if (isReduced || !el) return;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let raf = 0;
+    let t0 = 0;
+    const tick = (now: number) => {
+      setTime(Math.min(DURATION, ((now - t0) / 1000) % (DURATION + HOLD)));
+      raf = requestAnimationFrame(tick);
+    };
     const io = new IntersectionObserver(([e]) => {
+      cancelAnimationFrame(raf);
       if (e.isIntersecting) {
-        io.disconnect();
-        play();
+        t0 = performance.now();
+        raf = requestAnimationFrame(tick);
       }
-    }, { threshold: 0.5 });
+    }, { threshold: 0.35 });
     io.observe(el);
     return () => {
       io.disconnect();
-      cancelAnimationFrame(raf.current);
+      cancelAnimationFrame(raf);
     };
-  }, [play]);
+  }, []);
 
   return (
-    <div ref={box} className="flex flex-col gap-3">
-      <MathVisual spec={DEFAULT_MATH_SPECS.tangent} progress={progress} interactive={progress === 1} />
-      <Button variant="secondary" size="sm" className="self-start motion-reduce:hidden" onClick={play}>
-          <RotateCcw strokeWidth={1.75} />
-          {t('landing.fitur.math.replay')}
-        </Button>
+    <div ref={box} className="relative aspect-video overflow-hidden rounded-inner bg-action">
+      <StageView
+        scene={scene}
+        runtime={DURATION}
+        time={time}
+        onStatus={setStatus}
+        className="absolute inset-0"
+        fallback={<p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-action-foreground/80">{scene.title}</p>}
+      />
+      {status === 'loading' && <div className="pj-skeleton pointer-events-none absolute inset-0 bg-action" aria-hidden />}
     </div>
   );
 }

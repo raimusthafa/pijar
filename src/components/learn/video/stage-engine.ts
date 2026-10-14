@@ -148,14 +148,41 @@ export class StageEngine {
     return v3(p);
   }
 
-  private text(text: string, size: TextSize, color: string, opts: { mono?: boolean; weight?: number; scaleFont?: number } = {}): Text {
-    return new Text({
-      text,
-      fontSize: Math.round(SIZES[size] * (opts.scaleFont ?? 1)),
-      color,
-      fontFamily: opts.mono ? this.theme.fontMono : this.theme.fontBody,
-      fontWeight: opts.weight ?? 400,
-    });
+  private text(text: string, size: TextSize, color: string, opts: { mono?: boolean; weight?: number; scaleFont?: number; align?: 'left' | 'center' | 'right'; maxW?: number } = {}): Text {
+    const make = (t: string) =>
+      new Text({
+        text: t,
+        fontSize: Math.round(SIZES[size] * (opts.scaleFont ?? 1)),
+        color,
+        fontFamily: opts.mono ? this.theme.fontMono : this.theme.fontBody,
+        fontWeight: opts.weight ?? 400,
+        textAlign: opts.align ?? 'center',
+        lineHeight: 1.25,
+      });
+    const m = make(text);
+    const maxW = opts.maxW;
+    if (!maxW || m.getWidth() <= maxW || !/\s/.test(text)) return m;
+    // Too wide for the room beside it: break at spaces into lines no wider than the room (measured per character).
+    const perChar = m.getWidth() / text.length;
+    const limit = Math.max(8, Math.floor(maxW / perChar));
+    const lines: string[] = [];
+    let cur = '';
+    for (const w of text.split(/\s+/)) {
+      if (cur && cur.length + 1 + w.length > limit) {
+        lines.push(cur);
+        cur = w;
+      } else cur = cur ? `${cur} ${w}` : w;
+    }
+    if (cur) lines.push(cur);
+    return make(lines.join('\n'));
+  }
+
+  /** Width available for a text anchored at x, so it never runs off the frame. */
+  private roomFor(x: number, align: 'left' | 'center' | 'right' | undefined): number {
+    const edge = STAGE_W / 2 - 0.4;
+    if (align === 'left') return edge - x;
+    if (align === 'right') return x + edge;
+    return 2 * Math.min(edge - x, x + edge);
   }
 
   private buildAll(stage: StageSpec): Map<string, Rec> {
@@ -186,7 +213,7 @@ export class StageEngine {
     const color = this.col(('color' in o ? o.color : undefined) ?? undefined);
     switch (o.type) {
       case 'text': {
-        const m = this.text(o.text, o.size ?? 'md', color, { mono: o.mono });
+        const m = this.text(o.text, o.size ?? 'md', color, { mono: o.mono, align: o.align, maxW: this.roomFor(o.at[0], o.align) });
         m.moveTo(v3(o.at), o.align === 'left' ? [-1, 0, 0] : o.align === 'right' ? [1, 0, 0] : undefined);
         return { spec: o, mob: m, color };
       }
@@ -215,12 +242,13 @@ export class StageEngine {
       }
       case 'function-graph': {
         const ax = this.recs.get(o.axes)?.mob as Axes | undefined;
-        const fn = compileExpr(o.expr);
-        if (!ax || !fn) return null;
+        const base = compileExpr(o.expr);
+        if (!ax || !base) return null;
+        const fn = o.derivative ? (x: number) => (base(x + 1e-3) - base(x - 1e-3)) / 2e-3 : base;
         const xr = ax.getXRange();
         const lo = o.xRange ? Math.max(o.xRange[0], xr[0]) : xr[0];
         const hi = o.xRange ? Math.min(o.xRange[1], xr[1]) : xr[1];
-        const g: FunctionGraph = ax.plot((x) => fn(x), { color, xRange: [lo, hi], strokeWidth: 5, numSamples: 120 });
+        const g: FunctionGraph = ax.plot((x) => fn(x), { color, xRange: [lo, hi], strokeWidth: 5, numSamples: 160 });
         return { spec: o, mob: g, fn, color };
       }
       case 'vector': {
@@ -290,10 +318,13 @@ export class StageEngine {
         rect.setFill(fill, 1);
         const labelColor = filled ? T.onAmber : color;
         const label = this.text(o.label, 'sm', labelColor, { weight: 600, scaleFont: h < 0.7 ? 0.9 : 1 });
+        // A label wider than its box shrinks to fit instead of running over the edge.
+        if (label.getWidth() > w - 0.3) label.scale((w - 0.3) / label.getWidth());
         label.moveTo([o.at[0], o.at[1] + (o.sub ? 0.16 : 0), 0]);
         const parts: Mobject[] = [rect, label];
         if (o.sub) {
           const sub = this.text(o.sub, 'sm', filled ? T.onAmber : T.colors.muted, { scaleFont: 0.72 });
+          if (sub.getWidth() > w - 0.3) sub.scale((w - 0.3) / sub.getWidth());
           sub.moveTo([o.at[0], o.at[1] - 0.22, 0]);
           parts.push(sub);
         }
@@ -302,7 +333,7 @@ export class StageEngine {
       case 'tangent': {
         const g = this.recs.get(o.graph);
         if (!g?.fn) return null;
-        const line = new Line({ start: [0, 0, 0], end: [1, 0, 0], color, strokeWidth: 3.5 });
+        const line = new Line({ start: [0, 0, 0], end: [1, 0, 0], color, strokeWidth: 4.5 });
         const dot = new Dot({ point: [0, 0, 0], radius: 0.11, color: this.col('amber'), fillOpacity: 1, strokeWidth: 0 });
         const rec: Rec = { spec: o, mob: new Group(line, ...(o.dot !== false ? [dot] : [])), line, dot, color };
         this.placeTangent(rec, o.x);
@@ -442,6 +473,14 @@ export class StageEngine {
           const to = this.recs.get(e.to!);
           if (!to?.mob) break;
           this.show(m);
+          if (type === 'mathtex' && to.spec.type === 'mathtex') {
+            // Cross-fade: a glyph-by-glyph morph fills the holes of letters like o, a and e.
+            this.show(to.mob);
+            const out1 = wrap(new FadeOut(m, { duration: dur }), lin);
+            out.push({ ...out1, remove: [m] });
+            out.push(wrap(new FadeIn(to.mob, { duration: dur, shift: [0, -0.18, 0] }), lin));
+            break;
+          }
           out.push(wrap(new Transform(m, to.mob, { duration: dur }), lin));
           break;
         }

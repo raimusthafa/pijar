@@ -60,19 +60,24 @@ export function fallbackQuestions(p: GetQuestionsParams): BankQuestion[] {
     conceptTested: m.concept_tested,
   }));
   const id = p.language !== 'en';
-  const generic: BankQuestion[] = Array.from({ length: n }, (_, i) => ({
-    id: `${p.nodeId}-${p.difficulty}-gen${i}`,
-    question: id
-      ? `Pernyataan mana yang paling tepat menggambarkan inti dari "${label}"?`
-      : `Which statement best describes the core idea of "${label}"?`,
-    options: id
+  const generic: BankQuestion[] = Array.from({ length: n }, (_, i) => {
+    const [right, ...wrong] = id
       ? [`Konsep inti dan tujuan ${label}`, 'Tidak berkaitan dengan topik ini', 'Hanya berlaku pada kasus khusus', 'Tidak memiliki prasyarat apa pun']
-      : [`The core idea and purpose of ${label}`, 'Unrelated to this topic', 'Only applies to special cases', 'Has no prerequisites at all'],
-    correctIndex: 0,
-    explanation: id ? `Jawaban pertama merangkum inti ${label}.` : `The first option summarizes the core of ${label}.`,
-    difficulty: p.difficulty,
-    conceptTested: label,
-  }));
+      : [`The core idea and purpose of ${label}`, 'Unrelated to this topic', 'Only applies to special cases', 'Has no prerequisites at all'];
+    // Spread the right answer over 1-4 so the last-resort set cannot be passed by always picking option 1.
+    const at = (i + p.nodeId.length + DIFFICULTIES.indexOf(p.difficulty)) % 4;
+    return {
+      id: `${p.nodeId}-${p.difficulty}-gen${i}`,
+      question: id
+        ? `Pernyataan mana yang paling tepat menggambarkan inti dari "${label}"?`
+        : `Which statement best describes the core idea of "${label}"?`,
+      options: [...wrong.slice(0, at), right, ...wrong.slice(at)],
+      correctIndex: at,
+      explanation: id ? `Pernyataan "${right}" merangkum inti ${label}.` : `"${right}" summarizes the core of ${label}.`,
+      difficulty: p.difficulty,
+      conceptTested: label,
+    };
+  });
   return [...mock, ...generic].slice(0, n);
 }
 
@@ -120,7 +125,9 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
   try {
     const { generateStructuredJSON } = await import('@/lib/ai/provider');
     const { prompt, system } = buildPrompt(p, Math.max(3, count));
-    const res = await generateStructuredJSON<{ questions: any[] }>(prompt, system);
+    const raw = await generateStructuredJSON<{ questions: any[] } | any[]>(prompt, system);
+    // Some models return the bare array instead of {questions: [...]}.
+    const res = { questions: Array.isArray(raw) ? raw : raw?.questions };
     const rows: { topic: string; node_id: string; difficulty: Difficulty; question: BankQuestion }[] = [];
     const stamp = Date.now().toString(36);
     (res?.questions ?? []).forEach((q, i) => {

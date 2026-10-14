@@ -88,10 +88,31 @@ function stageFor(scene: Rec, dur: number, title: string, language: Lang): Stage
   return validateStage(buildRecipe('concept-map', {}, ctx)!, dur)!;
 }
 
+/**
+ * A scene title the model left out or wrote as a bare number ("1"): borrow a short phrase from the
+ * first caption or the narration, so the chip and the stage heading say something.
+ */
+export function sceneTitle(scene: Rec, index: number): string {
+  const given = cleanText(scene.title, 70);
+  if (given && given.length >= 3 && !/^\d+[.)]?$/.test(given)) return given;
+  const caps = Array.isArray(scene.captions) ? scene.captions : [];
+  const firstCaption = isObj(caps[0]) ? cleanText(caps[0].text, 160) : null;
+  const sources = [cleanText(scene.narration, 300), firstCaption?.replace(/\$[^$]*\$/g, '').trim()];
+  for (const raw of sources) {
+    if (!raw) continue;
+    const sentence = raw.split(/(?<=[.!?])\s/)[0].replace(/[.!?:;,]+$/, '').trim();
+    if (sentence.length < 3) continue;
+    if (sentence.length <= 44) return sentence;
+    const words = sentence.split(/\s+/).slice(0, 6).join(' ');
+    return words.slice(0, 44).replace(/[,;:]+$/, '');
+  }
+  return `${index + 1}`;
+}
+
 export function normalizeScene(raw: unknown, index: number, sceneStart: number, language: Lang): PlayableScene {
   const scene: Rec = isObj(raw) ? raw : {};
   const id = typeof scene.id === 'string' && /^[\w-]{1,32}$/.test(scene.id) ? scene.id : `sc${index + 1}`;
-  const title = cleanText(scene.title, 70) ?? `${index + 1}`;
+  const title = sceneTitle(scene, index);
   const narration = cleanText(scene.narration, 700) ?? '';
   const dur = clamp(num(scene.durationSeconds) ?? DEFAULT_SCENE_SECONDS, LIMITS.sceneMin, LIMITS.sceneMax);
   const stage = stageFor(scene, dur, title, language);

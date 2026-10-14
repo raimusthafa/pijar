@@ -10,7 +10,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'adaptive_state, correct, nodes, edges wajib diisi' }, { status: 400 });
     }
     const state: AdaptiveState = answerAdaptive(b.adaptive_state, b.correct, b.nodes, b.edges);
-    const done = isDone(state);
+    const cap = Number(b.max_questions);
+    const done = isDone(state) || (cap > 0 && state.answers.length >= cap);
     return NextResponse.json({
       success: true,
       adaptive_state: state,
