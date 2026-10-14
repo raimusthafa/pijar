@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test tests/auth.test.mjs tests/graph.test.mjs tests/graph-normalize.test.mjs tests/learn.test.mjs tests/math-spec.test.mjs tests/math-text.test.mjs tests/board-spec.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs tests/pretest.test.mjs tests/review.test.mjs tests/dashboard.test.mjs tests/five-e.test.mjs tests/workspace.test.mjs tests/workspace-ui.test.mjs tests/ui-rules.test.mjs tests/scene-dsl.test.mjs tests/question-quality.test.mjs",
+    "test": "node --experimental-strip-types --test tests/auth.test.mjs tests/graph.test.mjs tests/graph-normalize.test.mjs tests/learn.test.mjs tests/math-spec.test.mjs tests/math-text.test.mjs tests/board-spec.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs tests/pretest.test.mjs tests/review.test.mjs tests/dashboard.test.mjs tests/five-e.test.mjs tests/workspace.test.mjs tests/workspace-ui.test.mjs tests/ui-rules.test.mjs tests/scene-dsl.test.mjs tests/question-quality.test.mjs tests/tts.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

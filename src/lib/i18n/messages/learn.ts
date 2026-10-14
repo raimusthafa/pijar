@@ -59,6 +59,8 @@ export default defineMessages({
     'player.voice.native': 'Suara Indonesia',
     'player.voice.fallback': 'Suara bawaan perangkat',
     'player.voice.none': 'Hanya subtitle',
+    'player.voice.ai': 'Suara AI',
+    'player.voice.device': 'Suara perangkat',
     'player.stage.unsupported': 'Peramban ini tidak bisa menjalankan animasinya. Narasinya tetap ada di atas.',
 
     'visual.callstack.title': 'Tumpukan pemanggilan',
@@ -180,6 +182,8 @@ export default defineMessages({
     'player.voice.native': 'English voice',
     'player.voice.fallback': 'Device default voice',
     'player.voice.none': 'Captions only',
+    'player.voice.ai': 'AI Voice',
+    'player.voice.device': 'Device voice',
     'player.stage.unsupported': 'This browser cannot draw the animation. The narration is above.',
 
     'visual.callstack.title': 'Call stack',
