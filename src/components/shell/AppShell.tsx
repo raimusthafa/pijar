@@ -31,14 +31,14 @@ function NavList({ onNavigate }: { onNavigate?: boolean }) {
   const { t } = useT();
   const pathname = usePathname();
   return (
-    <ul className="flex flex-col gap-0.5">
+    <ul className="flex flex-col gap-1.5">
       {APP_NAV.map(({ href, labelKey, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         const props = {
           href,
           'aria-current': active ? ('page' as const) : undefined,
           className: cn(
-            'pj-press flex h-11 items-center gap-3 rounded-pill px-3.5 text-sm transition-colors duration-150 md:h-9',
+            'pj-press flex h-12 items-center gap-3.5 rounded-pill px-4 text-base transition-colors duration-150',
             active
               ? 'bg-action text-action-foreground font-medium'
               : 'text-muted-foreground hover:bg-hover hover:text-foreground',
@@ -46,7 +46,7 @@ function NavList({ onNavigate }: { onNavigate?: boolean }) {
         };
         const content = (
           <>
-            <Icon className="size-[18px] shrink-0" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-6 shrink-0" strokeWidth={1.75} aria-hidden />
             {t(labelKey)}
           </>
         );
@@ -94,9 +94,9 @@ export function AppShell({
         {t('shell.skip.content')}
       </a>
 
-      <aside className="hidden w-(--pj-sidebar-w) shrink-0 flex-col gap-6 px-3 py-4 md:flex">
+      <aside className="hidden w-(--pj-sidebar-w) shrink-0 flex-col gap-8 px-3 py-4 md:flex">
         <Link href="/dashboard" aria-label={t('common.brand.name')} className="w-fit rounded-pill px-2">
-          <Logo size={28} wordmark />
+          <Logo size={32} wordmark />
         </Link>
         <nav aria-label={t('shell.nav.primary')}>
           <NavList />
@@ -111,9 +111,9 @@ export function AppShell({
             >
               <Menu strokeWidth={1.75} />
             </SheetTrigger>
-            <SheetContent side="left" className="gap-6 px-3 py-4">
+            <SheetContent side="left" className="gap-8 px-3 py-4">
               <SheetTitle className="sr-only">{t('shell.nav.primary')}</SheetTitle>
-              <Logo size={28} wordmark className="px-2" />
+              <Logo size={32} wordmark className="px-2" />
               <nav aria-label={t('shell.nav.primary')}>
                 <NavList onNavigate />
               </nav>
