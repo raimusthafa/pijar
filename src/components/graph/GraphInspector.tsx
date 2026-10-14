@@ -125,7 +125,7 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
 
           <div className="grid gap-2 border-t border-hairline px-5 py-4">
             {redirectToPrereq && <p className="text-xs text-muted-foreground">{t('graph.insp.blocked')}</p>}
-            <Button render={<Link href={`/learn/${graphId}/${learnId}`} />} nativeButton={false} size="lg" className="w-full">
+            <Button render={<Link href={`/learn/${graphId}/${learnId}?topic=${encodeURIComponent(topic)}`} />} nativeButton={false} size="lg" className="w-full">
               {t(redirectToPrereq ? 'graph.insp.learn.prereq' : 'graph.insp.learn')}
             </Button>
             <Button variant="secondary" render={<Link href={`/workspace/${graphId}/${node.id}`} />} nativeButton={false}>

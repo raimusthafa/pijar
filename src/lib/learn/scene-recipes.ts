@@ -158,7 +158,7 @@ const functionPlot: Recipe = (p, ctx) => {
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
       { id: 'pt', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: x1 }, color: 'off-white', radius: 0.13 },
       { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'amber' },
-      { id: 'note', type: 'text', text: pStr(p, 'note', '', 90), at: [COL_X, 0.2], size: 'sm', color: 'off-white', align: 'center' },
+      { id: 'note', type: 'text', priority: 'low', text: pStr(p, 'note', '', 90), at: [COL_X, 0.2], size: 'sm', color: 'off-white', align: 'center' },
     ].filter((o) => o.type !== 'text' || o.text),
     timeline: [
       titleIn(ctx),
@@ -198,7 +198,7 @@ const derivativeTangent: Recipe = (p, ctx) => {
       { id: 'con', type: 'line', from: 'pp', to: 'pq', color: 'muted', dashed: true },
       { id: 'fl', type: 'mathtex', latex: fl, at: [COL_X, 1.9], size: 'lg', color: 'amber' },
       { id: 'dl', type: 'mathtex', latex: dl, at: [COL_X, 0.7], size: 'lg', color: 'off-white' },
-      { id: 'hint', type: 'text', text: pStr(p, 'hint', ctx.language === 'en' ? 'The height of the lower curve is the slope of the tangent above' : 'Tinggi kurva bawah sama dengan kemiringan garis singgung di atas', 90), at: [COL_X, -0.9], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'hint', type: 'text', priority: 'low', text: pStr(p, 'hint', ctx.language === 'en' ? 'The height of the lower curve is the slope of the tangent above' : 'Tinggi kurva bawah sama dengan kemiringan garis singgung di atas', 90), at: [COL_X, -0.9], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -307,7 +307,7 @@ const vectorAdd: Recipe = (p, ctx) => {
       { id: 'lb', type: 'mathtex', latex: `\\vec{${lb}}`, at: beside(a, sum, 0.42), size: 'md', color: 'muted' },
       { id: 'ls', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}}`, at: beside([0, 0], sum, 0.62), size: 'md', color: 'amber' },
       { id: 'eq', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}} = \\begin{pmatrix}${fmt(sum[0])}\\\\${fmt(sum[1])}\\end{pmatrix}`, at: [COL_X, 1.4], size: 'lg', color: 'amber' },
-      { id: 'tip', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Place the tail of one arrow on the tip of the other' : 'Letakkan pangkal satu panah di ujung panah yang lain', 80), at: [COL_X, 0.1], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'tip', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'Place the tail of one arrow on the tip of the other' : 'Letakkan pangkal satu panah di ujung panah yang lain', 80), at: [COL_X, 0.1], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -380,7 +380,7 @@ const limitApproach: Recipe = (p, ctx) => {
       { id: 'dl', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.max(xr[0], a - span) }, color: 'danger', radius: 0.1 },
       { id: 'dr', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.min(xr[1], a + span) }, color: 'success', radius: 0.1 },
       { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
-      { id: 'res', type: 'text', text: pStr(p, 'result', ctx.language === 'en' ? 'Both sides meet at the same value' : 'Dua sisi bertemu di nilai yang sama', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'res', type: 'text', priority: 'low', text: pStr(p, 'result', ctx.language === 'en' ? 'Both sides meet at the same value' : 'Dua sisi bertemu di nilai yang sama', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -415,7 +415,7 @@ const matrixTransform: Recipe = (p, ctx) => {
       { id: 'j', type: 'vector', from: G, to: [G[0], G[1] + u * cells], color: 'danger' },
       { id: 'sq', type: 'polygon', points: [G, [G[0] + u * cells, G[1]], [G[0] + u * cells, G[1] + u * cells], [G[0], G[1] + u * cells]], color: 'amber', fill: true },
       { id: 'mt', type: 'mathtex', latex: `A = ${mat}`, at: [4.5, 1.5], size: 'lg', color: 'amber' },
-      { id: 'cols', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'The columns say where the arrows land' : 'Kolom matriks menunjukkan arah panah mendarat', 56), at: [4.5, 0.3], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'cols', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'The columns say where the arrows land' : 'Kolom matriks menunjukkan arah panah mendarat', 56), at: [4.5, 0.3], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
@@ -464,7 +464,7 @@ const gradientDescent: Recipe = (p, ctx) => {
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
       { id: 'pt', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: start }, color: 'off-white', radius: 0.13 },
       { id: 'rule', type: 'mathtex', latex: pTex(p, 'rule', 'x_{new} = x - \\alpha\\, f\'(x)'), at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
-      { id: 'lowest', type: 'text', text: pStr(p, 'note', ctx.language === 'en' ? 'Steps shrink near the minimum' : 'Langkah mengecil dekat titik minimum', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'lowest', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'Steps shrink near the minimum' : 'Langkah mengecil dekat titik minimum', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: tl,
   };
@@ -506,7 +506,7 @@ const callStack: Recipe = (p, ctx) => {
   objs.push({ id: 'stk', type: 'text', text: pStr(p, 'stackLabel', 'call stack', 20), at: [x0, y0 - h / 2 - 0.5], size: 'sm', color: 'muted' });
   const rule = cleanText(p.rule, 48) ?? (given.length < 2 ? `${fn}(n) = n * ${fn}(n - 1)` : null);
   if (rule) {
-    objs.push({ id: 'rule', type: 'text', text: rule, at: [3.4, Math.min(3.0, yAt(m - 1) + h / 2 + 0.6)], size: 'sm', color: 'off-white', align: 'center', mono: true });
+    objs.push({ id: 'rule', type: 'text', priority: 'low', text: rule, at: [3.4, Math.min(3.0, yAt(m - 1) + h / 2 + 0.6)], size: 'sm', color: 'off-white', align: 'center', mono: true });
     tl.push({ do: 'write', target: 'rule', at: d * 0.12, dur: d * 0.14 });
   }
   tl.push({ do: 'create', target: 'floor', at: d * 0.07, dur: d * 0.08 });
@@ -605,27 +605,29 @@ const codeWalk: Recipe = (p, ctx) => {
   const d = ctx.d;
   const longest = Math.max(...code.map((l) => l.length));
   const big = longest <= 26; // larger type when the lines are short enough
-  const lh = big ? 0.78 : 0.62;
+  const lh = Math.min(big ? 0.78 : 0.62, 4.3 / code.length); // the panel stays above the step text under it
   const charW = big ? 0.27 : 0.2;
-  const W = Math.min(8.2, Math.max(5.6, longest * charW + 1.0));
-  const cx = -6.4 + W / 2;
-  const mid = 0.1;
+  const W = Math.min(10, Math.max(5.6, longest * charW + 1.0));
+  const mid = 0.35;
   const top = mid + ((code.length - 1) * lh) / 2;
+  const stepY = mid - (code.length * lh + 0.6) / 2 - 0.55;
+  // The walk visits lines that do something; a lone closing bracket is never the point of a step.
+  const live = code.map((l, i) => i).filter((i) => !/^[\s)}\]];,]*$/.test(code[i]));
+  const rows = live.length ? live : code.map((_, i) => i);
   const objs: Raw[] = [
     titleObj(ctx),
-    { id: 'panel', type: 'rectangle', at: [cx, mid], size: [W, code.length * lh + 0.6], color: 'muted' },
-    { id: 'bar', type: 'rectangle', at: [cx, top], size: [W - 0.2, lh], color: 'amber', fill: true },
+    { id: 'panel', type: 'rectangle', at: [0, mid], size: [W, code.length * lh + 0.6], color: 'muted' },
+    { id: 'bar', type: 'rectangle', at: [0, top - rows[0] * lh], size: [W - 0.2, lh], color: 'amber', fill: true },
   ];
-  code.forEach((l, i) => objs.push({ id: `c${i}`, type: 'text', text: l, at: [cx - W / 2 + 0.4, top - i * lh], size: big ? 'md' : 'sm', color: 'off-white', align: 'left', mono: true }));
-  const rightX = (cx + W / 2 + 6.6) / 2;
+  code.forEach((l, i) => objs.push({ id: `c${i}`, type: 'text', text: l, at: [-W / 2 + 0.4, top - i * lh], size: big ? 'md' : 'sm', color: 'off-white', align: 'left', mono: true }));
   const tl: Raw[] = [titleIn(ctx), { do: 'create', target: 'panel', at: d * 0.07, dur: d * 0.12 }, { do: 'fade-in', target: code.map((_, i) => `c${i}`), at: d * 0.14, dur: d * 0.2 }];
-  const n = Math.min(steps.length, code.length);
+  const n = Math.min(steps.length, rows.length);
   const per = (d * 0.6) / n;
   for (let i = 0; i < n; i++) {
-    objs.push({ id: `t${i}`, type: 'text', text: steps[i], at: [rightX, mid], size: 'md', color: 'off-white', align: 'center' });
+    objs.push({ id: `t${i}`, type: 'text', text: steps[i], at: [0, stepY], size: 'md', color: 'off-white', align: 'center' });
     const at = d * 0.36 + i * per;
     if (i === 0) tl.push({ do: 'fade-in', target: 'bar', at, dur: per * 0.4 });
-    else tl.push({ do: 'move-to', target: 'bar', point: [cx, top - i * lh], at, dur: per * 0.4 });
+    else tl.push({ do: 'move-to', target: 'bar', point: [0, top - rows[i] * lh], at, dur: per * 0.4 });
     tl.push({ do: 'fade-in', target: `t${i}`, at: at + per * 0.1, dur: per * 0.35 });
     if (i < n - 1) tl.push({ do: 'fade-out', target: `t${i}`, at: at + per * 0.8, dur: per * 0.18 });
   }

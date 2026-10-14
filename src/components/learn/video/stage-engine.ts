@@ -24,6 +24,8 @@ const v3 = (p: Pt): V3 => [p[0], p[1], 0];
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const smooth = (a: number) => a * a * (3 - 2 * a);
 const SIZES: Record<TextSize, number> = { sm: 26, md: 34, lg: 46, xl: 64 };
+/** Narrow stages (phones): the 16:9 frame shrinks everything, so type is enlarged until the smallest text reads about 11 px. */
+const COMPACT_SIZES: Record<TextSize, number> = { sm: 54, md: 58, lg: 66, xl: 78 };
 
 interface Rec {
   spec: StageObject;
@@ -71,6 +73,7 @@ export class StageEngine {
   private shown = new Set<Mobject>();
   private stage: StageSpec | null = null;
   private scale = 1;
+  private compact = false;
   private lastT = -1;
   private wantT = 0;
   private loading = false;
@@ -93,8 +96,9 @@ export class StageEngine {
 
   // ── build ───────────────────────────────────────────────────────
 
-  async load(stage: StageSpec, scale: number): Promise<void> {
+  async load(stage: StageSpec, scale: number, compact = false): Promise<void> {
     this.stage = stage;
+    this.compact = compact;
     this.scale = scale;
     this.loading = true;
     try {
@@ -148,11 +152,15 @@ export class StageEngine {
     return v3(p);
   }
 
+  private get sizes() {
+    return this.compact ? COMPACT_SIZES : SIZES;
+  }
+
   private text(text: string, size: TextSize, color: string, opts: { mono?: boolean; weight?: number; scaleFont?: number; align?: 'left' | 'center' | 'right'; maxW?: number } = {}): Text {
     const make = (t: string) =>
       new Text({
         text: t,
-        fontSize: Math.round(SIZES[size] * (opts.scaleFont ?? 1)),
+        fontSize: Math.round(this.sizes[size] * (opts.scaleFont ?? 1)),
         color,
         fontFamily: opts.mono ? this.theme.fontMono : this.theme.fontBody,
         fontWeight: opts.weight ?? 400,
@@ -191,6 +199,8 @@ export class StageEngine {
     this.recs = recs; // ptOf and the builders look up earlier objects here
     try {
       for (const o of stage.objects) {
+        // Low-priority notes are too small to read on a phone; the player shows them under the stage instead.
+        if (this.compact && 'priority' in o && o.priority === 'low') continue;
         try {
           const r = this.build(o);
           if (r) recs.set(o.id, r);
@@ -218,13 +228,13 @@ export class StageEngine {
         return { spec: o, mob: m, color };
       }
       case 'mathtex': {
-        const m = new MathTex({ latex: o.latex, color, fontSize: SIZES[o.size ?? 'md'] });
+        const m = new MathTex({ latex: o.latex, color, fontSize: this.sizes[o.size ?? 'md'] });
         m.moveTo(v3(o.at));
         return { spec: o, mob: m, color };
       }
       case 'axes': {
         const dec = (step: number) => (step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step) - 1e-9)));
-        const axisCfg = { includeNumbers: o.numbers !== false, numberFontSize: 20 };
+        const axisCfg = { includeNumbers: o.numbers !== false, numberFontSize: this.compact ? 34 : 20 };
         const xAxisConfig = { ...axisCfg, decimalPlaces: dec(o.xRange[2]) };
         // Number labels on the y axis sit right where curves cross it and collide; the ticks stay, the x labels carry the scale.
         const yAxisConfig = { ...axisCfg, includeNumbers: false, decimalPlaces: dec(o.yRange[2]) };
@@ -305,7 +315,7 @@ export class StageEngine {
         return { spec: o, mob: p, color };
       }
       case 'number-line': {
-        const n = new NumberLine({ xRange: o.range, length: o.length, color, includeNumbers: o.numbers !== false, numberFontSize: 22 });
+        const n = new NumberLine({ xRange: o.range, length: o.length, color, includeNumbers: o.numbers !== false, numberFontSize: this.compact ? 36 : 22 });
         n.moveTo(v3(o.at));
         return { spec: o, mob: n, color };
       }
@@ -331,12 +341,16 @@ export class StageEngine {
         const rect = new RoundedRectangle({ width: w, height: h, cornerRadius: o.round ? 0.16 : 0.04, color: stroke, fillOpacity: 1, strokeWidth: 3.5, center: v3(o.at) });
         rect.setFill(fill, 1);
         const labelColor = filled ? T.onAmber : color;
-        const label = this.text(o.label, 'sm', labelColor, { weight: 600, scaleFont: h < 0.7 ? 0.9 : 1 });
+        // On a phone a long label wraps onto two lines first, so shrinking it to fit costs less legibility.
+        const label = this.text(o.label, 'sm', labelColor, { weight: 600, scaleFont: h < 0.7 ? 0.9 : 1, maxW: this.compact ? w - 0.3 : undefined });
         // A label wider than its box shrinks to fit instead of running over the edge.
-        if (label.getWidth() > w - 0.3) label.scale((w - 0.3) / label.getWidth());
-        label.moveTo([o.at[0], o.at[1] + (o.sub ? 0.16 : 0), 0]);
+        const fit = Math.min(1, (w - 0.3) / label.getWidth(), this.compact ? (h - 0.15) / label.getHeight() : 1);
+        if (fit < 1) label.scale(fit);
+        // A phone has no room for the second line: the label alone is kept, large enough to read.
+        const sub1 = o.sub && !this.compact;
+        label.moveTo([o.at[0], o.at[1] + (sub1 ? 0.16 : 0), 0]);
         const parts: Mobject[] = [rect, label];
-        if (o.sub) {
+        if (sub1 && o.sub) {
           const sub = this.text(o.sub, 'sm', filled ? T.onAmber : T.colors.muted, { scaleFont: 0.72 });
           if (sub.getWidth() > w - 0.3) sub.scale((w - 0.3) / sub.getWidth());
           sub.moveTo([o.at[0], o.at[1] - 0.22, 0]);

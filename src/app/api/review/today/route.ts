@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { pickDailyReview, retention, type ReviewRow } from '@/lib/scheduler/engine';
+import { isDue, pickDailyReview, retention, type ReviewRow } from '@/lib/scheduler/engine';
 import { getQuestions } from '@/lib/learn/question-bank';
 import type { CurriculumNode } from '@/types';
 
@@ -25,7 +25,10 @@ export async function GET(request: Request) {
   const now = new Date();
   const picked = pickDailyReview((rows ?? []) as ReviewRow[], now, 5);
 
+  // Nothing due: list the practice candidates without spending AI calls; ?practice=1 writes the questions.
+  const withQuestions = q.get('practice') === '1' || picked.some(r => isDue(r, now));
   const items = await Promise.all(picked.map(async r => {
+    if (!withQuestions) return { nodeId: r.node_id, label: labels.get(r.node_id) ?? r.node_id, retention: retention(r, now) };
     const [question] = await getQuestions({
       topic: graph.topic, nodeId: r.node_id, label: labels.get(r.node_id), difficulty: 'medium', count: 1, language,
     });

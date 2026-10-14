@@ -4,6 +4,8 @@ import { defineMessages } from '../define';
 export default defineMessages({
   id: {
     'back.graph': 'Peta belajar',
+    'notFound.title': 'Konsep ini tidak ada di peta',
+    'notFound.body': 'Tautannya mungkin lama, atau konsep itu sudah tidak ada di peta belajarmu. Buka peta untuk memilih konsep yang tersedia.',
     'board.title': 'Coba sendiri',
     'board.goal': 'Tujuan: {goal}',
     'board.reset': 'Atur ulang',
@@ -123,6 +125,8 @@ export default defineMessages({
   },
   en: {
     'back.graph': 'Learning map',
+    'notFound.title': 'This concept is not on your map',
+    'notFound.body': 'The link may be old, or the concept is no longer on your learning map. Open the map to pick one that is.',
     'board.title': 'Try it yourself',
     'board.goal': 'Goal: {goal}',
     'board.reset': 'Reset',

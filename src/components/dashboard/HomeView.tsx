@@ -92,7 +92,7 @@ export function HomeView({
           </div>
           <div className="px-(--card-spacing)">
             {next.node ? (
-              <Button render={<Link href={`/learn/${graph.id}/${next.node.id}`} />} nativeButton={false}>
+              <Button render={<Link href={`/learn/${graph.id}/${next.node.id}?topic=${encodeURIComponent(graph.topic)}`} />} nativeButton={false}>
                 {next.kind === 'inProgress' ? t('dashboard.continue.ctaResume') : t('dashboard.continue.cta')}
                 <ArrowRight strokeWidth={1.75} aria-hidden />
               </Button>
@@ -139,7 +139,7 @@ export function HomeView({
                 {upcoming.map((item, i) => (
                   <li key={item.id}>
                     <Link
-                      href={`/learn/${graph.id}/${item.nodeId}`}
+                      href={`/learn/${graph.id}/${item.nodeId}?topic=${encodeURIComponent(graph.topic)}`}
                       className="flex min-h-11 items-center gap-3 rounded-inner px-2 text-sm transition-colors hover:bg-hover"
                     >
                       <span className="w-5 text-muted-foreground tabular-nums">{i + 1}</span>

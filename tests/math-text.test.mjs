@@ -64,3 +64,12 @@ describe('math-text: speakable', () => {
     assert.equal(speakable('Rp 5$ saja'), 'Rp 5$ saja');
   });
 });
+
+describe('math-text: bare TeX answer options', () => {
+  it('typesets a delimiter-less formula but leaves prose alone', () => {
+    assert.equal(joined(r`a \times b \times c`), r`[I:a \times b \times c]`);
+    assert.equal(joined(r`3x \times 15`), r`[I:3x \times 15]`);
+    assert.equal(joined(r`Kalikan dengan \times saja`), r`Kalikan dengan \times saja`);
+    assert.equal(joined('ab + ac'), 'ab + ac');
+  });
+});

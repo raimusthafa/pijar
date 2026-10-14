@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { CURATED_MATERIALS } from '../src/lib/learn/curated-materials.ts';
 import { normalizeVideoScript } from '../src/lib/learn/scene-normalize.ts';
+import { findGraphNode, isStoredGraphId } from '../src/lib/learn/node-check.ts';
 import { buildAdjacencyMaps } from '../src/lib/graph/engine.ts';
 
 describe('PIJAR F4 Learning Journey & Interactive Video Suite', () => {
@@ -213,4 +214,14 @@ describe('Lesson markdown subset', () => {
     assert.equal(b[2].inline[0].v, 'Paragraf <script>alert(1)</script> lanjut'); // plain text, rendered as text by React
     assert.equal(b[3].code, 'const a = 1;');
   });
+});
+
+it('node-check: unknown node and non-stored graph ids', () => {
+  const nodes = [{ id: 'a', label: 'A' }, { id: 'b' }];
+  assert.equal(findGraphNode(nodes, 'a')?.label, 'A');
+  assert.equal(findGraphNode(nodes, 'zzz'), null);
+  assert.equal(findGraphNode(null, 'a'), null);
+  assert.equal(isStoredGraphId('b9c093b3-561d-4b6d-8929-38b02623bd3f'), true);
+  assert.equal(isStoredGraphId('demo-graph'), false);
+  assert.equal(isStoredGraphId(undefined), false);
 });

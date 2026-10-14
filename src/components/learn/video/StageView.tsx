@@ -5,6 +5,9 @@ import type { PlayableScene } from '@/lib/learn/scene-dsl';
 import { readStageTheme } from './stage-theme';
 import type { StageEngine } from './stage-engine';
 
+/** Below this stage width (px) the frame is rebuilt with larger type and without low-priority notes. */
+export const COMPACT_BELOW = 560;
+
 export type StageStatus = 'loading' | 'ready' | 'unsupported';
 
 interface Props {
@@ -14,6 +17,8 @@ interface Props {
   /** Seconds since the start of this scene. */
   time: number;
   onStatus?: (s: StageStatus) => void;
+  /** Fires when the stage crosses the narrow threshold (phones). */
+  onCompact?: (compact: boolean) => void;
   className?: string;
   /** Shown when WebGL is missing or the engine failed. */
   fallback?: React.ReactNode;
@@ -23,11 +28,27 @@ interface Props {
  * One WebGL stage for the whole player. The engine is created once and reused for every scene,
  * and disposed (renderer, textures, canvas) when the component unmounts.
  */
-export default function StageView({ scene, runtime, time, onStatus, className, fallback }: Props) {
+export default function StageView({ scene, runtime, time, onStatus, onCompact, className, fallback }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const engineRef = useRef<StageEngine | null>(null);
   const [status, setStatus] = useState<StageStatus>('loading');
   const [engineReady, setEngineReady] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const compactCb = useRef(onCompact);
+  useEffect(() => {
+    compactCb.current = onCompact;
+  });
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => {
+      const c = e.contentRect.width > 0 && e.contentRect.width < COMPACT_BELOW;
+      setCompact(c);
+      compactCb.current?.(c);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const timeRef = useRef(time);
   useEffect(() => {
     timeRef.current = time;
@@ -74,7 +95,7 @@ export default function StageView({ scene, runtime, time, onStatus, className, f
     let live = true;
     engine.seek(timeRef.current);
     engine
-      .load(scene.stage, runtime / scene.durationSeconds)
+      .load(scene.stage, runtime / scene.durationSeconds, compact)
       .then(() => live && update('ready'))
       .catch((err) => {
         console.warn('[stage] load failed', err);
@@ -83,7 +104,7 @@ export default function StageView({ scene, runtime, time, onStatus, className, f
     return () => {
       live = false;
     };
-  }, [engineReady, scene, runtime]);
+  }, [engineReady, scene, runtime, compact]);
 
   useEffect(() => {
     engineRef.current?.seek(time);

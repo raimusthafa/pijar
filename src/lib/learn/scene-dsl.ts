@@ -25,8 +25,8 @@ interface Base {
 }
 
 export type StageObject =
-  | (Base & { type: 'text'; text: string; at: Pt; size?: TextSize; color?: StageColor; align?: 'left' | 'center' | 'right'; mono?: boolean })
-  | (Base & { type: 'mathtex'; latex: string; at: Pt; size?: TextSize; color?: StageColor })
+  | (Base & { type: 'text'; text: string; at: Pt; size?: TextSize; color?: StageColor; align?: 'left' | 'center' | 'right'; mono?: boolean; /** low: a side note, moved under the stage on narrow screens. */ priority?: 'low' })
+  | (Base & { type: 'mathtex'; latex: string; at: Pt; size?: TextSize; color?: StageColor; priority?: 'low' })
   | (Base & { type: 'axes'; at: Pt; size: [number, number]; xRange: Range3; yRange: Range3; xLabel?: string; yLabel?: string; numbers?: boolean; color?: StageColor })
   | (Base & { type: 'function-graph'; axes: string; expr: string; color?: StageColor; xRange?: [number, number]; /** Plot the slope of expr instead of expr itself. */ derivative?: boolean })
   | (Base & { type: 'vector'; from: Pt | string; to: Pt | string; axes?: string; color?: StageColor })
@@ -201,13 +201,13 @@ function validateObject(raw: unknown, known: Map<string, StageObjectType>): Stag
       const at = stagePt(raw.at);
       if (!text || !at) return null;
       const align: 'left' | 'right' | 'center' | undefined = raw.align === 'left' || raw.align === 'right' || raw.align === 'center' ? raw.align : undefined;
-      return dropUndef({ id, type, text, at, size: sizeOf(raw.size), color: col, align, mono: bool(raw.mono) });
+      return dropUndef({ id, type, text, at, size: sizeOf(raw.size), color: col, align, mono: bool(raw.mono), priority: raw.priority === 'low' ? ('low' as const) : undefined });
     }
     case 'mathtex': {
       const latex = cleanLatex(raw.latex);
       const at = stagePt(raw.at);
       if (!latex || !at) return null;
-      return dropUndef({ id, type, latex, at, size: sizeOf(raw.size), color: col });
+      return dropUndef({ id, type, latex, at, size: sizeOf(raw.size), color: col, priority: raw.priority === 'low' ? ('low' as const) : undefined });
     }
     case 'axes': {
       const at = stagePt(raw.at);

@@ -97,6 +97,9 @@ JSON: {"questions":[{"difficulty":"easy|medium|hard","question":"...","options":
 // In-process cache so a missing table (or several levels in one post-test) never costs extra AI calls
 const memo = new Map<string, BankQuestion[]>();
 
+/** The post-test is served by one request and graded by another, so both must pick the same questions: sort by id, never by arrival order. */
+const pick = (list: BankQuestion[], count: number) => [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, count);
+
 export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[]> {
   const count = p.count ?? 3;
   const { nodeId } = p;
@@ -120,7 +123,7 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
   };
 
   const cached = await readCache();
-  if (cached.length >= count) return cached.slice(0, count);
+  if (cached.length >= count) return pick(cached, count);
 
   try {
     const { generateStructuredJSON } = await import('@/lib/ai/provider');
@@ -144,7 +147,7 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
         try { await supabase.from('question_bank').insert(rows); } catch { /* table missing: skip cache */ }
       }
       const mine = rows.filter(r => r.difficulty === p.difficulty).map(r => r.question);
-      if (mine.length) return [...mine, ...fallbackQuestions({ ...p, count })].slice(0, count);
+      if (mine.length) return [...pick([...cached, ...mine], count), ...fallbackQuestions({ ...p, count })].slice(0, count);
     }
   } catch (e) {
     console.warn('question-bank: AI unavailable, using fallback', e);
@@ -154,8 +157,9 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
 
 /** Post-test: up to 10 items (3 easy, 4 medium, 3 hard). One AI call fills all levels. */
 export async function getPostTest(p: Omit<GetQuestionsParams, 'difficulty' | 'count'>): Promise<BankQuestion[]> {
-  const easy = await getQuestions({ ...p, difficulty: 'easy', count: 3 });
+  // Medium first: it asks for 4 per level, so the one AI call also covers easy and hard.
   const medium = await getQuestions({ ...p, difficulty: 'medium', count: 4 });
+  const easy = await getQuestions({ ...p, difficulty: 'easy', count: 3 });
   const hard = await getQuestions({ ...p, difficulty: 'hard', count: 3 });
   return [...easy, ...medium, ...hard].slice(0, 10);
 }

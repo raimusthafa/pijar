@@ -34,27 +34,32 @@ export function ReviewSession({ graphId: requested }: { graphId?: string }) {
 
   const [attempt, setAttempt] = useState(0);
 
+  // practice=true asks the server to write questions for concepts that are not due (it skips that when nothing is due).
+  const [practice, setPractice] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const qs = new URLSearchParams({ language: locale });
         if (requested) qs.set('graphId', requested);
+        if (practice) qs.set('practice', '1');
         const res = await fetch(`/api/review/today?${qs}`);
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error();
-        const items = ((json.items ?? []) as Item[]).filter(i => i.question);
-        const due = items.filter(i => i.retention < DUE_RETENTION);
+        const all = (json.items ?? []) as Item[];
+        const due = all.filter(i => i.question && i.retention < DUE_RETENTION);
         if (cancelled) return;
-        if (!json.graphId || items.length === 0) setPhase({ kind: 'empty', graphId: json.graphId ?? null, practice: [] });
-        else if (due.length === 0) setPhase({ kind: 'empty', graphId: json.graphId, practice: items });
-        else setPhase({ kind: 'asking', graphId: json.graphId, items: due });
+        if (!json.graphId || all.length === 0) setPhase({ kind: 'empty', graphId: json.graphId ?? null, practice: [] });
+        else if (due.length) setPhase({ kind: 'asking', graphId: json.graphId, items: due });
+        else if (practice) setPhase({ kind: 'asking', graphId: json.graphId, items: all.filter(i => i.question) });
+        else setPhase({ kind: 'empty', graphId: json.graphId, practice: all });
       } catch {
         if (!cancelled) setPhase({ kind: 'error' });
       }
     })();
     return () => { cancelled = true; };
-  }, [locale, requested, attempt]);
+  }, [locale, requested, attempt, practice]);
 
   const retry = () => { setPhase({ kind: 'loading' }); setAttempt(a => a + 1); };
 
@@ -106,7 +111,7 @@ export function ReviewSession({ graphId: requested }: { graphId?: string }) {
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 {phase.practice.length > 0 && phase.graphId && (
-                  <Button onClick={() => setPhase({ kind: 'asking', graphId: phase.graphId!, items: phase.practice })}>
+                  <Button onClick={() => { setPhase({ kind: 'loading' }); setPractice(true); }}>
                     {t('review.empty.practice')}
                   </Button>
                 )}

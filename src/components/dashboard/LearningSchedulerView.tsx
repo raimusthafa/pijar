@@ -97,7 +97,7 @@ export function LearningSchedulerView({ graph }: { graph: DashboardGraph }) {
                   className="size-5 shrink-0 accent-action"
                 />
                 <Link
-                  href={`/learn/${graph.id}/${item.nodeId}`}
+                  href={`/learn/${graph.id}/${item.nodeId}?topic=${encodeURIComponent(graph.topic)}`}
                   className={`min-w-0 flex-1 truncate text-sm ${done.has(item.id) ? 'text-muted-foreground line-through' : 'font-medium'}`}
                 >
                   {labelOf(item)}

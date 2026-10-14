@@ -53,6 +53,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const runtimes = useMemo(() => scenes.map(s => runtimeSeconds(s, locale === 'en' ? 'en' : 'id')), [scenes, locale]);
   const totalDuration = runtimes.reduce((a, r) => a + r, 0) || 45;
   const reducedMotion = useReducedMotion();
+  const [compact, setCompact] = useState(false);
   const [stageStatus, setStageStatus] = useState<StageStatus>('loading');
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -227,6 +228,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
               runtime={current.runtime}
               time={localTime}
               onStatus={setStageStatus}
+              onCompact={setCompact}
               className="absolute inset-0"
               fallback={
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center text-action-foreground">
@@ -255,6 +257,9 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
         </div>
         <div className="flex min-h-14 w-full items-center justify-center px-4 pb-3 pt-1 md:px-8" aria-live="off">
           {caption && <p className="max-w-2xl text-center text-sm leading-relaxed text-action-foreground"><MathText text={caption} /></p>}
+        </div>
+        <div className="empty:hidden px-4 pb-3 text-center text-sm text-action-foreground/70">
+          {compact && activeScene?.stage.objects.map((o) => (o.type === 'text' && o.priority === 'low' ? <p key={o.id}>{o.text}</p> : null))}
         </div>
       </div>
 

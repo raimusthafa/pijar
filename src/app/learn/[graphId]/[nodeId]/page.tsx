@@ -82,7 +82,7 @@ function LearnContent({ params }: LearnPageProps) {
   const searchParams = useSearchParams();
   const { t, locale } = useT();
 
-  const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; failed?: boolean }>();
+  const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; failed?: boolean; notFound?: boolean }>();
   const [attempt, setAttempt] = useState(0);
   const [passedKey, setPassedKey] = useState('');
 
@@ -116,6 +116,10 @@ function LearnContent({ params }: LearnPageProps) {
           }),
         });
         const data = await res.json();
+        if (data.code === 'NODE_NOT_FOUND') {
+          if (live) setFetched({ key, failed: true, notFound: true });
+          return;
+        }
         if (!data.success || !data.material) throw new Error(data.error || 'material');
         if (live) setFetched({ key, material: data.material });
       } catch {
@@ -159,6 +163,18 @@ function LearnContent({ params }: LearnPageProps) {
       {t('learn.back.graph')}
     </Link>
   );
+
+  if (failed && current?.notFound) {
+    return (
+      <Shell title={backLink}>
+        <div className={`${frame} flex flex-col items-start gap-4 py-24`}>
+          <h1 className="font-display text-h2">{t('learn.notFound.title')}</h1>
+          <p className="max-w-md text-base leading-relaxed text-muted-foreground">{t('learn.notFound.body')}</p>
+          <Button render={<Link href={mapHref} />} nativeButton={false}>{t('learn.back.graph')}</Button>
+        </div>
+      </Shell>
+    );
+  }
 
   if (failed) {
     return (

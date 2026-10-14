@@ -20,7 +20,7 @@ call-stack {fn,n} atau {frames:[{label,sub,ret}]} maks 6; tree-traversal {nodes:
 STAGE KUSTOM: {"objects":[...],"timeline":[...]}. Maks ${LIMITS.objects} objek, ${LIMITS.timeline} aksi. "id" unik (huruf, angka, - atau _, maks 24 karakter).
 Warna hanya: "ink","amber","off-white","muted","success","danger" (default off-white). Tanpa HTML. Rumus fungsi "expr" hanya memakai x, angka, + - * / ^ ( ), sin cos tan asin acos atan sqrt exp ln log abs, pi, e (maks 80 karakter).
 Objek (field "type"):
-- text {text,at:[x,y],size:"sm|md|lg|xl",color,align:"left|center|right",mono}
+- text {text,at:[x,y],size:"sm|md|lg|xl",color,align:"left|center|right",mono,priority:"low"}  (priority "low" untuk catatan samping yang boleh pindah ke bawah panggung di layar ponsel; jangan untuk rumus utama atau label)
 - mathtex {latex,at,size,color}  (LaTeX tanpa \href, \input, \def dan sejenisnya)
 - axes {at,size:[lebar,tinggi],xRange:[min,max,step],yRange:[min,max,step],xLabel,yLabel,numbers,color}  ("at" = titik tengah area plot; lebar maks 13, tinggi maks 7)
 - function-graph {axes:"id axes",expr,color,xRange}

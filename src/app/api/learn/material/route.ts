@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getOrGenerateMaterial } from '@/lib/learn/generator';
 import { toLessonLanguage } from '@/lib/learn/cache-key';
+import { CURATED_MATERIALS } from '@/lib/learn/curated-materials';
+import { findGraphNode, isStoredGraphId } from '@/lib/learn/node-check';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
@@ -29,13 +31,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // The browser only knows the concept when the graph sits in local storage (a direct link or a new device has none),
-    // so fall back to the stored graph. Without the label the model would write about a slug.
+    // The signed-in user's stored graph is the authority: an id that is not in it never gets a lesson or a cache row.
+    // Curated topics (no graph row) and local ids skip the check.
     let { nodeLabel, nodeCategory, nodeDescription } = { nodeLabel: bodyLabel, nodeCategory: bodyCategory, nodeDescription: bodyDescription };
-    if (!nodeLabel && user && typeof graphId === 'string') {
-      const { data } = await supabase.from('learning_graphs').select('nodes_json').eq('id', graphId).maybeSingle();
-      const n = (data?.nodes_json as { id: string; label?: string; category?: string; description?: string }[] | null)?.find((x) => x.id === nodeId);
-      if (n) ({ label: nodeLabel, category: nodeCategory, description: nodeDescription } = n);
+    if (user && isStoredGraphId(graphId) && !CURATED_MATERIALS[nodeId]) {
+      const { data } = await supabase.from('learning_graphs').select('nodes_json').eq('id', graphId).eq('user_id', user.id).maybeSingle();
+      const n = findGraphNode(data?.nodes_json, nodeId);
+      if (!n) {
+        return NextResponse.json({ success: false, code: 'NODE_NOT_FOUND', error: 'Konsep tidak ditemukan di peta ini' }, { status: 404 });
+      }
+      // The browser only knows the concept when the graph sits in local storage (a direct link or a new device has none).
+      if (!nodeLabel) ({ label: nodeLabel, category: nodeCategory, description: nodeDescription } = n);
     }
 
     // 2. Fetch or generate rich material & video script
