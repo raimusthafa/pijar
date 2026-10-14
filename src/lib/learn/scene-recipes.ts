@@ -71,7 +71,7 @@ function axesMap(at: [number, number], size: [number, number], xr: [number, numb
 /** Box width that fits a label (about 0.15 stage units per character). */
 const boxW = (label: string, min: number) => clamp(label.length * 0.15 + 0.9, min, 5);
 
-const titleObj = (ctx: RecipeCtx): Raw => ({ id: 'ttl', type: 'text', text: ctx.title.slice(0, 60), at: [-6.4, 3.25], size: 'md', color: 'muted', align: 'left' });
+const titleObj = (ctx: RecipeCtx): Raw => ({ id: 'ttl', type: 'text', text: ctx.title.slice(0, 60), at: [-6.4, 3.25], size: 'lg', color: 'off-white', align: 'left' });
 const titleIn = (ctx: RecipeCtx): Raw => ({ do: 'write', target: 'ttl', at: 0.1, dur: Math.min(1.2, ctx.d * 0.1) });
 
 const stepOf = (a: number, b: number) => {
@@ -193,7 +193,7 @@ const derivativeTangent: Recipe = (p, ctx) => {
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
       { id: 'g2', type: 'function-graph', axes: 'ax2', expr, color: 'off-white', xRange: [a, b], derivative: true },
       { id: 'tg', type: 'tangent', graph: 'g', x: a, length: 2.7, color: 'off-white', dot: false },
-      { id: 'pp', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: a }, color: 'amber', radius: 0.14 },
+      { id: 'pp', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: a }, color: 'amber', radius: 0.18 },
       { id: 'pq', type: 'dot', axes: 'ax2', onGraph: { graph: 'g2', x: a }, color: 'off-white', radius: 0.12 },
       { id: 'con', type: 'line', from: 'pp', to: 'pq', color: 'muted', dashed: true },
       { id: 'fl', type: 'mathtex', latex: fl, at: [COL_X, 1.9], size: 'lg', color: 'amber' },
@@ -208,10 +208,10 @@ const derivativeTangent: Recipe = (p, ctx) => {
       { do: 'fade-in', target: ['tg', 'pp'], at: d * 0.4, dur: d * 0.06 },
       { do: 'create', target: 'ax2', at: d * 0.44, dur: d * 0.1 },
       { do: 'fade-in', target: ['pq', 'con'], at: d * 0.54, dur: d * 0.04 },
-      { do: 'trace-tangent', target: 'tg', fromX: a, toX: b, at: t0, dur: win, linear: true },
-      { do: 'move-along', target: 'pp', fromX: a, toX: b, at: t0, dur: win, linear: true },
-      { do: 'move-along', target: 'pq', fromX: a, toX: b, at: t0, dur: win, linear: true },
-      { do: 'draw-graph', target: 'g2', at: t0, dur: win, linear: true },
+      { do: 'trace-tangent', target: 'tg', fromX: a, toX: b, at: t0, dur: win },
+      { do: 'move-along', target: 'pp', fromX: a, toX: b, at: t0, dur: win },
+      { do: 'move-along', target: 'pq', fromX: a, toX: b, at: t0, dur: win },
+      { do: 'draw-graph', target: 'g2', at: t0, dur: win },
       { do: 'write', target: 'dl', at: t0 + win * 0.25, dur: d * 0.1 },
       { do: 'fade-in', target: 'hint', at: t0 + win * 0.5, dur: d * 0.08 },
     ],
@@ -235,7 +235,7 @@ const areaRiemann: Recipe = (p, ctx) => {
       { id: 'r2', type: 'riemann', graph: 'g', range: [lo, hi], n: 12, color: 'off-white' },
       { id: 'r3', type: 'riemann', graph: 'g', range: [lo, hi], n: 40, color: 'off-white' },
       { id: 'ar', type: 'area', graph: 'g', range: [lo, hi], color: 'amber' },
-      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'amber' },
       { id: 'n1', type: 'text', text: pStr(p, 'n1', ctx.language === 'en' ? '4 slices' : '4 irisan', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
       { id: 'n2', type: 'text', text: pStr(p, 'n2', ctx.language === 'en' ? '12 slices' : '12 irisan', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
       { id: 'n3', type: 'text', text: pStr(p, 'n3', ctx.language === 'en' ? 'Thinner and thinner' : 'Makin tipis', 30), at: [COL_X, 0.2], size: 'md', color: 'muted', align: 'center' },
@@ -299,26 +299,30 @@ const vectorAdd: Recipe = (p, ctx) => {
   return {
     objects: [
       titleObj(ctx), axes,
-      { id: 'vb0', type: 'vector', from: [0, 0], to: b, axes: 'ax', color: 'ink' },
+      { id: 'vb0', type: 'line', from: [0, 0], to: b, axes: 'ax', color: 'muted', dashed: true },
       { id: 'va', type: 'vector', from: [0, 0], to: a, axes: 'ax', color: 'off-white' },
       { id: 'vb', type: 'vector', from: a, to: sum, axes: 'ax', color: 'muted' },
       { id: 'vs', type: 'vector', from: [0, 0], to: sum, axes: 'ax', color: 'amber' },
       { id: 'la', type: 'mathtex', latex: `\\vec{${la}}`, at: beside([0, 0], a, 0.42), size: 'md', color: 'off-white' },
       { id: 'lb', type: 'mathtex', latex: `\\vec{${lb}}`, at: beside(a, sum, 0.42), size: 'md', color: 'muted' },
-      { id: 'ls', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}}`, at: beside([0, 0], sum, 0.62), size: 'md', color: 'amber' },
-      { id: 'eq', type: 'mathtex', latex: `\\vec{${la}}+\\vec{${lb}} = \\begin{pmatrix}${fmt(sum[0])}\\\\${fmt(sum[1])}\\end{pmatrix}`, at: [COL_X, 1.4], size: 'lg', color: 'amber' },
-      { id: 'tip', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'Place the tail of one arrow on the tip of the other' : 'Letakkan pangkal satu panah di ujung panah yang lain', 80), at: [COL_X, 0.1], size: 'sm', color: 'muted', align: 'center' },
+      { id: 'ls', type: 'mathtex', latex: '\\vec{s}', at: beside([0, 0], sum, 0.52), size: 'md', color: 'amber' },
+      { id: 'pa', type: 'mathtex', latex: `\\vec{${la}} = \\begin{pmatrix}${fmt(a[0])}\\\\${fmt(a[1])}\\end{pmatrix}`, at: [3.8, 1.9], size: 'md', color: 'off-white' },
+      { id: 'pb', type: 'mathtex', latex: `\\vec{${lb}} = \\begin{pmatrix}${fmt(b[0])}\\\\${fmt(b[1])}\\end{pmatrix}`, at: [3.8, 1.0], size: 'md', color: 'off-white' },
+      { id: 'eq', type: 'mathtex', latex: `\\vec{s} = \\vec{${la}}+\\vec{${lb}} = \\begin{pmatrix}${fmt(sum[0])}\\\\${fmt(sum[1])}\\end{pmatrix}`, at: [3.8, 0.0], size: 'md', color: 'amber' },
+      { id: 'tip', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'Place the tail of one arrow on the tip of the other' : 'Letakkan pangkal satu panah di ujung panah yang lain', 80), at: [3.8, -1.0], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
       titleIn(ctx),
       { do: 'create', target: 'ax', at: d * 0.06, dur: d * 0.14 },
       { do: 'grow-arrow', target: 'va', at: d * 0.22, dur: d * 0.14 },
       { do: 'write', target: 'la', at: d * 0.3, dur: d * 0.08 },
-      { do: 'grow-arrow', target: 'vb', at: d * 0.4, dur: d * 0.14 },
+      { do: 'write', target: 'pa', at: d * 0.34, dur: d * 0.08 },
+      { do: 'grow-arrow', target: 'vb', at: d * 0.42, dur: d * 0.14 },
       { do: 'write', target: 'lb', at: d * 0.48, dur: d * 0.08 },
-      { do: 'fade-in', target: 'tip', at: d * 0.5, dur: d * 0.1 },
-      { do: 'grow-arrow', target: 'vb0', at: d * 0.58, dur: d * 0.1 },
-      { do: 'grow-arrow', target: 'vs', at: d * 0.66, dur: d * 0.16 },
+      { do: 'write', target: 'pb', at: d * 0.52, dur: d * 0.08 },
+      { do: 'fade-in', target: 'tip', at: d * 0.56, dur: d * 0.08 },
+      { do: 'create', target: 'vb0', at: d * 0.62, dur: d * 0.08 },
+      { do: 'grow-arrow', target: 'vs', at: d * 0.68, dur: d * 0.14 },
       { do: 'write', target: 'ls', at: d * 0.76, dur: d * 0.08 },
       { do: 'write', target: 'eq', at: d * 0.82, dur: d * 0.12 },
       { do: 'indicate', target: 'vs', at: d * 0.93, dur: d * 0.05 },
@@ -379,7 +383,7 @@ const limitApproach: Recipe = (p, ctx) => {
       { id: 'hole', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: a }, color: 'off-white', radius: 0.12, hollow: true },
       { id: 'dl', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.max(xr[0], a - span) }, color: 'danger', radius: 0.1 },
       { id: 'dr', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: Math.min(xr[1], a + span) }, color: 'success', radius: 0.1 },
-      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'lbl', type: 'mathtex', latex: label, at: [COL_X, 1.5], size: 'lg', color: 'amber' },
       { id: 'res', type: 'text', priority: 'low', text: pStr(p, 'result', ctx.language === 'en' ? 'Both sides meet at the same value' : 'Dua sisi bertemu di nilai yang sama', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: [
@@ -463,7 +467,7 @@ const gradientDescent: Recipe = (p, ctx) => {
       titleObj(ctx), axes,
       { id: 'g', type: 'function-graph', axes: 'ax', expr, color: 'amber', xRange: xr },
       { id: 'pt', type: 'dot', axes: 'ax', onGraph: { graph: 'g', x: start }, color: 'off-white', radius: 0.13 },
-      { id: 'rule', type: 'mathtex', latex: pTex(p, 'rule', 'x_{new} = x - \\alpha\\, f\'(x)'), at: [COL_X, 1.5], size: 'lg', color: 'off-white' },
+      { id: 'rule', type: 'mathtex', latex: pTex(p, 'rule', 'x_{new} = x - \\alpha\\, f\'(x)'), at: [COL_X, 1.5], size: 'lg', color: 'amber' },
       { id: 'lowest', type: 'text', priority: 'low', text: pStr(p, 'note', ctx.language === 'en' ? 'Steps shrink near the minimum' : 'Langkah mengecil dekat titik minimum', 60), at: [COL_X, 0.2], size: 'sm', color: 'muted', align: 'center' },
     ],
     timeline: tl,
@@ -568,13 +572,19 @@ const pipeline: Recipe = (p, ctx) => {
   const subs = pList(p, 'notes', 5).map((s) => cleanText(s, 34) ?? undefined);
   const d = ctx.d;
   const n = stages.length;
-  const w = Math.min(2.8, 11.8 / n - 0.75);
+  const w = Math.min(3.2, 11.8 / n - 0.65);
   const h = 1.9;
-  const y = 0.5;
-  const yTok = y - h / 2 - 0.5; // the packet rides under the boxes so it never covers a label
+  const y = 0.2;
+  const yTok = y - h / 2 - 0.45; // the packet rides under the boxes so it never covers a label
   const x = (i: number): number => (n === 1 ? 0 : -5.9 + w / 2 + (i * (11.8 - w)) / (n - 1));
-  const objs: Raw[] = [titleObj(ctx)];
-  const tl: Raw[] = [titleIn(ctx)];
+  const objs: Raw[] = [
+    titleObj(ctx),
+    { id: 'flow', type: 'text', priority: 'low', text: pStr(p, 'summary', ctx.language === 'en' ? 'Data moves sequentially through each processing stage' : 'Data mengalir bertahap melalui setiap tahapan proses', 80), at: [0, -1.9], size: 'sm', color: 'muted', align: 'center' },
+  ];
+  const tl: Raw[] = [
+    titleIn(ctx),
+    { do: 'fade-in', target: 'flow', at: d * 0.28, dur: d * 0.12 },
+  ];
   stages.forEach((s, i) => {
     objs.push({ id: `s${i}`, type: 'box', at: [x(i), y], size: [w, h], label: s, sub: subs[i], color: 'off-white', round: true });
     if (i > 0) objs.push({ id: `a${i}`, type: 'vector', from: [x(i - 1) + w / 2 + 0.05, y], to: [x(i) - w / 2 - 0.05, y], color: 'muted' });

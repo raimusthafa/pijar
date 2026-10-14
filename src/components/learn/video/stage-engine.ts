@@ -24,8 +24,8 @@ const v3 = (p: Pt): V3 => [p[0], p[1], 0];
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const smooth = (a: number) => a * a * (3 - 2 * a);
 const SIZES: Record<TextSize, number> = { sm: 26, md: 34, lg: 46, xl: 64 };
-/** Narrow stages (phones): the 16:9 frame shrinks everything, so type is enlarged until the smallest text reads about 11 px. */
-const COMPACT_SIZES: Record<TextSize, number> = { sm: 54, md: 58, lg: 66, xl: 78 };
+/** Narrow stages (phones): enlarged type so that smallest code/body text is >= 11px on 390px screens. */
+const COMPACT_SIZES: Record<TextSize, number> = { sm: 64, md: 72, lg: 82, xl: 96 };
 
 interface Rec {
   spec: StageObject;
@@ -272,7 +272,7 @@ export class StageEngine {
           if (!Number.isFinite(v) || !Number.isFinite(prev) || (Math.abs(v - prev) > span * 1.5)) breaks.push(x1 - (hi - lo) / N / 2);
           prev = v;
         }
-        const g: FunctionGraph = ax.plot((x) => cap(fn(x)), { color, xRange: [lo, hi], strokeWidth: 5, numSamples: 160, discontinuities: breaks.slice(0, 24) });
+        const g: FunctionGraph = ax.plot((x) => cap(fn(x)), { color, xRange: [lo, hi], strokeWidth: 8, numSamples: 160, discontinuities: breaks.slice(0, 24) });
         return { spec: o, mob: g, fn, color };
       }
       case 'vector': {
@@ -348,21 +348,36 @@ export class StageEngine {
         if (fit < 1) label.scale(fit);
         // A phone has no room for the second line: the label alone is kept, large enough to read.
         const sub1 = o.sub && !this.compact;
-        label.moveTo([o.at[0], o.at[1] + (sub1 ? 0.16 : 0), 0]);
-        const parts: Mobject[] = [rect, label];
+        const parts: Mobject[] = [rect];
         if (sub1 && o.sub) {
           const sub = this.text(o.sub, 'sm', filled ? T.onAmber : T.colors.muted, { scaleFont: 0.72 });
           if (sub.getWidth() > w - 0.3) sub.scale((w - 0.3) / sub.getWidth());
-          sub.moveTo([o.at[0], o.at[1] - 0.22, 0]);
-          parts.push(sub);
+          const lH = label.getHeight();
+          const sH = sub.getHeight();
+          const gap = 0.08;
+          const totalH = lH + sH + gap;
+          const scaleToFit = totalH > h - 0.18 ? (h - 0.18) / totalH : 1;
+          if (scaleToFit < 1) {
+            label.scale(scaleToFit);
+            sub.scale(scaleToFit);
+          }
+          const finalLH = label.getHeight();
+          const finalSH = sub.getHeight();
+          const top = o.at[1] + (finalLH + finalSH + gap) / 2;
+          label.moveTo([o.at[0], top - finalLH / 2, 0]);
+          sub.moveTo([o.at[0], top - finalLH - gap - finalSH / 2, 0]);
+          parts.push(label, sub);
+        } else {
+          label.moveTo([o.at[0], o.at[1], 0]);
+          parts.push(label);
         }
         return { spec: o, mob: new Group(...parts), rect, color, fill };
       }
       case 'tangent': {
         const g = this.recs.get(o.graph);
         if (!g?.fn) return null;
-        const line = new Line({ start: [0, 0, 0], end: [1, 0, 0], color, strokeWidth: 4.5 });
-        const dot = new Dot({ point: [0, 0, 0], radius: 0.11, color: this.col('amber'), fillOpacity: 1, strokeWidth: 0 });
+        const line = new Line({ start: [0, 0, 0], end: [1, 0, 0], color, strokeWidth: 8 });
+        const dot = new Dot({ point: [0, 0, 0], radius: 0.19, color: this.col('amber'), fillOpacity: 1, strokeWidth: 0 });
         const rec: Rec = { spec: o, mob: new Group(line, ...(o.dot !== false ? [dot] : [])), line, dot, color };
         this.placeTangent(rec, o.x);
         return rec;
@@ -501,12 +516,34 @@ export class StageEngine {
           const to = this.recs.get(e.to!);
           if (!to?.mob) break;
           this.show(m);
-          if (type === 'mathtex' && to.spec.type === 'mathtex') {
-            // Cross-fade: a glyph-by-glyph morph fills the holes of letters like o, a and e.
+          if (type === 'mathtex' || to.spec.type === 'mathtex') {
+            // Cross-fade with 250ms overlap:
+            // A glyph-by-glyph morph creates thick distorted black blobs (artifacts) during LaTeX formula morphs.
+            // Overlapping cross-fade completely avoids glyph distortion.
             this.show(to.mob);
-            const out1 = wrap(new FadeOut(m, { duration: dur }), lin);
-            out.push({ ...out1, remove: [m] });
-            out.push(wrap(new FadeIn(to.mob, { duration: dur, shift: [0, -0.18, 0] }), lin));
+            const aOut = new FadeOut(m, { duration: dur });
+            const aIn = new FadeIn(to.mob, { duration: dur, shift: [0, -0.16, 0] });
+            const overlapFrac = Math.min(0.35, 0.25 / Math.max(0.5, dur));
+            const outEnd = clamp01(0.5 + overlapFrac);
+            const inStart = clamp01(0.5 - overlapFrac);
+            out.push({
+              begin: () => {
+                aOut.begin();
+                aIn.begin();
+              },
+              at: (al) => {
+                const k = lin ? al : smooth(al);
+                const alOut = clamp01(k / outEnd);
+                const alIn = clamp01((k - inStart) / (1 - inStart));
+                aOut.interpolate(alOut);
+                aIn.interpolate(alIn);
+              },
+              end: () => {
+                aOut.finish();
+                aIn.finish();
+              },
+              remove: [m],
+            });
             break;
           }
           out.push(wrap(new Transform(m, to.mob, { duration: dur }), lin));

@@ -205,3 +205,41 @@ it('separateTexts pushes a formula that lands on the one above it', () => {
   const [a, b] = st.objects;
   assert.ok(a.at[1] - b.at[1] >= 1.4, `gap ${a.at[1] - b.at[1]}`);
 });
+
+describe('BL1 recipe composition and typography improvements', () => {
+  it('all recipes set title size lg and color off-white', () => {
+    for (const name of RECIPE_NAMES) {
+      const frag = buildRecipe(name, {}, { d: 14, title: 'Title', language: 'id' });
+      const ttl = frag.objects.find((o) => o.id === 'ttl');
+      assert.ok(ttl, `${name} has ttl`);
+      assert.equal(ttl.size, 'lg');
+      assert.equal(ttl.color, 'off-white');
+    }
+  });
+
+  it('vector-add uses dashed guide vector and side column breakdown', () => {
+    const frag = buildRecipe('vector-add', {}, { d: 14, title: 'Vector Addition', language: 'id' });
+    const vb0 = frag.objects.find((o) => o.id === 'vb0');
+    assert.ok(vb0 && vb0.type === 'line' && vb0.dashed);
+    const ls = frag.objects.find((o) => o.id === 'ls');
+    assert.equal(ls.latex, '\\vec{s}');
+    const pa = frag.objects.find((o) => o.id === 'pa');
+    assert.ok(pa && pa.type === 'mathtex');
+  });
+
+  it('pipeline centers boxes vertically and includes flow summary text', () => {
+    const frag = buildRecipe('pipeline', {}, { d: 14, title: 'Pipeline', language: 'id' });
+    const s0 = frag.objects.find((o) => o.id === 's0');
+    assert.equal(s0.at[1], 0.2);
+    const flow = frag.objects.find((o) => o.id === 'flow');
+    assert.ok(flow && flow.type === 'text');
+    assert.equal(flow.at[1], -1.9);
+  });
+
+  it('derivative-tangent has prominent touch point', () => {
+    const frag = buildRecipe('derivative-tangent', {}, { d: 14, title: 'Tangent', language: 'id' });
+    const pp = frag.objects.find((o) => o.id === 'pp');
+    assert.ok(pp && pp.radius >= 0.18 && pp.color === 'amber');
+  });
+});
+
