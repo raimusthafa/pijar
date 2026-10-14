@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { weeklyReport, retentionBars, overlayStatus, daysUntilDue, dueRows, nextStep } from '../src/lib/dashboard/derive.ts';
+import { weeklyReport, retentionBars, overlayStatus, daysUntilDue, dueRows, nextStep, buildGraphOptions } from '../src/lib/dashboard/derive.ts';
 import { cleanDraft, isMissingTable } from '../src/lib/community/posts.ts';
 
 const now = new Date('2026-10-13T12:00:00Z');
@@ -47,6 +47,33 @@ describe('dashboard derive', () => {
     assert.equal(merged[0].status, 'completed');
     assert.equal(nextStep(nodes, edges).node.id, 'x');
     assert.equal(nextStep(merged.map(n => ({ ...n, status: 'completed' })), edges).kind, 'done');
+  });
+  test('buildGraphOptions computes done/total progress descriptions accurately', () => {
+    const graphs = [
+      {
+        id: 'g1',
+        topic: 'Aljabar Dasar',
+        nodes: [{ status: 'completed' }, { status: 'completed' }, { status: 'ready' }],
+      },
+      {
+        id: 'g2',
+        topic: 'Kalkulus Lanjut',
+        nodes: [{ status: 'ready' }, { status: 'locked' }],
+      },
+    ];
+    const opts = buildGraphOptions(graphs, (done, total) => `${done} dari ${total} konsep`);
+    assert.deepEqual(opts, [
+      {
+        value: 'g1',
+        label: 'Aljabar Dasar',
+        description: '2 dari 3 konsep',
+      },
+      {
+        value: 'g2',
+        label: 'Kalkulus Lanjut',
+        description: '0 dari 2 konsep',
+      },
+    ]);
   });
 });
 

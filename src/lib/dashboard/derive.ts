@@ -92,3 +92,31 @@ export function nextStep(nodes: CurriculumNode[], edges: CurriculumEdge[]): { no
   if (node.status === 'ready' || node.status === 'prerequisite_gap') return { node, kind: 'ready' };
   return { node, kind: 'other' };
 }
+
+export interface GraphOptionInput {
+  id: string;
+  topic: string;
+  nodes: { status: string }[];
+}
+
+export interface GraphOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
+/** Builds dropdown options for the dashboard map picker with progress summary. */
+export function buildGraphOptions(
+  graphs: GraphOptionInput[],
+  formatProgress: (done: number, total: number) => string,
+): GraphOption[] {
+  return graphs.map((g) => {
+    const done = g.nodes.filter((n) => n.status === 'completed').length;
+    const total = g.nodes.length;
+    return {
+      value: g.id,
+      label: g.topic,
+      description: formatProgress(done, total),
+    };
+  });
+}

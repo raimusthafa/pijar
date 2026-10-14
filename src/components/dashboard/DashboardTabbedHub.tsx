@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select } from '@/components/ui/select';
 import { useT } from '@/lib/i18n/client';
+import { buildGraphOptions } from '@/lib/dashboard/derive';
 import { HomeView } from './HomeView';
 import { MasteryTrackingView } from './MasteryTrackingView';
 import { ReportView } from './ReportView';
 import { CommunityView } from './CommunityView';
 import type { DashboardHubProps } from './types';
+
+export { buildGraphOptions };
 
 /** Four tabs. The map picker only shows when the learner has more than one active map. */
 export function DashboardTabbedHub(props: DashboardHubProps) {
@@ -17,6 +21,10 @@ export function DashboardTabbedHub(props: DashboardHubProps) {
   const graph = graphs.find(g => g.id === graphId) ?? graphs[0];
   const rows = graph ? progress.filter(r => r.graph_id === graph.id) : [];
   const now = new Date(nowIso);
+
+  const options = useMemo(() => {
+    return buildGraphOptions(graphs, (done, total) => t('dashboard.graphs.progress', { done, total }));
+  }, [graphs, t]);
 
   return (
     <Tabs defaultValue="home">
@@ -28,16 +36,12 @@ export function DashboardTabbedHub(props: DashboardHubProps) {
           <TabsTrigger value="community" className="max-sm:px-1 max-sm:text-[13px]">{t('dashboard.tabs.community')}</TabsTrigger>
         </TabsList>
         {graphs.length > 1 && (
-          <select
-            aria-label={t('dashboard.graphs.pick')}
+          <Select
+            ariaLabel={t('dashboard.graphs.pick')}
             value={graph?.id}
-            onChange={e => setGraphId(e.target.value)}
-            className="h-11 w-full max-w-xs rounded-control border border-field bg-raised px-3 text-base text-foreground md:h-10 md:text-sm"
-          >
-            {graphs.map(g => (
-              <option key={g.id} value={g.id}>{g.topic}</option>
-            ))}
-          </select>
+            onValueChange={setGraphId}
+            options={options}
+          />
         )}
       </div>
 
