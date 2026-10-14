@@ -22,6 +22,7 @@ export function MathDemo() {
   const box = useRef<HTMLDivElement>(null);
   const [time, setTime] = useState(DURATION); // the finished frame is the poster until playback begins
   const [status, setStatus] = useState<StageStatus>('loading');
+  const [near, setNear] = useState(false); // the 300 kB engine is fetched only when the block is about to scroll into view
 
   const scene = useMemo(
     () =>
@@ -39,6 +40,19 @@ export function MathDemo() {
       ),
     [t, locale],
   );
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setNear(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = box.current;
@@ -65,6 +79,7 @@ export function MathDemo() {
 
   return (
     <div ref={box} className="relative aspect-video overflow-hidden rounded-inner bg-action">
+      {near && (
       <StageView
         scene={scene}
         runtime={DURATION}
@@ -73,6 +88,7 @@ export function MathDemo() {
         className="absolute inset-0"
         fallback={<p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-action-foreground/80">{scene.title}</p>}
       />
+      )}
       {status === 'loading' && <div className="pj-skeleton pointer-events-none absolute inset-0 bg-action" aria-hidden />}
     </div>
   );

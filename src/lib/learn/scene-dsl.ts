@@ -404,6 +404,37 @@ function validateEntry(raw: unknown, known: Map<string, StageObjectType>, sceneD
   return e;
 }
 
+const TEXT_H = { sm: 0.4, md: 0.55, lg: 0.8, xl: 1.1 } as const;
+
+/** Rough box of a free-standing text or formula, in stage units, centred on its anchor. */
+function textBox(o: StageObject): { w: number; h: number } | null {
+  if (o.type !== 'text' && o.type !== 'mathtex') return null;
+  const base = TEXT_H[o.size ?? 'md'];
+  if (o.type === 'text') return { w: Math.min(o.text.length * base * 0.34, 9), h: base };
+  const tall = /\\(d?frac|sqrt|sum|int|lim|binom|begin)/.test(o.latex);
+  return { w: Math.min(o.latex.length * base * 0.2, 9), h: tall ? base * 1.9 : base * 1.1 };
+}
+
+/**
+ * Models place formulas a little too close together (a fraction is about twice as tall as it looks in the
+ * JSON). Walk top to bottom and push a text that would land on the one above it down, as far as the stage allows.
+ */
+export function separateTexts(objects: StageObject[]): void {
+  const items = objects
+    .map((o) => ({ o, b: textBox(o) }))
+    .filter((x): x is { o: Extract<StageObject, { at: Pt }>; b: { w: number; h: number } } => x.b !== null && 'at' in x.o)
+    .sort((a, b) => b.o.at[1] - a.o.at[1]);
+  for (let i = 1; i < items.length; i++) {
+    const cur = items[i];
+    for (let j = 0; j < i; j++) {
+      const up = items[j];
+      const sameColumn = Math.abs(cur.o.at[0] - up.o.at[0]) < (cur.b.w + up.b.w) / 2;
+      const need = (cur.b.h + up.b.h) / 2 + 0.1;
+      if (sameColumn && up.o.at[1] - cur.o.at[1] < need) cur.o.at = [cur.o.at[0], Math.max(-3.2, up.o.at[1] - need)];
+    }
+  }
+}
+
 /** Validate a stage. Returns null when nothing drawable is left. */
 export function validateStage(raw: unknown, sceneDur: number): StageSpec | null {
   if (!isObj(raw) || !Array.isArray(raw.objects)) return null;
@@ -418,6 +449,7 @@ export function validateStage(raw: unknown, sceneDur: number): StageSpec | null 
     known.set(v.id, v.type);
   }
   if (!objects.some((o) => o.type !== 'group')) return null;
+  separateTexts(objects);
   const timeline: TimelineEntry[] = [];
   const rawTimeline = Array.isArray(raw.timeline) ? raw.timeline : [];
   for (const t of rawTimeline) {

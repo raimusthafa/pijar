@@ -114,6 +114,8 @@ function getTopicLanguage(topic: string, nodeId: string): { lang: string; visual
   if (t.includes('stat') || t.includes('probabilitas')) {
     return { lang: 'python', visualType: 'math-visualization' };
   }
+  // A maths concept whose topic text has no 'math' word (e.g. "Aljabar dasar") must not default to TypeScript examples.
+  if (MATH_WORDS.test(`${topic} ${nodeId}`)) return { lang: 'latex', visualType: 'math-visualization' };
   return { lang: 'typescript', visualType: n.includes('stack') || n.includes('rekursi') ? 'call-stack' : 'code-execution' };
 }
 
@@ -336,7 +338,7 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
   ],
   "videoScript": {
     "conceptId": "${nodeId}",
-    "title": "Visualisasi: ${nodeLabel}",
+    "title": "${language === 'en' ? 'Visualization' : 'Visualisasi'}: ${nodeLabel}",
     "totalDurationSeconds": 45,
     "scenes": [
       {
@@ -355,7 +357,8 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
   }
 }
 Isi "scenes" dengan 3 sampai 5 scene sesuai aturan VIDEO PENJELASAN di bawah (resep atau stage kustom pada tiap scene).
-Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan caption tiap scene berurutan dalam waktu relatif scene. ${MATH_FORMAT_NOTE}${mathGuide}`;
+Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan caption tiap scene berurutan dalam waktu relatif scene. ${MATH_FORMAT_NOTE}${mathGuide}
+${language === 'en' ? 'LANGUAGE: the instructions above are in Indonesian, but EVERY learner-facing string in the JSON (title, summary, explanation, analogy, definitions, examples, misconceptions, quiz, scene titles, narration, captions, board instruction and labels) MUST be written in English. Do not leave any Indonesian text.' : ''}`;
 
   try {
     const aiOutput = await generateStructuredJSON<DetailedLearningMaterial>(prompt, systemInstruction, undefined, { budgetMs: LESSON_BUDGET_MS });

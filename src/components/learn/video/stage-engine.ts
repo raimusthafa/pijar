@@ -226,7 +226,8 @@ export class StageEngine {
         const dec = (step: number) => (step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step) - 1e-9)));
         const axisCfg = { includeNumbers: o.numbers !== false, numberFontSize: 20 };
         const xAxisConfig = { ...axisCfg, decimalPlaces: dec(o.xRange[2]) };
-        const yAxisConfig = { ...axisCfg, decimalPlaces: dec(o.yRange[2]) };
+        // Number labels on the y axis sit right where curves cross it and collide; the ticks stay, the x labels carry the scale.
+        const yAxisConfig = { ...axisCfg, includeNumbers: false, decimalPlaces: dec(o.yRange[2]) };
         const ax = new Axes({
           xRange: o.xRange, yRange: o.yRange, xLength: o.size[0], yLength: o.size[1], color,
           axisConfig: axisCfg, xAxisConfig, yAxisConfig, tips: true,
@@ -248,7 +249,20 @@ export class StageEngine {
         const xr = ax.getXRange();
         const lo = o.xRange ? Math.max(o.xRange[0], xr[0]) : xr[0];
         const hi = o.xRange ? Math.min(o.xRange[1], xr[1]) : xr[1];
-        const g: FunctionGraph = ax.plot((x) => fn(x), { color, xRange: [lo, hi], strokeWidth: 5, numSamples: 160 });
+        // Poles (tan, 1/x): break the path where the curve leaps across the plot, and keep each branch inside the
+        // plotting box so it never runs into the title or the labels.
+        const yr = ax.getYRange();
+        const span = yr[1] - yr[0];
+        const cap = (v: number) => Math.max(yr[0] - span * 0.08, Math.min(yr[1] + span * 0.08, v));
+        const breaks: number[] = [];
+        const N = 600;
+        for (let i = 0, prev = fn(lo); i < N; i++) {
+          const x1 = lo + ((i + 1) / N) * (hi - lo);
+          const v = fn(x1);
+          if (!Number.isFinite(v) || !Number.isFinite(prev) || (Math.abs(v - prev) > span * 1.5)) breaks.push(x1 - (hi - lo) / N / 2);
+          prev = v;
+        }
+        const g: FunctionGraph = ax.plot((x) => cap(fn(x)), { color, xRange: [lo, hi], strokeWidth: 5, numSamples: 160, discontinuities: breaks.slice(0, 24) });
         return { spec: o, mob: g, fn, color };
       }
       case 'vector': {

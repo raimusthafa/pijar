@@ -193,3 +193,15 @@ describe('review fixes', () => {
     assert.equal(s.objects[0].text, '  return 1;');
   });
 });
+
+it('separateTexts pushes a formula that lands on the one above it', () => {
+  const st = validateStage({
+    objects: [
+      { id: 'a', type: 'mathtex', latex: '\\frac{d}{dx}\\sin(x)=\\cos(x)', at: [0, 0.4], size: 'lg' },
+      { id: 'b', type: 'mathtex', latex: '\\frac{d}{dx}\\cos(x)=-\\sin(x)', at: [0, -0.2], size: 'lg' },
+    ],
+    timeline: [{ do: 'write', target: 'a', at: 0, dur: 1 }, { do: 'write', target: 'b', at: 1, dur: 1 }],
+  }, 12);
+  const [a, b] = st.objects;
+  assert.ok(a.at[1] - b.at[1] >= 1.4, `gap ${a.at[1] - b.at[1]}`);
+});

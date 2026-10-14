@@ -23,7 +23,12 @@ function findClose(s: string, close: string, from: number): number {
   return -1;
 }
 
+/** A short string such as "a \times b" that has TeX commands but no delimiters (models forget them in answer options). */
+const isBareTex = (s: string) =>
+  !/[$]|\\[([]/.test(s) && /\\[a-zA-Z]+/.test(s) && !/[A-Za-z]{3,}/.test(s.replace(/\\[a-zA-Z]+/g, ''));
+
 export function splitMath(src: string): MathSeg[] {
+  if (isBareTex(src)) return [{ t: 'math', v: repairTex(src).trim(), display: false }];
   const out: MathSeg[] = [];
   let buf = '';
   const pushText = (v: string) => {
