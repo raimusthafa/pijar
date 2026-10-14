@@ -18,7 +18,7 @@ import { MathText } from '@/components/ui/math-text';
 import { createClient } from '@/lib/supabase/client';
 import { getActiveGraph, getMasteredNodes, markNodeMastered } from '@/lib/graph/storage';
 import { CURATED_MATERIALS } from '@/lib/learn/curated-materials';
-import { exprFromScript, fallbackBoardSpec } from '@/lib/learn/board-spec';
+import { boardForLesson } from '@/lib/learn/board-spec';
 import { countWords } from '@/lib/learn/markdown';
 import type { DetailedLearningMaterial } from '@/lib/learn/types';
 
@@ -155,7 +155,7 @@ function LearnContent({ params }: LearnPageProps) {
 
   // The AI board, or a recipe picked by keyword for math lessons that came without one (older caches, curated lessons).
   const board = useMemo(
-    () => material?.interactiveBoard ?? (material ? fallbackBoardSpec(`${material.title} ${node?.label ?? ''} ${node?.description ?? ''}`, locale, exprFromScript(material.videoScript)) : null),
+    () => (material ? boardForLesson(material, `${material.title} ${node?.label ?? ''} ${node?.description ?? ''}`, locale) : null),
     [material, node?.label, node?.description, locale],
   );
 

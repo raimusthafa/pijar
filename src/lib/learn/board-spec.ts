@@ -232,9 +232,30 @@ function normalize(raw: Record<string, unknown>, recipe?: BoardRecipe): BoardSpe
 /** Sanitizes the board inside an AI-produced material in place; a bad board is deleted, never fatal. */
 export function sanitizeMaterialBoard(material: unknown, language: 'id' | 'en' = 'id'): void {
   if (!isObj(material) || !('interactiveBoard' in material)) return;
-  const clean = sanitizeBoardSpec(isObj(material.interactiveBoard) ? { ...material.interactiveBoard, lang: language } : null);
+  let input: Record<string, unknown> | null = isObj(material.interactiveBoard) ? { ...material.interactiveBoard, lang: language } : null;
+  // A recipe reference without a curve would silently study x^2: borrow the curve the video plots.
+  const hint = exprFromScript(material.videoScript);
+  if (input && hint && input.recipe && !(isObj(input.params) && typeof input.params.expr === 'string' && compileExpr(input.params.expr))) {
+    input = { ...input, params: { ...(isObj(input.params) ? input.params : {}), expr: hint } };
+  }
+  const clean = sanitizeBoardSpec(input);
   if (clean) material.interactiveBoard = clean;
   else delete material.interactiveBoard;
+}
+
+const squash = (s?: string) => (s ?? '').replace(/\s/g, '');
+
+/** The board a lesson shows: its own, unless it is the baked-in x^2 default while the video plots another curve (older cached lessons). */
+export function boardForLesson(
+  material: { interactiveBoard?: BoardSpec; videoScript?: unknown },
+  text: string,
+  lang: 'id' | 'en' = 'id',
+): BoardSpec | null {
+  const hint = exprFromScript(material.videoScript);
+  const own = material.interactiveBoard;
+  const stale = !!own && !!hint && squash(own.curves?.[0]?.expr) === 'x^2' && squash(hint) !== 'x^2';
+  if (own && !stale) return own;
+  return fallbackBoardSpec(text, lang, hint) ?? own ?? null;
 }
 
 // ── Recipes ───────────────────────────────────────────────────────

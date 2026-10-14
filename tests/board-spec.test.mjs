@@ -204,3 +204,23 @@ describe('board follows the lesson function', () => {
     assert.ok(b.viewBox.y[1] <= 3 && b.viewBox.y[0] >= -3, `y window ${b.viewBox.y}`);
   });
 });
+
+describe('board never silently studies x^2 for another lesson', () => {
+  it('a recipe reference without a curve borrows the one the video plots', () => {
+    const m = {
+      videoScript: { scenes: [{ recipe: { name: 'function-plot', params: { expr: 'sin(x)' } } }] },
+      interactiveBoard: { recipe: 'derivative-tangent' },
+    };
+    sanitizeMaterialBoard(m, 'id');
+    assert.equal(m.interactiveBoard.curves[0].expr, 'sin(x)');
+  });
+  it('an old cached x^2 board is replaced when the video plots another curve', async () => {
+    const { boardForLesson } = await import('../src/lib/learn/board-spec.ts');
+    const stale = boardFromRecipe('derivative-tangent', {}, 'id');
+    const script = { scenes: [{ recipe: { name: 'function-plot', params: { expr: 'sin(x)' } } }] };
+    const b = boardForLesson({ interactiveBoard: stale, videoScript: script }, 'Turunan fungsi sinus', 'id');
+    assert.equal(b.curves[0].expr, 'sin(x)');
+    // a board that already matches, or a lesson with no hint, is left alone
+    assert.equal(boardForLesson({ interactiveBoard: stale, videoScript: { scenes: [] } }, 'Turunan', 'id'), stale);
+  });
+});
