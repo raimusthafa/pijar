@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/auth.test.mjs tests/graph.test.mjs tests/learn.test.mjs tests/math-spec.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs tests/pretest.test.mjs tests/review.test.mjs tests/dashboard.test.mjs tests/five-e.test.mjs tests/workspace.test.mjs tests/workspace-ui.test.mjs tests/ui-rules.test.mjs",
+    "test": "node --test tests/auth.test.mjs tests/graph.test.mjs tests/graph-normalize.test.mjs tests/learn.test.mjs tests/math-spec.test.mjs tests/math-text.test.mjs tests/board-spec.test.mjs tests/mastery.test.mjs tests/diagnostic.test.mjs tests/pretest.test.mjs tests/review.test.mjs tests/dashboard.test.mjs tests/five-e.test.mjs tests/workspace.test.mjs tests/workspace-ui.test.mjs tests/ui-rules.test.mjs tests/scene-dsl.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -18,8 +18,11 @@
     "@xyflow/react": "^12.12.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "jsxgraph": "^1.14.0",
+    "katex": "^0.19.0",
     "lucide-react": "^1.54.0",
     "mafs": "^0.21.0",
+    "manim-web": "^0.37.0",
     "mathjs": "^15.2.0",
     "motion": "^14.2.0",
     "next": "16.4.0",

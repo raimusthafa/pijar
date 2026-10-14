@@ -4,6 +4,7 @@ import { getWorkspace, listEvents, appendEvent, MigrationMissing } from '@/lib/w
 import { phasePrompt } from '@/lib/workspace/five-e';
 import { parseImageDataUrl, buildHistory, MAX_TEXT } from '@/lib/workspace/evidence';
 import { streamChatResponse } from '@/lib/ai/provider';
+import { MATH_FORMAT_NOTE } from '@/lib/learn/math-text';
 
 const KINDS = ['chat', 'quiz', 'image', 'canvas'] as const;
 const bad = (code: string, status = 400) => NextResponse.json({ code }, { status });
@@ -56,7 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const userEvent = await appendEvent(s, user.id, id, { kind, role: 'user', content, image_path, meta });
     const history = buildHistory(await listEvents(s, user.id, id), 12);
-    const system = `${phasePrompt(ws.phase, { concept: label, language })}\n${GUARD[language]}`;
+    const system = `${phasePrompt(ws.phase, { concept: label, language })}\n${GUARD[language]} ${MATH_FORMAT_NOTE}`;
 
     const stream = await streamChatResponse(history, system, img ? [{ mimeType: img.mimeType, base64: img.base64 }] : undefined);
     const enc = new TextEncoder();

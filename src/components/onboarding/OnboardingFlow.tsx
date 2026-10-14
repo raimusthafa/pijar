@@ -15,6 +15,7 @@ import {
   type LearningGoal,
 } from '@/lib/onboarding/goals';
 import { AuthFrame } from '@/components/auth/AuthFrame';
+import { GeneratingScreen, useStages } from '@/components/ui/generating-screen';
 import { GoalStep } from './GoalStep';
 import { ConfirmStep, type Understanding } from './ConfirmStep';
 import { StyleStep, type LearningStyle } from './StyleStep';
@@ -41,7 +42,8 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export function OnboardingFlow() {
-  const { locale } = useT();
+  const { t, locale } = useT();
+  const analysisStages = useStages('onboarding', ['read', 'topic', 'summary']);
   const router = useRouter();
   const [supabase] = useState(createClient);
   const box = useRef<HTMLDivElement>(null);
@@ -207,6 +209,10 @@ export function OnboardingFlow() {
     document.cookie = `pijar_active_topic_key=custom; path=/; max-age=604800; SameSite=Lax`;
 
     router.push(`/diagnostic?topic=${encodeURIComponent(cleanTopic)}&count=${count}&practitioner=${practitioner ? '1' : '0'}`);
+  }
+
+  if (step === 'confirm' && status === 'loading') {
+    return <GeneratingScreen title={t('common.generating.onboarding.title')} stages={analysisStages} paceMs={4500} className="h-dvh" />;
   }
 
   return (

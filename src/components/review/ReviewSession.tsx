@@ -7,11 +7,12 @@ import { AnswerOption } from '@/components/ui/answer-option';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { GeneratingScreen, useStages } from '@/components/ui/generating-screen';
 import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/lib/i18n/client';
 import { daysUntilDue } from '@/lib/dashboard/derive';
 import { DUE_RETENTION } from '@/lib/scheduler/engine';
+import { MathText } from '@/components/ui/math-text';
 
 interface Question { id: string; question: string; options: string[]; correctIndex: number; explanation: string }
 interface Item { nodeId: string; label: string; retention: number; question?: Question }
@@ -133,31 +134,11 @@ export function ReviewSession({ graphId: requested }: { graphId?: string }) {
   }
 }
 
-/** Skeleton shaped like the question card. After a few seconds it says why it is slow, because generating questions can take a while. */
+/** Whole-page wait while today's due concepts are found and their questions are written. */
 function Waiting() {
   const { t } = useT();
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setSlow(true), 4000);
-    return () => clearTimeout(id);
-  }, []);
-  return (
-    <div className="grid gap-5" role="status">
-      <div className="grid gap-2">
-        <p className="text-sm text-muted-foreground">{t(slow ? 'review.loading.slow' : 'review.loading')}</p>
-        <Skeleton className="h-2 w-full rounded-pill" />
-      </div>
-      <Card tone="raised" className="gap-5">
-        <div className="grid gap-5 px-(--card-spacing)">
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-5 w-4/5" />
-          <div className="grid gap-2">
-            {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-inner" />)}
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
+  const stages = useStages('review', ['due', 'questions']);
+  return <GeneratingScreen title={t('common.generating.review.title')} stages={stages} paceMs={5000} className="min-h-[calc(100dvh-16rem)]" />;
 }
 
 function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[]) => void }) {
@@ -215,7 +196,7 @@ function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[])
             <p className="text-xs text-muted-foreground">{t('review.concept', { label: item.label })}</p>
             <p className="text-xs text-muted-foreground">{t('review.recall', { pct: Math.round(item.retention * 100) })}</p>
           </div>
-          <h2 className="font-display text-h4 font-semibold">{q.question}</h2>
+          <h2 className="font-display text-h4 font-semibold"><MathText text={q.question} /></h2>
 
           <div role="group" aria-label={t('review.options')} className="grid gap-2">
             {q.options.map((opt, i) => (
@@ -236,8 +217,8 @@ function Questions({ items, onFinish }: { items: Item[]; onFinish: (r: Result[])
             {answered && (
               <div className="pj-rise grid gap-1 text-sm">
                 <p className="font-medium">{correct ? t('review.correct') : t('review.wrong')}</p>
-                {!correct && <p>{t('review.correctWas', { answer: q.options[q.correctIndex] })}</p>}
-                {q.explanation && <p className="text-muted-foreground">{q.explanation}</p>}
+                {!correct && <p><MathText text={t('review.correctWas', { answer: q.options[q.correctIndex] })} /></p>}
+                {q.explanation && <p className="text-muted-foreground"><MathText text={q.explanation} /></p>}
               </div>
             )}
           </div>
@@ -274,7 +255,7 @@ function Summary({ results, persisted }: { results: Result[]; persisted: boolean
           <ul className="grid gap-2">
             {list.map(r => (
               <li key={r.nodeId} className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate">{r.label}</span>
+                <span className="min-w-0 truncate"><MathText text={r.label} /></span>
                 <span className="shrink-0 text-xs text-muted-foreground">{when(r)}</span>
               </li>
             ))}

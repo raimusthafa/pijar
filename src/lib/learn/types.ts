@@ -2,6 +2,8 @@
 // PIJAR - Learning Journey & Interactive Video Types (F4)
 // ================================================================
 
+import type { RecipeRef, StageSpec } from './scene-dsl';
+
 export type VisualSceneType =
   | 'call-stack'
   | 'loss-landscape'
@@ -26,14 +28,13 @@ export interface MathSpec {
   ratio?: { a: number; b: number };
 }
 
-export interface VisualSceneState {
+/**
+ * Old scene state, read only to convert materials cached before the scene DSL existed
+ * (see scene-normalize.ts). New content never writes it.
+ */
+export interface LegacyVisualState {
   math?: MathSpec;
-  currentStep?: number;
-  totalSteps?: number;
-  highlightedLine?: number;
-  variables?: Record<string, string | number | boolean>;
   stackItems?: Array<{ label: string; value: string; isBaseCase?: boolean }>;
-  lossPoint?: { x: number; y: number; loss: number; step: number };
   treeNodes?: Array<{ id: string; label: string; isHighlighted?: boolean; children?: string[] }>;
   activeNodes?: string[];
   flowStages?: Array<{ id: string; label: string; status: 'pending' | 'active' | 'done' }>;
@@ -52,9 +53,16 @@ export interface VideoScene {
   title: string;
   durationSeconds: number;
   narration: string;
-  visualType: VisualSceneType;
-  visualState: VisualSceneState;
+  /** Times are seconds from the start of this scene. */
   captions: VideoCaption[];
+  /** Custom stage (objects + timeline), see scene-dsl.ts. */
+  stage?: StageSpec;
+  /** Or a named recipe with parameters, see scene-recipes.ts. */
+  recipe?: RecipeRef;
+  /** @deprecated Old shape, converted to a recipe on read. */
+  visualType?: VisualSceneType;
+  /** @deprecated Old shape, converted to a recipe on read. */
+  visualState?: LegacyVisualState;
 }
 
 export interface VideoScriptPlan {
@@ -90,6 +98,8 @@ export interface DetailedLearningMaterial {
   keyTakeaways: string[];
   checkpointQuestions: CheckpointQuizQuestion[];
   videoScript: VideoScriptPlan;
+  /** Optional interactive board for math topics (validated BoardSpec, see board-spec.ts). */
+  interactiveBoard?: import('./board-spec').BoardSpec;
 }
 
 export interface CheckpointQuizQuestion {

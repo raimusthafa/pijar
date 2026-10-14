@@ -1,5 +1,6 @@
 import { Check, X } from "lucide-react"
 import { cn } from "cn"
+import { MathText } from '@/components/ui/math-text';
 
 /*
   One answer choice for review, diagnostic and post-test. The row keeps a quiet raised surface;
@@ -38,7 +39,7 @@ function AnswerOption({
           {keyHint}
         </kbd>
       )}
-      <span className="min-w-0 flex-1">{children}</span>
+      <span className="min-w-0 flex-1">{typeof children === "string" ? <MathText text={children} /> : children}</span>
       {state === "correct" && (
         <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-pill bg-success text-success-foreground">
           <Check className="size-3.5" strokeWidth={2.5} />

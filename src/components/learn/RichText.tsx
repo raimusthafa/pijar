@@ -1,4 +1,4 @@
-import React from 'react';
+import { MathText } from '@/components/ui/math-text';
 import { parseBlocks, parseInline, type Inline } from '@/lib/learn/markdown';
 
 export function InlineText({ text }: { text: string }) {
@@ -10,11 +10,11 @@ function Inlines({ items }: { items: Inline[] }) {
     <>
       {items.map((x, i) =>
         x.t === 'b' ? (
-          <strong key={i} className="font-semibold text-foreground">{x.v}</strong>
+          <strong key={i} className="font-semibold text-foreground"><MathText text={x.v} /></strong>
         ) : x.t === 'code' ? (
           <code key={i} className="rounded-control bg-surface px-1.5 py-0.5 font-mono text-[0.9em]">{x.v}</code>
         ) : (
-          <React.Fragment key={i}>{x.v}</React.Fragment>
+          <MathText key={i} text={x.v} />
         ),
       )}
     </>

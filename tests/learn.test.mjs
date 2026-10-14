@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CURATED_MATERIALS } from '../src/lib/learn/curated-materials.ts';
+import { normalizeVideoScript } from '../src/lib/learn/scene-normalize.ts';
 import { buildAdjacencyMaps } from '../src/lib/graph/engine.ts';
 
 describe('PIJAR F4 Learning Journey & Interactive Video Suite', () => {
@@ -55,24 +56,13 @@ describe('PIJAR F4 Learning Journey & Interactive Video Suite', () => {
 
   // ── Skenario 3: Visual Scene Types Compatibility ──────────
   it('Skenario 3: Visual scene types terpetakan ke tipe yang didukung renderer', () => {
-    const validTypes = new Set([
-      'call-stack',
-      'loss-landscape',
-      'tree-structure',
-      'code-execution',
-      'data-flow',
-      'concept-illustration',
-      'math-visualization',
-      'comparison',
-    ]);
-
+    // Setiap scene punya panggung animasi nyata: resep atau stage kustom yang lolos validasi.
     for (const [key, mat] of Object.entries(CURATED_MATERIALS)) {
-      for (const scene of mat.videoScript.scenes) {
-        assert.ok(
-          validTypes.has(scene.visualType),
-          `Visual type "${scene.visualType}" pada "${key}" scene "${scene.id}" harus merupakan tipe yang didukung`
-        );
-        assert.ok(scene.visualState && typeof scene.visualState === 'object', 'Visual state harus berupa objek terdefinisi');
+      const play = normalizeVideoScript(mat.videoScript, 'id');
+      assert.equal(play.scenes.length, mat.videoScript.scenes.length);
+      for (const sc of play.scenes) {
+        assert.ok(sc.stage.objects.length >= 4, `Scene "${sc.id}" pada "${key}" harus punya panggung dengan objek`);
+        assert.ok(sc.stage.timeline.length >= 4, `Scene "${sc.id}" pada "${key}" harus punya animasi`);
       }
     }
   });

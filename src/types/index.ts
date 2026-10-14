@@ -106,6 +106,7 @@ export interface CurriculumNode {
   status: NodeStatus;
   estimated_minutes: number;
   is_gap: boolean;         // Apakah ini node gap yang ditemukan dari diagnosa
+  level?: number;          // Kolom pada peta (jalur terpanjang dari akar), diisi normalizeGraph
 }
 
 export interface CurriculumEdge {

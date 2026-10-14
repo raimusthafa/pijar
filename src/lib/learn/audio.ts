@@ -3,6 +3,8 @@
 // Multi-tier audio abstraction: Web Speech, Cached Audio, Captions-Only
 // ================================================================
 
+import { speakable } from './math-text';
+
 export type AudioMode = 'speech-synthesis' | 'cached-audio' | 'captions-only';
 
 export interface AudioCapability {
@@ -104,7 +106,7 @@ export class VideoNarrationController {
     }
 
     try {
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(speakable(text, this.lang));
       utterance.lang = this.lang === 'en' ? 'en-US' : 'id-ID';
       utterance.rate = this.playbackRate;
 

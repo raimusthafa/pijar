@@ -253,7 +253,7 @@ function MapCanvas({
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.15, maxZoom: 1.25 }}
-        minZoom={0.4}
+        minZoom={0.15}
         maxZoom={1.6}
         nodesDraggable={false}
         nodesConnectable={false}

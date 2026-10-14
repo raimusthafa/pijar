@@ -6,6 +6,7 @@ import { BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { GeneratingScreen, useStages } from '@/components/ui/generating-screen';
 import { useT } from '@/lib/i18n/client';
 import { createClient } from '@/lib/supabase/client';
 import { isMissingGoalsTable } from '@/lib/onboarding/goals';
@@ -52,6 +53,10 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
   const [stage, setStage] = useState<Stage>('intro');
   const [startError, setStartError] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // The concept map request has finished and only the first question is left (stage 2 of the preparing screen).
+  const [mapDone, setMapDone] = useState(false);
+  const prepStages = useStages('diagnostic', ['read', 'map', 'first']);
+  const saveStages = useStages('save', ['score', 'mark', 'store']);
 
   const [graph, setGraph] = useState<Graph | null>(null);
   const [fixedList, setFixedList] = useState<Q[] | null>(null); // fixed-length fallback
@@ -79,12 +84,14 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
   async function start() {
     if (!ctx) return;
     setStartError(false);
+    setMapDone(false);
     setStage('preparing');
     askedRef.current = [];
     try {
       const g = await post<{ nodes: CurriculumNode[]; edges: Graph['edges']; goal_node_id: string }>('/api/diagnostic/graph', {
         topic: ctx.topic, target_goal: ctx.goal, is_practitioner_track: ctx.practitioner, language,
       });
+      setMapDone(true);
       const s = await post<{ adaptive_state: AdaptiveState; next: { nodeId: string; question: ApiQ } }>('/api/diagnostic/start', {
         topic: ctx.topic, target_goal: ctx.goal, nodes: g.nodes, edges: g.edges, goal_node_id: g.goal_node_id, language,
       });
@@ -295,20 +302,28 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
   }
 
   if (stage === 'preparing') {
-    return <div className="mx-auto w-full max-w-2xl"><QuestionSkeleton title={t('diagnostic.preparing.title')} desc={t('diagnostic.preparing.desc')} /></div>;
+    return (
+      <GeneratingScreen
+        title={t('common.generating.diagnostic.title')}
+        stages={prepStages}
+        stage={mapDone ? 2 : 0}
+        ceil={mapDone ? 2 : 1}
+        paceMs={6000}
+        className="min-h-[calc(100dvh-16rem)]"
+      />
+    );
   }
 
   if (stage === 'analyzing') {
     return (
-      <div className="mx-auto w-full max-w-2xl">
-        <QuestionSkeleton title={t('diagnostic.analyzing.title')} desc={t('diagnostic.analyzing.desc')} />
-        {saveError && (
-          <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-            <p>{t('diagnostic.save.error')}</p>
-            <Button variant="secondary" onClick={finish}>{t('diagnostic.save.retry')}</Button>
-          </div>
-        )}
-      </div>
+      <GeneratingScreen
+        title={t('common.generating.save.title')}
+        stages={saveStages}
+        paceMs={4000}
+        error={saveError}
+        onRetry={finish}
+        className="min-h-[calc(100dvh-16rem)]"
+      />
     );
   }
 

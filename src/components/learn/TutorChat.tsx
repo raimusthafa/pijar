@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
+import { MathText } from '@/components/ui/math-text';
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 
@@ -84,7 +85,7 @@ export function TutorChat({ nodeId, title, topic }: { nodeId: string; title: str
           <div key={i} className={cn('flex', m.role === 'user' && 'justify-end')}>
             {m.content ? (
               <p className={cn('max-w-[88%] rounded-inner px-3 py-2 leading-relaxed whitespace-pre-wrap', m.role === 'user' ? 'bg-action text-action-foreground' : 'bg-surface')}>
-                {m.content}
+                <MathText text={m.content} />
               </p>
             ) : (
               <div className="w-40 space-y-2 rounded-inner bg-surface px-3 py-2" role="status" aria-label={t('learn.chat.typing')}>

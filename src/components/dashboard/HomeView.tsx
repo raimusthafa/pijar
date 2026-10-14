@@ -14,6 +14,7 @@ import type { ReviewRow } from '@/lib/scheduler/engine';
 import type { MessageKey } from '@/lib/i18n/messages';
 import { LearningSchedulerView } from './LearningSchedulerView';
 import type { DashboardGraph } from './types';
+import { MathText } from '@/components/ui/math-text';
 
 const REASON: Record<Exclude<NextKind, 'done'>, MessageKey> = {
   gap: 'dashboard.continue.gap',
@@ -75,7 +76,7 @@ export function HomeView({
             <p className="text-sm text-muted-foreground">{t('dashboard.continue.title')}</p>
             {next.node ? (
               <>
-                <h2 className="font-display text-h3 font-semibold">{next.node.label}</h2>
+                <h2 className="font-display text-h3 font-semibold"><MathText text={next.node.label} /></h2>
                 <p className="max-w-prose text-sm text-muted-foreground">{t(REASON[next.kind as Exclude<NextKind, 'done'>])}</p>
                 <p className="text-xs text-muted-foreground">
                   {t('dashboard.continue.from', { topic: graph.topic })}

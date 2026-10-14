@@ -20,6 +20,7 @@ import { advance, openWorkspace, sendEvent } from '@/lib/workspace/client';
 import { cn } from '@/lib/utils';
 import { CanvasPad } from './CanvasPad';
 import { errKey, fitSize, nearBottom, phaseIndex } from './logic';
+import { MathText } from '@/components/ui/math-text';
 
 type Concept = { label: string; topic: string; objective: string };
 type Msg = {
@@ -109,7 +110,7 @@ function Item({ m, onRetry }: { m: Msg; onRetry: () => void }) {
         {m.state === 'streaming' && !m.content ? (
           <p className="text-muted-foreground motion-safe:animate-pulse">{t('workspace.chat.thinking')}</p>
         ) : (
-          m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>
+          m.content && <p className="whitespace-pre-wrap break-words"><MathText text={m.content} /></p>
         )}
         {m.state === 'stopped' && <p className="mt-1 text-xs text-muted-foreground">{t('workspace.chat.stopped')}</p>}
         {m.state === 'error' && (

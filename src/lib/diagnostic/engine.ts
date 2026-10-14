@@ -4,8 +4,8 @@
 // ================================================================
 
 import { generateStructuredJSON } from '../ai/provider.ts';
-import { validateDAG, buildAdjacencyMaps } from '../graph/engine.ts';
 import { calculateHierarchicalLayout } from '../graph/layout.ts';
+import { normalizeGraph } from '../graph/normalize.ts';
 import type {
   DiagnosticQuestion,
   DiagnosticAnswer,
@@ -281,44 +281,7 @@ export function sanitizeDAG(
   nodes: CurriculumNode[],
   edges: CurriculumEdge[]
 ): { nodes: CurriculumNode[]; edges: CurriculumEdge[] } {
-  // 1. Remove duplicate nodes & ensure valid IDs
-  const uniqueNodesMap = new Map<string, CurriculumNode>();
-  for (const n of nodes) {
-    if (n && n.id && !uniqueNodesMap.has(n.id)) {
-      uniqueNodesMap.set(n.id, { ...n });
-    }
-  }
-
-  const cleanNodes = Array.from(uniqueNodesMap.values());
-  const validNodeIds = new Set(cleanNodes.map(n => n.id));
-
-  // 2. Filter edges to only reference existing nodes and avoid self-loops
-  const candidateEdges = edges.filter(
-    e => e.source && e.target && e.source !== e.target && validNodeIds.has(e.source) && validNodeIds.has(e.target)
-  );
-
-  // 3. Iteratively construct DAG without cycles using Kahn's check
-  const acceptedEdges: CurriculumEdge[] = [];
-  const edgeDeduplication = new Set<string>();
-
-  for (const edge of candidateEdges) {
-    const key = `${edge.source}->${edge.target}`;
-    if (edgeDeduplication.has(key)) continue;
-
-    // Test DAG validity with this edge added
-    const testEdges = [...acceptedEdges, edge];
-    const validation = validateDAG(cleanNodes, testEdges);
-
-    if (!validation.hasCycles) {
-      edgeDeduplication.add(key);
-      acceptedEdges.push(edge);
-    }
-  }
-
-  return {
-    nodes: cleanNodes,
-    edges: acceptedEdges,
-  };
+  return normalizeGraph(nodes, edges);
 }
 
 /**
@@ -347,6 +310,7 @@ Kesenjangan Pengetahuan (Gaps & Miskonsepsi) yang terdeteksi:
 ${gapsSummary || 'Tidak ada gap kritis, siswa menjawab dengan pemahaman tinggi.'}
 
 Ketentuan Struktur Kurikulum:
+0. Setiap node WAJIB punya "prerequisites": array id node lain yang harus dikuasai lebih dulu ([] untuk konsep paling awal), dan setiap "source"/"target" pada edges HARUS persis sama dengan salah satu "id" node.
 1. Buat antara 8 hingga 12 konsep (nodes) yang membentuk jalur pembelajaran runtut dari Fondasi, Konsep Inti, hingga Penerapan Mahir.
 2. Setiap node memiliki:
    - "id": slug unik huruf kecil (contoh: "dasar-sintaks", "arsitektur-komponen")
@@ -372,7 +336,8 @@ Format JSON wajib:
       "description": "Deskripsi singkat...",
       "status": "ready",
       "estimated_minutes": 30,
-      "is_gap": false
+      "is_gap": false,
+      "prerequisites": ["id-konsep-prasyarat"]
     }
   ],
   "edges": [

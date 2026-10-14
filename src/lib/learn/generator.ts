@@ -5,8 +5,13 @@
 
 import { generateStructuredJSON } from '@/lib/ai/provider';
 import { CURATED_MATERIALS } from './curated-materials';
-import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType, MathSpec, MathTemplate } from './types';
-import { DEFAULT_MATH_SPECS, sanitizeScenesMath } from './math-spec';
+import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType } from './types';
+import { sanitizeScenesMath } from './math-spec';
+import { sanitizeVideoScript } from './scene-normalize';
+import { buildFallbackVideo } from './scene-fallback';
+import { SCENE_PROMPT_GUIDE } from './scene-prompt';
+import { sanitizeMaterialBoard } from './board-spec';
+import { MATH_FORMAT_NOTE } from './math-text';
 import { createClient } from '@/lib/supabase/server';
 import { materialCacheKeys, type LessonLanguage } from './cache-key';
 
@@ -52,6 +57,8 @@ function validateMaterialContract(data: DetailedLearningMaterial): data is Detai
 
   // Math specs are optional extras: bad ones are dropped, never fail the material.
   sanitizeScenesMath(data);
+  sanitizeVideoScript(data); // stage/recipe scenes validated, old shapes left for the reader to convert
+  sanitizeMaterialBoard(data); // interactiveBoard: cleaned or removed
 
   return true;
 }
@@ -65,29 +72,25 @@ function isMathTopic(params: { topic: string; nodeId: string; nodeLabel?: string
   return visualType === 'math-visualization' || MATH_WORDS.test(`${params.topic} ${params.nodeId} ${params.nodeLabel ?? ''} ${params.nodeDescription ?? ''}`);
 }
 
-function pickMathTemplate(text: string): MathTemplate {
+function pickMathRecipe(text: string): string {
   if (/vektor|vector/i.test(text)) return 'vector-add';
-  if (/integral|luas|area/i.test(text)) return 'area';
+  if (/integral|luas|area/i.test(text)) return 'area-riemann';
   if (/rasio|ratio|perbandingan/i.test(text)) return 'ratio';
-  if (/eksponen|exponen/i.test(text)) return 'exponential';
-  return 'tangent';
+  if (/limit/i.test(text)) return 'limit-approach';
+  if (/matriks|matrix/i.test(text)) return 'matrix-transform';
+  if (/sin|cos|trigon|lingkaran|circle/i.test(text)) return 'unit-circle';
+  return 'derivative-tangent';
 }
 
-const MATH_PROMPT_GUIDE = `
-SPESIFIKASI VISUAL MATEMATIKA (wajib untuk topik matematika):
-Setiap scene dengan "visualType": "math-visualization" HARUS punya "visualState.math" berupa JSON deklaratif (bukan kode).
-Template yang tersedia: "function-plot", "vector-add", "tangent", "area", "ratio", "exponential".
-Field (semua opsional kecuali template): viewBox {x:[min,max], y:[min,max]} (-100..100), functions [{expr,label}] maks 3,
-vectors [{from:[x,y], to:[x,y], label}] maks 4, points [{at:[x,y], label}] maks 6, tangentAt (angka), shadeArea [a,b], ratio {a,b}.
-Rumus "expr" hanya boleh memakai variabel x, angka, + - * / ^ ( ), fungsi sin cos tan asin acos atan sqrt exp ln log abs, dan konstanta pi e. Maks 80 karakter. Tanpa kata lain.
-Contoh per template:
-{"template":"function-plot","viewBox":{"x":[-5,5],"y":[-2,10]},"functions":[{"expr":"x^2","label":"f(x) = x^2"}]}
-{"template":"vector-add","viewBox":{"x":[-1,7],"y":[-1,6]},"vectors":[{"to":[3,1],"label":"a"},{"to":[1,3],"label":"b"}]}
-{"template":"tangent","viewBox":{"x":[-3,3],"y":[-1,9]},"functions":[{"expr":"x^2"}],"tangentAt":1}
-{"template":"area","viewBox":{"x":[-1,5],"y":[-1,5]},"functions":[{"expr":"sqrt(x)"}],"shadeArea":[0,4]}
-{"template":"ratio","ratio":{"a":2,"b":3}}
-{"template":"exponential","viewBox":{"x":[-3,4],"y":[-1,10]},"functions":[{"expr":"2^x","label":"f(x) = 2^x"}]}
-Pilih template yang sesuai dengan konsep, dan buat tiap scene math punya spec yang berbeda agar visual berkembang.`;
+// --- interactive board prompt (board-spec.ts is the contract) ---
+const BOARD_PROMPT_GUIDE = `
+PAPAN INTERAKTIF (opsional, hanya topik matematika): tambahkan field "interactiveBoard" di level atas materi, berupa JSON deklaratif (bukan kode).
+Cara singkat, pakai resep: {"recipe":"derivative-tangent","params":{"expr":"x^2","x0":1},"instruction":"...","learningGoal":"..."}
+Resep: derivative-tangent, secant-tangent, riemann-sum, vector-addition, unit-circle, function-transform, quadratic-explorer.
+Atau kustom: {"learningGoal":"...","instruction":"...","viewBox":{"x":[-6,6],"y":[-4,8]},"sliders":[{"name":"a","min":-3,"max":3,"step":0.1,"initial":1}],"curves":[{"expr":"a*x^2"}],"gliders":[{"on":"f","x":1}],"tangents":[{"at":"P"}],"readouts":[{"label":"Kemiringan","kind":"slope","ref":"P"}]}
+Batas: sliders maks 4 (nama salah satu a b c d h k m n t), curves maks 3, gliders maks 2. Rumus memakai x dan nama slider, perkalian selalu ditulis dengan *.
+"instruction" satu kalimat perintah untuk siswa (contoh: "Geser titik P sepanjang kurva dan amati kemiringan garis singgung."), "learningGoal" satu kalimat tujuan. Teks polos tanpa LaTeX.`;
+
 
 /**
  * Determines appropriate programming language or notation based on curriculum topic.
@@ -124,10 +127,6 @@ function buildTopicAwareFallback(params: MaterialGenerationParams): DetailedLear
   const desc = nodeDescription || `Konsep fundamental dalam kurikulum ${topic}.`;
   const { lang, visualType: baseVisual } = getTopicLanguage(topic, nodeId);
   const mathy = isMathTopic(params);
-  const visualType: VisualSceneType = mathy ? 'math-visualization' : baseVisual;
-  const mathSpecs: [MathSpec, MathSpec] | null = mathy
-    ? [DEFAULT_MATH_SPECS['function-plot'], DEFAULT_MATH_SPECS[pickMathTemplate(`${label} ${nodeId} ${desc}`)]]
-    : null;
 
   return {
     nodeId,
@@ -214,64 +213,7 @@ Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${lab
         conceptTested: `Real-world Impact`,
       },
     ],
-    videoScript: {
-      conceptId: nodeId,
-      title: `Eksplanasi Visual: ${label}`,
-      totalDurationSeconds: 40,
-      scenes: [
-        {
-          id: `${nodeId}-sc1`,
-          sceneNumber: 1,
-          title: `Pengantar Konsep ${label}`,
-          durationSeconds: 12,
-          narration: `Halo! Mari memahami konsep ${label}. Konsep ini memegang peran kunci dalam pembelajaran kurikulum ${topic}.`,
-          visualType: visualType,
-          visualState: {
-            notes: `Fokus pembelajaran: ${desc}`,
-            activeNodes: [label, category],
-            ...(mathSpecs ? { math: mathSpecs[0] } : {}),
-          },
-          captions: [
-            { startSeconds: 0, endSeconds: 6, text: `Memahami konsep ${label} secara komprehensif.` },
-            { startSeconds: 6, endSeconds: 12, text: `Konsep ini merupakan pilar utama dalam ${topic}.` },
-          ],
-        },
-        {
-          id: `${nodeId}-sc2`,
-          sceneNumber: 2,
-          title: `Alur Kerja dan Struktur Logika`,
-          durationSeconds: 14,
-          narration: `Perhatikan diagram di samping. Setiap komponen saling terhubung untuk menghasilkan alur eksekusi yang optimal dan terstruktur.`,
-          visualType: visualType,
-          visualState: {
-            currentStep: 2,
-            totalSteps: 3,
-            notes: `Alur eksekusi logis konsep ${label}.`,
-            ...(mathSpecs ? { math: mathSpecs[1] } : {}),
-          },
-          captions: [
-            { startSeconds: 12, endSeconds: 19, text: `Perhatikan struktur dan hubungan antar komponen logis.` },
-            { startSeconds: 19, endSeconds: 26, text: `Alur data diproses secara terstruktur dan efisien.` },
-          ],
-        },
-        {
-          id: `${nodeId}-sc3`,
-          sceneNumber: 3,
-          title: `Rangkuman & Validasi Pemahaman`,
-          durationSeconds: 14,
-          narration: `Dengan menguasai ${label}, kamu siap melangkah ke materi tingkat lanjut. Sekarang, uji pemahamanmu pada checkpoint kuis di bawah!`,
-          visualType: 'concept-illustration',
-          visualState: {
-            notes: `Siap melanjutkan ke materi tingkat lanjut.`,
-            activeNodes: ['Konsep Selesai', 'Uji Checkpoint'],
-          },
-          captions: [
-            { startSeconds: 26, endSeconds: 33, text: `Fondasi konsep ${label} berhasil kamu pahami.` },
-            { startSeconds: 33, endSeconds: 40, text: `Uji pemahamanmu pada checkpoint kuis berikutnya!` },
-          ],
-        },
-      ],
-    },
+    videoScript: buildFallbackVideo({ nodeId, label, topic, category, desc, mathy, visual: baseVisual, mathRecipe: pickMathRecipe(`${label} ${nodeId} ${desc}`), language: params.language ?? 'id' }),
   };
 }
 
@@ -315,7 +257,7 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
   const { lang, visualType } = getTopicLanguage(topic, nodeId);
   const nodeLabel = params.nodeLabel || nodeId.replace(/-/g, ' ');
   const nodeDesc = params.nodeDescription || 'Konsep kurikulum';
-  const mathGuide = isMathTopic(params) ? MATH_PROMPT_GUIDE : '';
+  const mathGuide = SCENE_PROMPT_GUIDE + (isMathTopic(params) ? BOARD_PROMPT_GUIDE : '');
 
   const systemInstruction = `Kamu adalah Principal Curriculum Architect dan Senior Learning Experience Designer di Pijar.
 Tugasmu adalah menghasilkan materi edukasi berbobot ilmiah tinggi, intuitif, ramah pembelajar, dan skrip video visual interaktif untuk konsep teknologi.
@@ -330,7 +272,7 @@ KEMBALIKAN HANYA JSON VALID SESUAI FORMAT SCHEMA.`;
 - Nama Konsep: "${nodeLabel}"
 - Deskripsi: "${nodeDesc}"
 - Bahasa Kode Relevan: "${lang}"
-- Tipe Visual Video: "${visualType}"
+- Petunjuk jenis visual (boleh diabaikan bila ada yang lebih cocok): "${visualType}"
 
 FORMAT JSON YANG WAJIB DIHASILKAN:
 {
@@ -399,53 +341,18 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
         "sceneNumber": 1,
         "title": "Pengantar & Motivasi Masalah",
         "durationSeconds": 14,
-        "narration": "Narasi pengantar dalam bahasa Indonesia ramah dan jelas...",
-        "visualType": "${visualType}",
-        "visualState": {
-          "notes": "Penjelasan visual scene 1",
-          "activeNodes": ["${nodeLabel}"]
-        },
+        "narration": "Narasi pengantar dalam bahasa pengguna, ramah dan jelas...",
+        "recipe": { "name": "<salah satu resep>", "params": {} },
         "captions": [
           { "startSeconds": 0, "endSeconds": 7, "text": "Kalimat subtitle 1..." },
           { "startSeconds": 7, "endSeconds": 14, "text": "Kalimat subtitle 2..." }
-        ]
-      },
-      {
-        "id": "sc2",
-        "sceneNumber": 2,
-        "title": "Mekanisme dan Alur Komputasi",
-        "durationSeconds": 16,
-        "narration": "Narasi adegan kedua menjelaskan detail teknis...",
-        "visualType": "${visualType}",
-        "visualState": {
-          "currentStep": 2,
-          "totalSteps": 3,
-          "notes": "Langkah pemrosesan detail..."
-        },
-        "captions": [
-          { "startSeconds": 14, "endSeconds": 22, "text": "Kalimat subtitle 3..." },
-          { "startSeconds": 22, "endSeconds": 30, "text": "Kalimat subtitle 4..." }
-        ]
-      },
-      {
-        "id": "sc3",
-        "sceneNumber": 3,
-        "title": "Kesimpulan & Evaluasi",
-        "durationSeconds": 15,
-        "narration": "Narasi penutup memotivasi kuis checkpoint...",
-        "visualType": "concept-illustration",
-        "visualState": {
-          "notes": "Rangkuman keberhasilan pemahaman konsep."
-        },
-        "captions": [
-          { "startSeconds": 30, "endSeconds": 37, "text": "Kalimat subtitle 5..." },
-          { "startSeconds": 37, "endSeconds": 45, "text": "Kalimat subtitle 6..." }
         ]
       }
     ]
   }
 }
-Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan scene captions bersambung.${mathGuide}`;
+Isi "scenes" dengan 3 sampai 5 scene sesuai aturan VIDEO PENJELASAN di bawah (resep atau stage kustom pada tiap scene).
+Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan caption tiap scene berurutan dalam waktu relatif scene. ${MATH_FORMAT_NOTE}${mathGuide}`;
 
   try {
     const aiOutput = await generateStructuredJSON<DetailedLearningMaterial>(prompt, systemInstruction);

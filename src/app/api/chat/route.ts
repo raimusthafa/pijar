@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { streamChatResponse } from '@/lib/ai/provider';
+import { MATH_FORMAT_NOTE } from '@/lib/learn/math-text';
 import { createClient } from '@/lib/supabase/server';
 
 // ================================================================
@@ -45,7 +46,8 @@ Pedoman Pengajaran:
 1. Bersikaplah ramah, empatik, menyemangati, dan menggunakan metode Socratic (membimbing pemikiran siswa).
 2. Jika siswa bertanya tentang kesulitan konsep, gunakan analogi dunia nyata dan jelaskan prasyarat logis yang menopang konsep ini.
 3. Jika siswa bertanya tentang kuis atau kode, berikan arahan konseptual langkah-demi-langkah, jangan langsung memberi jawaban mentah tanpa penjelasan.
-4. Gunakan Bahasa Indonesia yang ringkas, hangat, dan mudah dipahami oleh mahasiswa atau pembelajar teknologi.`;
+4. Gunakan Bahasa Indonesia yang ringkas, hangat, dan mudah dipahami oleh mahasiswa atau pembelajar teknologi.
+5. ${MATH_FORMAT_NOTE}`;
 
     try {
       const stream = await streamChatResponse(messages, systemPrompt);

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useT } from '@/lib/i18n/client';
 import type { ResultData } from './types';
+import { MathText } from '@/components/ui/math-text';
 
 /** Two columns: the answer (where to start, what to do) on the left, the evidence on the right. */
 export function ResultView({ r, onRetake }: { r: ResultData; onRetake: () => void }) {
@@ -47,7 +48,7 @@ export function ResultView({ r, onRetake }: { r: ResultData; onRetake: () => voi
             <ul className="divide-y divide-hairline">
               {r.gaps.map(g => (
                 <li key={g.id} className="grid gap-1 py-3 first:pt-0 last:pb-0">
-                  <span className="font-medium">{g.label}</span>
+                  <span className="font-medium"><MathText text={g.label} /></span>
                   <span className="text-sm text-muted-foreground">{g.reason}</span>
                 </li>
               ))}
@@ -61,7 +62,7 @@ export function ResultView({ r, onRetake }: { r: ResultData; onRetake: () => voi
             <p className="text-sm text-muted-foreground">{t('diagnostic.result.mastered.empty')}</p>
           ) : (
             <ul className="divide-y divide-hairline">
-              {r.mastered.map(m => <li key={m.id} className="py-2.5 first:pt-0 last:pb-0">{m.label}</li>)}
+              {r.mastered.map(m => <li key={m.id} className="py-2.5 first:pt-0 last:pb-0"><MathText text={m.label} /></li>)}
             </ul>
           )}
         </section>

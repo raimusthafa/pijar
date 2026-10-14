@@ -8,7 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/components/workspace/data';
 import { GraphWorkspace, GraphWorkspaceSkeleton } from '@/components/graph/CurriculumCanvas';
 import { overlayStatus, type ProgressRow } from '@/lib/dashboard/derive';
-import type { CurriculumEdge, CurriculumNode } from '@/types';
+import { normalizeGraph } from '@/lib/graph/normalize';
+import type { CurriculumNode } from '@/types';
 
 type Params = Promise<{ id: string }>;
 
@@ -42,11 +43,13 @@ async function Content({ params }: { params: Params }) {
   }
 
   const { data: rows } = await supabase.from('node_progress').select('*').eq('graph_id', graph.id);
-  const nodes = overlayStatus((graph.nodes_json ?? []) as CurriculumNode[], (rows ?? []) as ProgressRow[]);
+  // Stored graphs from older builds can lack edges or have mismatched ids: repair at read time, never write back.
+  const fixed = normalizeGraph(graph.nodes_json, graph.edges_json);
+  const nodes = overlayStatus(fixed.nodes as CurriculumNode[], (rows ?? []) as ProgressRow[]);
 
   return (
     <AppShell user={shellUser} title={t('graph.title')}>
-      <GraphWorkspace graphId={graph.id} topic={graph.topic} nodes={nodes} edges={(graph.edges_json ?? []) as CurriculumEdge[]} />
+      <GraphWorkspace graphId={graph.id} topic={graph.topic} nodes={nodes} edges={fixed.edges} />
     </AppShell>
   );
 }

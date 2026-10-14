@@ -2,13 +2,23 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Captions, ChevronLeft, ChevronRight, Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import type { VideoScriptPlan } from '@/lib/learn/types';
+import { normalizeVideoScript } from '@/lib/learn/scene-normalize';
+import { runtimeSeconds } from '@/lib/learn/scene-dsl';
+import { MathText } from '@/components/ui/math-text';
 import { VideoNarrationController, probeAudioCapability } from '@/lib/learn/audio';
+import type { StageStatus } from './video/StageView';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
-import { SceneVisualRenderer } from './visuals/SceneVisualRenderer';
+
+// The stage pulls in three.js and manim-web: client only, loaded on demand.
+const StageView = dynamic(() => import('./video/StageView'), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 bg-action" aria-hidden />,
+});
 
 interface InteractiveVideoPlayerProps {
   script: VideoScriptPlan;
@@ -18,6 +28,18 @@ interface InteractiveVideoPlayerProps {
 const SPEEDS = [1, 1.25, 1.5];
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true } as const;
 
+function useReducedMotion() {
+  const [r, setR] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setR(q.matches);
+    on();
+    q.addEventListener('change', on);
+    return () => q.removeEventListener('change', on);
+  }, []);
+  return r;
+}
+
 const formatTime = (secs: number) => {
   const s = Math.floor(secs);
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -25,8 +47,13 @@ const formatTime = (secs: number) => {
 
 export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoPlayerProps) {
   const { t, locale } = useT();
-  const scenes = useMemo(() => script.scenes ?? [], [script.scenes]);
-  const totalDuration = script.totalDurationSeconds || scenes.reduce((a, s) => a + s.durationSeconds, 0) || 45;
+  const playable = useMemo(() => normalizeVideoScript(script, locale === 'en' ? 'en' : 'id'), [script, locale]);
+  const scenes = playable.scenes;
+  // Each scene runs as long as its narration needs, so voice and animation end together.
+  const runtimes = useMemo(() => scenes.map(s => runtimeSeconds(s, locale === 'en' ? 'en' : 'id')), [scenes, locale]);
+  const totalDuration = runtimes.reduce((a, r) => a + r, 0) || 45;
+  const reducedMotion = useReducedMotion();
+  const [stageStatus, setStageStatus] = useState<StageStatus>('loading');
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -81,24 +108,26 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const sceneOffsets = useMemo(
     () =>
       scenes.map((s, i) => {
-        const start = scenes.slice(0, i).reduce((a, x) => a + x.durationSeconds, 0);
-        return { id: s.id, start, end: start + s.durationSeconds, scene: s };
+        const start = runtimes.slice(0, i).reduce((a, x) => a + x, 0);
+        return { id: s.id, start, end: start + runtimes[i], scene: s, runtime: runtimes[i] };
       }),
-    [scenes],
+    [scenes, runtimes],
   );
 
   const current = sceneOffsets.find(so => currentTime >= so.start && currentTime < so.end) ?? sceneOffsets[sceneOffsets.length - 1] ?? null;
   const activeScene = current?.scene ?? scenes[0];
   const activeIndex = Math.max(0, scenes.findIndex(s => s.id === activeScene?.id));
 
-  // Before the first play, show the finished frame as a poster.
-  const sceneProgress = current && (isPlaying || currentTime > 0)
-    ? Math.min(1, Math.max(0, (currentTime - current.start) / Math.max(0.1, current.end - current.start)))
-    : 1;
+  // Paused at the start of a scene (first load, scene jump, restart) and reduced motion show the finished
+  // frame as a poster, so the stage is never an empty dark box. Pressing play animates from the start.
+  const rawLocal = current ? Math.max(0, currentTime - current.start) : 0;
+  const poster = reducedMotion || (!isPlaying && rawLocal < 0.05);
+  const localTime = current ? (poster ? current.runtime : Math.min(current.runtime, rawLocal)) : 0;
 
-  const caption = showCaptions && activeScene
-    ? activeScene.captions?.find(c => {
-        const e = currentTime - (current?.start ?? 0);
+  const caption = showCaptions && activeScene && current
+    ? activeScene.captions.find(c => {
+        const k = current.runtime / activeScene.durationSeconds;
+        const e = localTime / k;
         return e >= c.startSeconds && e <= c.endSeconds;
       })?.text
     : undefined;
@@ -183,26 +212,34 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-hairline bg-raised px-5 py-3">
-        <p className="min-w-0 flex-1 basis-48 text-sm font-medium">{script.title}</p>
+        <p className="min-w-0 flex-1 basis-48 text-sm font-medium">{playable.title}</p>
         <Badge variant="outline">{voiceLabel}</Badge>
       </div>
 
-      <div className="pj-panel-soft flex min-h-[340px] flex-1 flex-col items-center justify-center gap-4 p-4 md:p-8">
-        {activeScene && (
-          <div className="w-full max-w-2xl">
-            <SceneVisualRenderer
-              type={activeScene.visualType}
-              state={activeScene.visualState}
-              title={activeScene.title}
-              progress={sceneProgress}
-              interactive={!isPlaying}
+      <div className="bg-action">
+        <div className="relative mx-auto aspect-video max-h-[70dvh] w-full">
+          {activeScene && current && (
+            <StageView
+              scene={activeScene}
+              runtime={current.runtime}
+              time={localTime}
+              onStatus={setStageStatus}
+              className="absolute inset-0"
+              fallback={
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center text-action-foreground">
+                  <p className="font-display text-h4">{activeScene.title}</p>
+                  <p className="max-w-xl text-sm text-action-foreground/80">{activeScene.narration}</p>
+                  <p className="text-xs text-action-foreground/70">{t('learn.player.stage.unsupported')}</p>
+                </div>
+              }
             />
-          </div>
-        )}
-        <div className="flex min-h-11 w-full max-w-xl items-center justify-center" aria-live="off">
-          {caption && (
-            <p className="rounded-inner bg-action px-4 py-2 text-center text-sm text-action-foreground">{caption}</p>
           )}
+          {stageStatus === 'loading' && (
+            <div className="pj-skeleton pointer-events-none absolute inset-0 bg-action" aria-hidden />
+          )}
+        </div>
+        <div className="flex min-h-14 w-full items-center justify-center px-4 pb-3 pt-1 md:px-8" aria-live="off">
+          {caption && <p className="max-w-2xl text-center text-sm leading-relaxed text-action-foreground"><MathText text={caption} /></p>}
         </div>
       </div>
 

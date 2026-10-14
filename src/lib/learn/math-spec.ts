@@ -17,8 +17,11 @@ const FN_REWRITE: Record<string, string> = { ln: 'log', log: 'log10' };
 
 const TOKEN_RE = /\s+|\d+(?:\.\d+)?|\.\d+|[a-z]+|[-+*/^()]/gy;
 
-/** Returns a safe numeric function of x, or null if the text is not an allowed formula. */
-export function compileExpr(input: unknown): ((x: number) => number) | null {
+/**
+ * Returns a safe numeric function of x, or null if the text is not an allowed formula.
+ * `params` lists extra single-letter names allowed as slider parameters (board-spec.ts); their values come in as the second argument.
+ */
+export function compileExpr(input: unknown, params: readonly string[] = []): ((x: number, p?: Record<string, number>) => number) | null {
   if (typeof input !== 'string') return null;
   const str = input.trim().toLowerCase();
   if (!str || str.length > MAX_EXPR_LEN) return null;
@@ -40,7 +43,7 @@ export function compileExpr(input: unknown): ((x: number) => number) | null {
       if (FUNCTIONS.has(tok)) {
         if (next !== '(') return null;
         out.push(FN_REWRITE[tok] ?? tok);
-      } else if (tok === 'x' || CONSTANTS.has(tok)) {
+      } else if (tok === 'x' || CONSTANTS.has(tok) || params.includes(tok)) {
         if (next === '(') return null; // no x(...) / e(...) call syntax
         out.push(tok);
       } else {
@@ -54,15 +57,15 @@ export function compileExpr(input: unknown): ((x: number) => number) | null {
   if (prev === null) return null;
 
   // 2. Only now hand the rebuilt token string to the mathjs number-only build.
-  let fn: { evaluate: (scope: { x: number }) => unknown };
+  let fn: { evaluate: (scope: Record<string, number>) => unknown };
   try {
     fn = compile(out.join(' '));
   } catch {
     return null;
   }
-  return (x: number) => {
+  return (x: number, p?: Record<string, number>) => {
     try {
-      const v = fn.evaluate({ x });
+      const v = fn.evaluate({ ...p, x });
       return typeof v === 'number' && Number.isFinite(v) ? v : NaN;
     } catch {
       return NaN;

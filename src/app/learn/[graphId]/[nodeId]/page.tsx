@@ -3,20 +3,22 @@
 import React, { Suspense, use, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, PencilRuler, WifiOff } from 'lucide-react';
+import { ArrowLeft, PencilRuler } from 'lucide-react';
 import { AppShell } from '@/components/shell/AppShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Skeleton } from '@/components/ui/skeleton';
+import { GeneratingScreen, useStages } from '@/components/ui/generating-screen';
 import { InteractiveVideoPlayer } from '@/components/learn/InteractiveVideoPlayer';
+import { InteractiveBoard } from '@/components/learn/board/InteractiveBoard';
 import { PostTest } from '@/components/learn/PostTest';
 import { CodeBlock, RichText } from '@/components/learn/RichText';
 import { TutorChat } from '@/components/learn/TutorChat';
 import { useT } from '@/lib/i18n/client';
+import { MathText } from '@/components/ui/math-text';
 import { createClient } from '@/lib/supabase/client';
 import { getActiveGraph, getMasteredNodes, markNodeMastered } from '@/lib/graph/storage';
 import { CURATED_MATERIALS } from '@/lib/learn/curated-materials';
+import { fallbackBoardSpec } from '@/lib/learn/board-spec';
 import { countWords } from '@/lib/learn/markdown';
 import type { DetailedLearningMaterial } from '@/lib/learn/types';
 
@@ -26,7 +28,7 @@ interface LearnPageProps {
 
 export default function LearnPage({ params }: LearnPageProps) {
   return (
-    <Suspense fallback={<Shell><LessonSkeleton /></Shell>}>
+    <Suspense fallback={<Shell><LessonGenerating /></Shell>}>
       <LearnContent params={params} />
     </Suspense>
   );
@@ -48,25 +50,19 @@ function Shell({ title, children }: { title?: React.ReactNode; children: React.R
 
 const frame = 'mx-auto w-full max-w-4xl px-5 md:px-8';
 
-function LessonSkeleton({ withNote = false }: { withNote?: boolean }) {
+/** The whole-page wait for a lesson that has to be written. One request does it all, so the stage pacing is cosmetic. */
+function LessonGenerating({ error = false, onRetry }: { error?: boolean; onRetry?: () => void }) {
   const { t } = useT();
+  const stages = useStages('lesson', ['gap', 'material', 'animation', 'quiz']);
   return (
-    <div className={`${frame} space-y-8 pt-10 pb-16`} aria-busy="true">
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-3/4 max-w-xl" />
-        <Skeleton className="h-4 w-48" />
-        {withNote && (
-          <div role="status" className="max-w-xl space-y-1 pt-2">
-            <p className="text-base font-medium">{t('learn.loading.title')}</p>
-            <p className="text-sm text-muted-foreground">{t('learn.loading.body')}</p>
-          </div>
-        )}
-      </div>
-      <Skeleton className="h-[26rem] w-full rounded-card" />
-      <div className="mx-auto max-w-2xl space-y-3">
-        {[100, 92, 96, 70].map((w, i) => <Skeleton key={i} className="h-4" style={{ width: `${w}%` }} />)}
-      </div>
-    </div>
+    <GeneratingScreen
+      title={t('common.generating.lesson.title')}
+      stages={stages}
+      paceMs={7000}
+      hint={t('common.generating.hint.lesson')}
+      error={error}
+      onRetry={onRetry}
+    />
   );
 }
 
@@ -151,6 +147,12 @@ function LearnContent({ params }: LearnPageProps) {
     return Math.max(1, Math.round(countWords(text) / 200));
   }, [material]);
 
+  // The AI board, or a recipe picked by keyword for math lessons that came without one (older caches, curated lessons).
+  const board = useMemo(
+    () => material?.interactiveBoard ?? (material ? fallbackBoardSpec(`${material.title} ${node?.label ?? ''} ${node?.description ?? ''}`, locale) : null),
+    [material, node?.label, node?.description, locale],
+  );
+
   const backLink = (
     <Link href={mapHref} className="pj-press -ml-2 inline-flex h-11 items-center gap-2 rounded-pill px-3 text-sm text-muted-foreground hover:bg-hover hover:text-foreground md:h-9">
       <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />
@@ -161,22 +163,12 @@ function LearnContent({ params }: LearnPageProps) {
   if (failed) {
     return (
       <Shell title={backLink}>
-        <EmptyState
-          className="py-24"
-          icon={WifiOff}
-          title={t('learn.error.title')}
-          description={t('learn.error.body')}
-          action={<Button onClick={() => setAttempt(a => a + 1)}>{t('common.action.retry')}</Button>}
-        />
+        <LessonGenerating error onRetry={() => setAttempt(a => a + 1)} />
       </Shell>
     );
   }
 
-  if (!material) {
-    // Curated lessons load at once, so only generated ones get the "being prepared" note.
-    const instant = locale === 'id' && Boolean(CURATED_MATERIALS[nodeId]);
-    return <Shell title={backLink}><LessonSkeleton withNote={!instant} /></Shell>;
-  }
+  if (!material) return <Shell title={backLink}><LessonGenerating /></Shell>;
 
   const level = t(`learn.level.${material.targetLevel}` as 'learn.level.beginner');
 
@@ -184,7 +176,7 @@ function LearnContent({ params }: LearnPageProps) {
     <Shell title={backLink}>
       <article id="lesson-top" className={`${frame} space-y-10 pt-10 pb-24`}>
         <header className="space-y-5">
-          <h1 className="font-display text-h2 max-w-3xl">{material.title}</h1>
+          <h1 className="font-display text-h2 max-w-3xl"><MathText text={material.title} /></h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
             {node?.category && <span>{node.category}</span>}
             {node?.category && <span aria-hidden>·</span>}
@@ -193,7 +185,7 @@ function LearnContent({ params }: LearnPageProps) {
             <span>{t('learn.byline.minutes', { n: minutes })}</span>
             {mastered && <Badge variant="success">{t('learn.byline.mastered')}</Badge>}
           </div>
-          <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">{material.summary}</p>
+          <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground"><MathText text={material.summary} /></p>
           <Button variant="secondary" render={<Link href={workspaceHref} />} nativeButton={false}>
             <PencilRuler strokeWidth={1.75} aria-hidden />
             {t('learn.action.workspace')}
@@ -202,10 +194,17 @@ function LearnContent({ params }: LearnPageProps) {
 
         <InteractiveVideoPlayer script={material.videoScript} />
 
+        {board && (
+          <section className="mx-auto w-full max-w-3xl space-y-4">
+            <h2 className="font-display text-h3">{t('learn.board.title')}</h2>
+            <InteractiveBoard spec={board} />
+          </section>
+        )}
+
         <div className="mx-auto max-w-2xl space-y-10">
           <div className="rounded-inner bg-surface p-5">
             <p className="text-sm font-medium">{t('learn.objective.label')}</p>
-            <p className="mt-1 text-base leading-relaxed">{material.learningObjective}</p>
+            <p className="mt-1 text-base leading-relaxed"><MathText text={material.learningObjective} /></p>
           </div>
 
           <Section title={t('learn.section.concept')}>
@@ -214,7 +213,7 @@ function LearnContent({ params }: LearnPageProps) {
 
           {material.analogy && (
             <Section title={t('learn.section.analogy')}>
-              <p className="rounded-inner bg-surface p-5 text-base leading-[1.75]">{material.analogy}</p>
+              <p className="rounded-inner bg-surface p-5 text-base leading-[1.75]"><MathText text={material.analogy} /></p>
             </Section>
           )}
 
@@ -223,8 +222,8 @@ function LearnContent({ params }: LearnPageProps) {
               <dl className="divide-y divide-hairline rounded-inner border border-hairline">
                 {material.keyDefinitions.map((d, i) => (
                   <div key={i} className="grid gap-1 px-5 py-4 sm:grid-cols-[10rem_1fr] sm:gap-6">
-                    <dt className="text-base font-medium">{d.term}</dt>
-                    <dd className="text-base leading-relaxed text-muted-foreground">{d.definition}</dd>
+                    <dt className="text-base font-medium"><MathText text={d.term} /></dt>
+                    <dd className="text-base leading-relaxed text-muted-foreground"><MathText text={d.definition} /></dd>
                   </div>
                 ))}
               </dl>
@@ -236,10 +235,10 @@ function LearnContent({ params }: LearnPageProps) {
               <div className="space-y-8">
                 {material.examples.map((ex, i) => (
                   <div key={i} className="space-y-3">
-                    <h3 className="font-display text-h4">{ex.title}</h3>
+                    <h3 className="font-display text-h4"><MathText text={ex.title} /></h3>
                     <CodeBlock code={ex.code} language={ex.language} />
                     {ex.output && <CodeBlock code={ex.output} language={t('learn.example.output')} />}
-                    <p className="text-base leading-relaxed text-muted-foreground">{ex.explanation}</p>
+                    <p className="text-base leading-relaxed text-muted-foreground"><MathText text={ex.explanation} /></p>
                   </div>
                 ))}
               </div>
@@ -253,11 +252,11 @@ function LearnContent({ params }: LearnPageProps) {
                   <li key={i} className="space-y-3 rounded-inner border border-hairline p-5">
                     <div>
                       <p className="text-sm text-muted-foreground">{t('learn.misconception.wrong')}</p>
-                      <p className="text-base leading-relaxed">{m.misconception}</p>
+                      <p className="text-base leading-relaxed"><MathText text={m.misconception} /></p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">{t('learn.misconception.right')}</p>
-                      <p className="text-base leading-relaxed">{m.correction}</p>
+                      <p className="text-base leading-relaxed"><MathText text={m.correction} /></p>
                     </div>
                   </li>
                 ))}
@@ -267,14 +266,14 @@ function LearnContent({ params }: LearnPageProps) {
 
           {material.realWorldApplication && (
             <Section title={t('learn.section.application')}>
-              <p className="text-base leading-[1.75]">{material.realWorldApplication}</p>
+              <p className="text-base leading-[1.75]"><MathText text={material.realWorldApplication} /></p>
             </Section>
           )}
 
           {!!material.keyTakeaways?.length && (
             <Section title={t('learn.section.takeaways')}>
               <ol className="list-decimal space-y-2 pl-6 text-base leading-relaxed marker:text-muted-foreground">
-                {material.keyTakeaways.map((k, i) => <li key={i}>{k}</li>)}
+                {material.keyTakeaways.map((k, i) => <li key={i}><MathText text={k} /></li>)}
               </ol>
             </Section>
           )}

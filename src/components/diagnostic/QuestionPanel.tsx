@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useT } from '@/lib/i18n/client';
 import type { Q } from './types';
+import { MathText } from '@/components/ui/math-text';
 
 /** One question with 1 to 4 key answers and immediate feedback that says nothing about what comes next. */
 export function QuestionPanel({
@@ -55,7 +56,7 @@ export function QuestionPanel({
       <Card key={q.id + number} tone="raised" className="pj-rise gap-5">
         <div className="grid gap-5 px-(--card-spacing)">
           <p className="text-xs text-muted-foreground">{t('diagnostic.question.concept', { label: q.label })}</p>
-          <h2 className="font-display text-h4 font-semibold">{q.question}</h2>
+          <h2 className="font-display text-h4 font-semibold"><MathText text={q.question} /></h2>
 
           <div role="group" aria-label={t('diagnostic.options.label')} className="grid gap-2">
             {q.options.map((opt, i) => (
@@ -76,8 +77,8 @@ export function QuestionPanel({
             {answered ? (
               <div className="pj-rise grid gap-1 text-sm">
                 <p className="font-medium">{correct ? t('diagnostic.feedback.correct') : t('diagnostic.feedback.wrong')}</p>
-                {!correct && <p>{t('diagnostic.feedback.correctWas', { answer: q.options[q.correctIndex] })}</p>}
-                {q.explanation && <p className="text-muted-foreground">{q.explanation}</p>}
+                {!correct && <p><MathText text={t('diagnostic.feedback.correctWas', { answer: q.options[q.correctIndex] })} /></p>}
+                {q.explanation && <p className="text-muted-foreground"><MathText text={q.explanation} /></p>}
               </div>
             ) : (
               <p className="hidden text-xs text-muted-foreground md:block">{t('diagnostic.keys.hint')}</p>

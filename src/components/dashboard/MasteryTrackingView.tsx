@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useT } from '@/lib/i18n/client';
 import { computeMasteryMetrics } from '@/lib/mastery/engine';
 import type { DashboardGraph } from './types';
+import { MathText } from '@/components/ui/math-text';
 
 export function MasteryTrackingView({ graph }: { graph?: DashboardGraph }) {
   const { t } = useT();
@@ -73,7 +74,7 @@ export function MasteryTrackingView({ graph }: { graph?: DashboardGraph }) {
               <ul className="grid gap-3">
                 {m.bottlenecks.map(b => (
                   <li key={b.nodeId} className="text-sm">
-                    <p className="font-medium">{b.label}</p>
+                    <p className="font-medium"><MathText text={b.label} /></p>
                     <p className="text-muted-foreground">
                       {b.blockedDownstreamCount === 1
                         ? t('dashboard.mastery.unlocks.one')

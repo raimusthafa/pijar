@@ -11,6 +11,7 @@ import { useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
 import type { CurriculumEdge } from '@/types';
 import { StatusChip } from './StatusChip';
+import { MathText } from '@/components/ui/math-text';
 
 type Props = {
   node: EnrichedConceptNode | null;
@@ -88,7 +89,7 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
                   <span className="text-xs text-muted-foreground tabular-nums">{t('graph.node.minutes', { n: node.estimated_minutes })}</span>
                 )}
               </div>
-              <h2 className="mt-3 font-display text-h4 font-semibold">{node.label}</h2>
+              <h2 className="mt-3 font-display text-h4 font-semibold"><MathText text={node.label} /></h2>
               {node.category && <p className="mt-0.5 text-xs text-muted-foreground">{node.category}</p>}
             </div>
             <Button variant="ghost" size="icon-sm" aria-label={t('graph.insp.close')} onClick={onClose}>
@@ -97,7 +98,7 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {node.description && <p className="text-sm">{node.description}</p>}
+            {node.description && <p className="text-sm"><MathText text={node.description} /></p>}
             {node.justification && (
               <div className="mt-4">
                 <h3 className="text-xs font-medium text-muted-foreground">{t('graph.insp.why')}</h3>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateStructuredJSON } from '@/lib/ai/provider';
 import { initAdaptive } from '@/lib/diagnostic/adaptive';
+import { MATH_FORMAT_NOTE } from '@/lib/learn/math-text';
 import { nextAdaptiveQuestion } from '@/lib/diagnostic/adaptive-server';
 import type { DiagnosticQuestion, QuestionDifficulty } from '@/types';
 
@@ -236,7 +237,7 @@ Format JSON Wajib:
 }
 Gunakan Bahasa Indonesia edukatif formal.`;
 
-      const systemInstruction = `Kamu adalah Chief Psychometrician dan Educational Evaluator di Pijar. Buat soal diagnostik adaptif yang mampu membedakan tingkat pemahaman siswa secara presisi untuk topik apa pun di dunia ini. Selalu kembalikan HANYA JSON valid.`;
+      const systemInstruction = `Kamu adalah Chief Psychometrician dan Educational Evaluator di Pijar. Buat soal diagnostik adaptif yang mampu membedakan tingkat pemahaman siswa secara presisi untuk topik apa pun di dunia ini. Selalu kembalikan HANYA JSON valid. ${MATH_FORMAT_NOTE}`;
 
       const aiResponse = await generateStructuredJSON<{ questions: DiagnosticQuestion[] }>(
         prompt,

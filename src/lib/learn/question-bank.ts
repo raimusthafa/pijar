@@ -7,6 +7,7 @@
 // ================================================================
 
 import { MOCK_DIAGNOSTIC_QUESTIONS } from '../ai/mock-data.ts';
+import { MATH_FORMAT_NOTE } from './math-text.ts';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
@@ -79,7 +80,7 @@ function buildPrompt(p: GetQuestionsParams, per: number): { prompt: string; syst
   const lang = p.language === 'en' ? 'English' : 'Bahasa Indonesia';
   const label = p.label || p.nodeId;
   return {
-    system: `You write multiple-choice questions for a tutoring app. Output only valid JSON. Write in ${lang}.`,
+    system: `You write multiple-choice questions for a tutoring app. Output only valid JSON. Write in ${lang}. ${MATH_FORMAT_NOTE}`,
     prompt: `Topic: "${p.topic}". Concept: "${label}".
 Write ${per} easy, ${per} medium and ${per} hard multiple-choice questions about this concept, in ${lang}.
 easy = recall or recognize; medium = apply to a small case; hard = analyze, compare or find the flaw.
