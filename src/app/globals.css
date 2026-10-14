@@ -56,9 +56,9 @@
   /* Decorative panels only (CLAUDE.md 8.3 E1): hero and large panels, soft and low contrast */
   --pj-panel-from: #f6e6c2;
   --pj-panel-to: #fbfaf7;
-  /* Landing hero sky (E1, hero frame only). Light enough that ink text keeps 4.5:1 or better. */
-  --pj-hero-from: #b4cfe7; /* sky top */
-  --pj-hero-to: #e9f2f7;
+  /* Landing hero amber (E1, hero frame only). Light enough that ink text keeps 4.5:1 or better. */
+  --pj-hero-from: #ecce8e; /* amber top */
+  --pj-hero-to: #fbf4e3;
 
   /* Radius hierarchy. Not one uniform radius. */
   --pj-r-pill: 100px; /* buttons, chips, nav pill, tabs */
@@ -374,6 +374,9 @@
 @utility pj-panel-soft {
   background: linear-gradient(180deg, var(--pj-panel-from), var(--pj-panel-to));
 }
+@utility pj-hero-card {
+  background: linear-gradient(180deg, var(--pj-hero-from), var(--pj-hero-to));
+}
 
 /* Skeleton: calm opacity pulse, stops under reduced motion (see the reduce block above). */
 @keyframes pj-pulse {
@@ -430,7 +433,7 @@
   }
   .pijar-gradient-soft,
   .pijar-gradient-hero {
-    background: var(--pj-surface);
+    background: linear-gradient(180deg, var(--pj-hero-from), var(--pj-hero-to));
   }
   .glass {
     background: var(--pj-ground);

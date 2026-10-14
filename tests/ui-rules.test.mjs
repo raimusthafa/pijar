@@ -22,7 +22,7 @@ const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\
 // Allowlists: file (relative to src, posix) -> why.
 const ALLOW = {
   gradient: {
-    // E1 (CLAUDE.md 8.3): the hero and closing panels carry one token-based sky gradient.
+    // E1 (CLAUDE.md 8.3): the hero and closing panels carry one token-based amber gradient.
     'app/page.tsx': 'E1 hero and closing panel',
   },
   shadow: {},

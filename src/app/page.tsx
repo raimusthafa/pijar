@@ -13,7 +13,7 @@ import { Reveal } from '@/components/landing/Reveal';
 import { StepCarousel } from '@/components/landing/StepCarousel';
 import { getT } from '@/lib/i18n/server';
 
-const SKY = 'bg-[linear-gradient(180deg,var(--pj-hero-from),var(--pj-hero-to))]';
+const AMBER_PANEL = 'bg-[linear-gradient(180deg,var(--pj-hero-from),var(--pj-hero-to))]';
 const ICON = { strokeWidth: 1.75 } as const;
 
 function Chip({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
@@ -46,9 +46,9 @@ export default async function LandingPage() {
     <>
       <MarketingNav revealAfterId="hero" />
       <main className="flex flex-col">
-        {/* Hero: inset rounded frame with a soft sky (E1) and a decorative 3D node object (E2). */}
+        {/* Hero: inset rounded frame with a soft amber gradient (E1) and a decorative 3D node object (E2). */}
         <section id="hero" className="p-3">
-          <div className={`relative isolate overflow-hidden rounded-card-lg ${SKY}`}>
+          <div className={`relative isolate overflow-hidden rounded-card-lg ${AMBER_PANEL}`}>
             <Particles className="absolute inset-0 -z-10 size-full" />
             <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-5 pt-3 md:px-9">
               <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill">
@@ -75,7 +75,7 @@ export default async function LandingPage() {
 
             <div className="pj-gutter mx-auto flex max-w-[1100px] flex-col items-center gap-8 pt-12 text-center md:pt-16">
               <h1 className="pj-rise text-display text-balance text-ink">
-                {t('landing.hero.title.a')} <span className="text-ink/60">{t('landing.hero.title.b')}</span>
+                {t('landing.hero.title.a')} <span className="text-ink/75">{t('landing.hero.title.b')}</span>
               </h1>
               <p style={{ '--pj-i': 1 } as React.CSSProperties} className="pj-rise max-w-[34rem] text-lg text-ink/80 md:text-xl">{t('landing.hero.sub')}</p>
               <div style={{ '--pj-i': 2 } as React.CSSProperties} className="pj-rise flex flex-col items-center gap-3 sm:flex-row">
@@ -170,13 +170,13 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Closing: one pill button on the sky panel. */}
+        {/* Closing: one pill button on the amber panel. */}
         <section className="px-3 pb-3">
-          <div className={`relative overflow-hidden rounded-card-lg ${SKY} py-24 md:py-36`}>
+          <div className={`relative overflow-hidden rounded-card-lg ${AMBER_PANEL} py-24 md:py-36`}>
             <div className="pj-gutter mx-auto flex max-w-[var(--pj-content-max)] flex-col items-center gap-10">
               <Reveal>
                 <h2 className="text-h1 text-center text-balance text-ink">
-                  {t('landing.close.title.a')} <span className="text-ink/60">{t('landing.close.title.b')}</span>
+                  {t('landing.close.title.a')} <span className="text-ink/75">{t('landing.close.title.b')}</span>
                 </h2>
               </Reveal>
               <Button size="lg" render={<Link href="/auth/register" />} nativeButton={false}>

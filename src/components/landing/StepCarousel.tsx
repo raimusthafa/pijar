@@ -81,7 +81,7 @@ function Snippet({ n }: { n: number }) {
   );
 }
 
-/** Horizontal scroll-snap carousel of the five steps. The card most in view gets the sky tone. */
+/** Horizontal scroll-snap carousel of the five steps. The card most in view gets the amber tone. */
 export function StepCarousel() {
   const { t } = useT();
   const track = useRef<HTMLDivElement>(null);
@@ -124,7 +124,7 @@ export function StepCarousel() {
             key={n}
             className={cn(
               'flex min-h-[420px] w-[min(82vw,420px)] shrink-0 snap-start flex-col gap-4 rounded-card-lg p-6 transition-colors duration-300 ease-out-pj md:p-9',
-              active === n - 1 ? 'bg-[var(--pj-hero-from)]' : 'bg-surface',
+              active === n - 1 ? 'pj-hero-card' : 'bg-surface',
             )}
           >
             <span className="inline-flex size-10 items-center justify-center rounded-pill bg-raised font-display text-lg font-semibold">{n}</span>
