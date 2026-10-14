@@ -67,7 +67,7 @@ function ConceptNode({ data }: NodeProps<ConceptFlowNode>) {
           }
         }}
         className={cn(
-          'pj-press relative flex w-[264px] flex-col items-start gap-2 rounded-inner border-2 bg-raised p-3.5 text-left transition-[opacity,border-color] duration-200 ease-out-pj',
+          'pj-press relative flex w-[264px] flex-col items-start gap-2 rounded-inner border-2 bg-raised p-3.5 text-left transition-[opacity,border-color] duration-200 ease-out-pj cursor-grab active:cursor-grabbing',
           STATUS_BORDER[node.status] ?? 'border-hairline',
           selected ? 'ring-2 ring-ink ring-offset-2 ring-offset-background' : onPath ? 'ring-2 ring-amber' : '',
           dimmed ? 'opacity-25' : node.status === 'locked' ? 'opacity-75' : 'opacity-100',

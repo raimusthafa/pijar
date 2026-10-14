@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { forwardRef, useMemo } from 'react';
-import { PencilRuler, RotateCcw, X } from 'lucide-react';
+import { Lock, PencilRuler, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { prerequisitesWithin } from '@/lib/graph/prereq';
@@ -60,9 +60,8 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
   const chain = useMemo(() => (node ? prerequisitesWithin(node.id, edges) : null), [node, edges]);
   const direct = chain ? [...chain.level].filter(([, l]) => l === 1).map(([id]) => id) : [];
   const deeper = chain ? [...chain.level].filter(([, l]) => l === 2).map(([id]) => id) : [];
-  const unresolved = direct.find((id) => nodes.get(id)?.status !== 'completed');
-  const redirectToPrereq = node?.status === 'locked' && unresolved;
-  const learnId = redirectToPrereq ? unresolved : node?.id;
+  const isLocked = node?.status === 'locked';
+  const isCompleted = node?.status === 'completed';
 
   return (
     <aside
@@ -124,11 +123,28 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
           </div>
 
           <div className="grid gap-2 border-t border-hairline px-5 py-4">
-            {redirectToPrereq && <p className="text-xs text-muted-foreground">{t('graph.insp.blocked')}</p>}
-            <Button render={<Link href={`/learn/${graphId}/${learnId}?topic=${encodeURIComponent(topic)}`} />} nativeButton={false} size="lg" className="w-full">
-              {t(redirectToPrereq ? 'graph.insp.learn.prereq' : 'graph.insp.learn')}
-            </Button>
-            <Button variant="secondary" render={<Link href={`/workspace/${graphId}/${node.id}`} />} nativeButton={false}>
+            {isLocked && <p className="text-xs text-muted-foreground">{t('graph.insp.blocked')}</p>}
+            {isLocked ? (
+              <Button disabled size="lg" className="w-full cursor-not-allowed">
+                <Lock className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+                <span>{t('graph.insp.locked')}</span>
+              </Button>
+            ) : (
+              <Button
+                render={<Link href={`/learn/${graphId}/${node.id}?topic=${encodeURIComponent(topic)}`} />}
+                nativeButton={false}
+                size="lg"
+                className="w-full"
+              >
+                {t(isCompleted ? 'graph.insp.review' : 'graph.insp.learn')}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              render={isLocked ? undefined : <Link href={`/workspace/${graphId}/${node.id}`} />}
+              nativeButton={isLocked}
+              disabled={isLocked}
+            >
               <PencilRuler strokeWidth={1.75} aria-hidden />
               {t('graph.insp.workspace')}
             </Button>

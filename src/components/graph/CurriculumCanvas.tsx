@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ReactFlow, ReactFlowProvider, MarkerType, useReactFlow, type Edge } from '@xyflow/react';
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  MarkerType,
+  useReactFlow,
+  BezierEdge,
+  type Edge,
+  type OnNodesChange,
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ArrowLeft, List as ListIcon, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +33,7 @@ const NODE_W = 264;
 const NODE_H = 168;
 const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 120, nodeSpacing: 40, startX: 40, startY: 40 };
 const nodeTypes = { conceptNode: ConceptNodeComponent };
+const edgeTypes = { bezier: BezierEdge };
 const PANEL = 376; // inspector width plus its margin on desktop
 
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -208,14 +217,31 @@ function MapCanvas({
     setCenter((x0 + x1) / 2 + (desktop ? PANEL / 2 / z : 0), (y0 + y1) / 2 + (desktop ? 0 : (r.height * 0.39) / z), { zoom: z, duration: dur(350) });
   }, [selectedId, path, posOf, getZoom, flowToScreenPosition, setCenter]);
 
-  const rfNodes = useMemo<ConceptFlowNode[]>(() => placed.map((n) => {
+  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({});
+
+  const onNodesChange: OnNodesChange<ConceptFlowNode> = useCallback((changes) => {
+    setNodePositions((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const c of changes) {
+        if (c.type === 'position' && c.position) {
+          next[c.id] = c.position;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const nodes = useMemo<ConceptFlowNode[]>(() => placed.map((n) => {
     const onPath = Boolean(path?.level.has(n.id));
     const isRecommended = recommended?.id === n.id;
     const matches = filter === 'all' || n.status === 'prerequisite_gap' || (filter === 'ready' && n.status === 'ready');
+    const pos = nodePositions[n.id] ?? { x: n.x, y: n.y };
     return {
       id: n.id,
       type: 'conceptNode',
-      position: { x: n.x, y: n.y },
+      position: pos,
       data: {
         node: n,
         selected: n.id === selectedId,
@@ -227,7 +253,7 @@ function MapCanvas({
         onArrow,
       },
     };
-  }), [placed, path, filter, selectedId, roving, recommended, pick, onArrow]);
+  }), [placed, path, filter, selectedId, roving, recommended, pick, onArrow, nodePositions]);
 
   const rfEdges = useMemo<Edge[]>(() => edges.map((e) => {
     const isSourceSelected = e.source === selectedId;
@@ -241,7 +267,7 @@ function MapCanvas({
       id: e.id,
       source: e.source,
       target: e.target,
-      type: 'smoothstep',
+      type: 'bezier',
       animated: shouldAnimate,
       style: {
         stroke: active ? 'var(--pj-amber)' : 'var(--pj-ink)',
@@ -264,18 +290,20 @@ function MapCanvas({
   return (
     <div ref={wrapRef} role="group" aria-label={t('graph.canvas.label')} className="relative h-full">
       <ReactFlow
-        nodes={rfNodes}
+        nodes={nodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1.25 }}
         minZoom={0.15}
         maxZoom={1.6}
-        nodesDraggable={false}
+        nodesDraggable={true}
         nodesConnectable={false}
-        elementsSelectable={false}
+        elementsSelectable={true}
         nodesFocusable={false}
         edgesFocusable={false}
+        onNodesChange={onNodesChange}
         onPaneClick={onClear}
         proOptions={{ hideAttribution: true }}
         className="bg-background!"
