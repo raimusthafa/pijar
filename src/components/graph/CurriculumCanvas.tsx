@@ -21,9 +21,9 @@ import { GraphInspector } from './GraphInspector';
 import { GraphLegend } from './GraphLegend';
 import { OutlineView, type OutlineGroup } from './OutlineView';
 
-const NODE_W = 232;
-const NODE_H = 96;
-const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 88, nodeSpacing: 28, startX: 40, startY: 40 };
+const NODE_W = 264;
+const NODE_H = 168;
+const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 120, nodeSpacing: 40, startX: 40, startY: 40 };
 const nodeTypes = { conceptNode: ConceptNodeComponent };
 const PANEL = 376; // inspector width plus its margin on desktop
 
@@ -210,6 +210,7 @@ function MapCanvas({
 
   const rfNodes = useMemo<ConceptFlowNode[]>(() => placed.map((n) => {
     const onPath = Boolean(path?.level.has(n.id));
+    const isRecommended = recommended?.id === n.id;
     const matches = filter === 'all' || n.status === 'prerequisite_gap' || (filter === 'ready' && n.status === 'ready');
     return {
       id: n.id,
@@ -221,29 +222,44 @@ function MapCanvas({
         onPath,
         dimmed: !matches || Boolean(selectedId && n.id !== selectedId && !onPath),
         tabbable: n.id === roving,
+        isRecommended,
         onSelect: pick,
         onArrow,
       },
     };
-  }), [placed, path, filter, selectedId, roving, pick, onArrow]);
+  }), [placed, path, filter, selectedId, roving, recommended, pick, onArrow]);
 
   const rfEdges = useMemo<Edge[]>(() => edges.map((e) => {
-    const active = Boolean(path?.edgeIds.has(e.id));
+    const isSourceSelected = e.source === selectedId;
+    const isTargetSelected = e.target === selectedId;
+    const isConnectedToSelected = isSourceSelected || isTargetSelected;
+    const isPathActive = Boolean(path?.edgeIds.has(e.id));
+    const active = isConnectedToSelected || isPathActive;
+    const shouldAnimate = isConnectedToSelected && !reduced();
+
     return {
       id: e.id,
       source: e.source,
       target: e.target,
+      type: 'smoothstep',
+      animated: shouldAnimate,
       style: {
-        stroke: 'var(--pj-text)',
-        strokeWidth: active ? 2 : 1,
-        opacity: active ? 0.9 : selectedId ? 0.1 : 0.4,
-        transition: 'opacity 200ms cubic-bezier(0.23, 1, 0.32, 1)',
+        stroke: active ? 'var(--pj-amber)' : 'var(--pj-ink)',
+        strokeWidth: active ? 2.5 : 1.75,
+        opacity: active ? 1 : selectedId ? 0.15 : 0.3,
+        strokeDasharray: shouldAnimate ? '5 5' : undefined,
+        transition: 'opacity 200ms cubic-bezier(0.23, 1, 0.32, 1), stroke 200ms ease',
       },
-      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: active ? 'var(--pj-text)' : 'var(--pj-text-muted)' },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 14,
+        height: 14,
+        color: active ? 'var(--pj-amber)' : 'var(--pj-ink)',
+      },
     };
   }), [edges, path, selectedId]);
 
-  const fit = useCallback(() => fitView({ padding: 0.12, maxZoom: 1.25, duration: dur(300) }), [fitView]);
+  const fit = useCallback(() => fitView({ padding: 0.2, maxZoom: 1.25, duration: dur(300) }), [fitView]);
 
   return (
     <div ref={wrapRef} role="group" aria-label={t('graph.canvas.label')} className="relative h-full">
@@ -252,7 +268,7 @@ function MapCanvas({
         edges={rfEdges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1.25 }}
+        fitViewOptions={{ padding: 0.2, maxZoom: 1.25 }}
         minZoom={0.15}
         maxZoom={1.6}
         nodesDraggable={false}

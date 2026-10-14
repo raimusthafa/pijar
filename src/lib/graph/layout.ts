@@ -17,10 +17,10 @@ export interface LayoutOptions {
 }
 
 const DEFAULT_OPTIONS: Required<LayoutOptions> = {
-  nodeWidth: 260,
-  nodeHeight: 110,
-  rankSpacing: 130,
-  nodeSpacing: 45,
+  nodeWidth: 264,
+  nodeHeight: 168,
+  rankSpacing: 120,
+  nodeSpacing: 40,
   startX: 80,
   startY: 60,
 };
