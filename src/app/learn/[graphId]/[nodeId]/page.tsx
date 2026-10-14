@@ -82,14 +82,18 @@ function LearnContent({ params }: LearnPageProps) {
   const searchParams = useSearchParams();
   const { t, locale } = useT();
 
-  const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; failed?: boolean; notFound?: boolean }>();
+  const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; topic?: string; failed?: boolean; notFound?: boolean }>();
   const [attempt, setAttempt] = useState(0);
   const [passedKey, setPassedKey] = useState('');
 
   // The stored topic is client-only; the server snapshot (null) keeps `ready` false until it resolves.
   const stored = useSyncExternalStore(subscribeNever, () => sessionStorage.getItem('pijar_topic') ?? '', () => null);
   const ready = stored !== null; // topic resolved, so the first fetch uses the right key
-  const topic = searchParams.get('topic') || stored || 'dsa';
+  // The first guess only names the request; the server answers with the graph's real topic, which wins from then on.
+  const guess = searchParams.get('topic') || stored || 'dsa';
+  const key = `${guess}/${nodeId}/${graphId}/${locale}/${attempt}`;
+  const current = fetched?.key === key ? fetched : undefined;
+  const topic = current?.topic || guess;
   const graph = useMemo(() => (ready ? getActiveGraph(topic) : null), [ready, topic]);
   const storedMastered = useMemo(() => ready && getMasteredNodes(topic).includes(nodeId), [ready, topic, nodeId]);
   const mastered = storedMastered || passedKey === `${topic}/${nodeId}`;
@@ -98,8 +102,6 @@ function LearnContent({ params }: LearnPageProps) {
 
   // One generation per concept and language: the server caches it, so a visit never regenerates.
   const curated = locale === 'id' ? CURATED_MATERIALS[nodeId] : undefined;
-  const key = `${topic}/${nodeId}/${graphId}/${locale}/${attempt}`;
-  const current = fetched?.key === key ? fetched : undefined;
   const material = curated ?? current?.material ?? null;
   const failed = !curated && Boolean(current?.failed);
   useEffect(() => {
@@ -111,7 +113,7 @@ function LearnContent({ params }: LearnPageProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            topic, nodeId, graphId, language: locale,
+            topic: guess, nodeId, graphId, language: locale,
             nodeLabel: node?.label, nodeCategory: node?.category, nodeDescription: node?.description,
           }),
         });
@@ -121,7 +123,7 @@ function LearnContent({ params }: LearnPageProps) {
           return;
         }
         if (!data.success || !data.material) throw new Error(data.error || 'material');
-        if (live) setFetched({ key, material: data.material });
+        if (live) setFetched({ key, material: data.material, topic: data.topic });
       } catch {
         if (live) setFetched({ key, failed: true });
       }
@@ -129,7 +131,7 @@ function LearnContent({ params }: LearnPageProps) {
     return () => { live = false; };
     // node is read once for hints only; the cache key is topic + nodeId + language.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, topic, nodeId, graphId, locale, attempt]);
+  }, [ready, guess, nodeId, graphId, locale, attempt]);
 
   const handlePassed = useCallback(() => {
     setPassedKey(`${topic}/${nodeId}`);

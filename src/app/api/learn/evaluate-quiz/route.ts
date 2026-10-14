@@ -7,6 +7,7 @@ import type { CurriculumNode, CurriculumEdge } from '@/types';
 import { buildAdjacencyMaps } from '@/lib/graph/engine';
 import { isMastered, MASTERY_THRESHOLD } from '@/lib/mastery/engine';
 import { getPostTest } from '@/lib/learn/question-bank';
+import { resolveTopic } from '@/lib/learn/node-check';
 
 // Review columns come from a migration that may not be applied yet: probe once, degrade quietly.
 async function reviewColumnsOk(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      topic = 'dsa',
+      topic: bodyTopic = 'dsa',
       nodeId,
       graphId,
       answers = {}, // { [questionId]: selectedIndex }
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
       postTest = false, // true: grade the (up to 10 item) post-test from the question bank
       language = 'id',
     } = body;
+
+    const topic = await resolveTopic(supabase, user?.id, graphId, bodyTopic);
 
     if (!nodeId || typeof nodeId !== 'string') {
       return NextResponse.json(

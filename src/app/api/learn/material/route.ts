@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getOrGenerateMaterial } from '@/lib/learn/generator';
 import { toLessonLanguage } from '@/lib/learn/cache-key';
 import { CURATED_MATERIALS } from '@/lib/learn/curated-materials';
-import { findGraphNode, isStoredGraphId } from '@/lib/learn/node-check';
+import { findGraphNode, isStoredGraphId, resolveTopic } from '@/lib/learn/node-check';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      topic = 'dsa',
+      topic: bodyTopic = 'dsa',
       nodeId,
       nodeLabel: bodyLabel,
       nodeCategory: bodyCategory,
@@ -23,6 +23,8 @@ export async function POST(request: Request) {
       forceRegenerate = false,
       language,
     } = body;
+
+    const topic = await resolveTopic(supabase, user?.id, graphId, bodyTopic);
 
     if (!nodeId || typeof nodeId !== 'string') {
       return NextResponse.json(
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       material,
+      topic,
       authenticated: Boolean(user),
     });
   } catch (err: unknown) {

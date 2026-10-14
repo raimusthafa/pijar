@@ -41,7 +41,7 @@ export function PostTest({ topic, nodeId, graphId, label, graph, onPassed, mapHr
   async function load() {
     setPhase('loading');
     try {
-      const qs = new URLSearchParams({ topic, nodeId, label, language: locale });
+      const qs = new URLSearchParams({ topic, nodeId, graphId, label, language: locale });
       const res = await fetch(`/api/learn/post-test?${qs}`);
       const data = await res.json();
       if (!data.success || !Array.isArray(data.questions) || data.questions.length === 0) throw new Error('empty');
