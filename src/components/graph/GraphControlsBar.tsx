@@ -23,7 +23,7 @@ export function GraphFilterBar({
   return (
     <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
       <Tabs value={filter} onValueChange={(v) => onFilter(v as GraphFilter)}>
-        <TabsList aria-label={t('graph.filter.label')} className="border border-hairline bg-raised">
+        <TabsList aria-label={t('graph.filter.label')} className="border border-hairline">
           <TabsTrigger value="all">{t('graph.filter.all')}</TabsTrigger>
           <TabsTrigger value="gaps">{t('graph.filter.gaps')}</TabsTrigger>
           <TabsTrigger value="ready">{t('graph.filter.ready')}</TabsTrigger>

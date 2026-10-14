@@ -22,7 +22,7 @@ function TabsList({ className, children, ...props }: TabsPrimitive.List.Props) {
       {...props}
     >
       <TabsPrimitive.Indicator
-        className="absolute top-(--active-tab-top) left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) rounded-pill border border-hairline bg-raised transition-[translate,width] duration-200 ease-out-pj motion-reduce:transition-none"
+        className="absolute top-(--active-tab-top) left-0 h-(--active-tab-height) w-(--active-tab-width) translate-x-(--active-tab-left) rounded-pill bg-brand transition-[translate,width] duration-200 ease-out-pj motion-reduce:transition-none"
       />
       {children}
     </TabsPrimitive.List>
@@ -34,7 +34,7 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "pj-press relative z-10 inline-flex h-11 items-center justify-center gap-2 rounded-pill px-4 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:text-foreground data-active:text-foreground md:h-9 [&_svg]:size-4 [&_svg]:shrink-0",
+        "pj-press relative z-10 inline-flex h-11 items-center justify-center gap-2 rounded-pill px-4 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:bg-hover hover:text-foreground data-active:text-brand-foreground data-active:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink md:h-9 [&_svg]:size-4 [&_svg]:shrink-0",
         className
       )}
       {...props}

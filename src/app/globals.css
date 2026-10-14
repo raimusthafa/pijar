@@ -145,6 +145,8 @@
   --color-ink: var(--pj-ink);
   --color-amber: var(--pj-amber);
   --color-amber-foreground: var(--pj-amber-fg);
+  --color-brand: var(--pj-amber);
+  --color-brand-foreground: var(--pj-amber-fg);
   --color-ground: var(--pj-ground);
   --color-surface: var(--pj-surface);
   --color-surface-strong: var(--pj-surface-strong);
