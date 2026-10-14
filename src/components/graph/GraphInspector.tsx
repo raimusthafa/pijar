@@ -20,6 +20,7 @@ type Props = {
   edges: CurriculumEdge[];
   graphId: string;
   topic: string;
+  inferredEdges?: boolean;
   onClose: () => void;
   onSelect: (id: string) => void;
 };
@@ -53,7 +54,7 @@ function PrereqList({ ids, nodes, edges, to, onSelect }: { ids: string[]; nodes:
 
 /** Right panel on desktop, bottom sheet below md. Stays mounted so open and close are the same interruptible transition. */
 export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspector(
-  { node, open, nodes, edges, graphId, topic, onClose, onSelect },
+  { node, open, nodes, edges, graphId, topic, inferredEdges, onClose, onSelect },
   ref,
 ) {
   const { t } = useT();
@@ -108,6 +109,11 @@ export const GraphInspector = forwardRef<HTMLElement, Props>(function GraphInspe
             <Separator className="my-4" />
 
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">{t('graph.insp.prereq')}</h3>
+            {inferredEdges && (
+              <p className="mb-2 rounded-control border border-hairline bg-surface px-2.5 py-1.5 text-xs text-muted-foreground">
+                {t('graph.insp.inferred')}
+              </p>
+            )}
             {direct.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('graph.insp.prereq.none')}</p>
             ) : (

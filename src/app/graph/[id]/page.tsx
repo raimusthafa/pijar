@@ -49,7 +49,13 @@ async function Content({ params }: { params: Params }) {
 
   return (
     <AppShell user={shellUser} title={t('graph.title')}>
-      <GraphWorkspace graphId={graph.id} topic={graph.topic} nodes={nodes} edges={fixed.edges} />
+      <GraphWorkspace
+        graphId={graph.id}
+        topic={graph.topic}
+        nodes={nodes}
+        edges={fixed.edges}
+        inferredEdges={fixed.inferredEdges}
+      />
     </AppShell>
   );
 }

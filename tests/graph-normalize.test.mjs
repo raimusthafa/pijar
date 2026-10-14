@@ -53,6 +53,26 @@ test('no relation at all (the stored Turunan Trigonometri case) is layered by ca
     n('x4', { category: 'Penerapan' }), n('x5', { category: 'Lanjutan' }),
   ], undefined, 4);
   assert.equal(g.nodes.find((x) => x.id === 'x5').level, 3);
+  assert.equal(g.inferredEdges, true);
+});
+
+test('graphs with actual edges or prerequisites do not flag inferredEdges', () => {
+  const g1 = normalizeGraph([n('a', { prerequisites: [] }), n('b', { prerequisites: ['a'] })], []);
+  assert.equal(g1.inferredEdges, undefined);
+
+  const g2 = normalizeGraph([n('a'), n('b')], [{ source: 'a', target: 'b' }]);
+  assert.equal(g2.inferredEdges, undefined);
+});
+
+test('8 concepts with single category tier chunk into 3 vertical columns', () => {
+  const raw = Array.from({ length: 8 }, (_, i) => n(`c${i + 1}`, { category: 'Kalkulus' }));
+  const g = check(raw, undefined, 3);
+  assert.equal(g.inferredEdges, true);
+  const placed = calculateHierarchicalLayout(g.nodes, g.edges);
+  const colXs = [...new Set(placed.map((p) => p.x))];
+  assert.equal(colXs.length, 3, 'chunks into exactly 3 columns');
+  const nodesPerCol = colXs.map((x) => placed.filter((p) => p.x === x).length);
+  assert.deepEqual(nodesPerCol, [3, 3, 2], '3 nodes in col 1 & 2, 2 nodes in col 3');
 });
 
 test('garbage input does not throw', () => {

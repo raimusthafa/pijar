@@ -31,7 +31,7 @@ import { OutlineView, type OutlineGroup } from './OutlineView';
 
 const NODE_W = 264;
 const NODE_H = 168;
-const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 120, nodeSpacing: 40, startX: 40, startY: 40 };
+const LAYOUT = { nodeWidth: NODE_W, nodeHeight: NODE_H, rankSpacing: 100, nodeSpacing: 48, startX: 40, startY: 40 };
 const nodeTypes = { conceptNode: ConceptNodeComponent };
 const edgeTypes = { bezier: BezierEdge };
 const PANEL = 376; // inspector width plus its margin on desktop
@@ -56,7 +56,19 @@ export function GraphWorkspaceSkeleton() {
   );
 }
 
-export function GraphWorkspace({ graphId, topic, nodes, edges }: { graphId: string; topic: string; nodes: CurriculumNode[]; edges: CurriculumEdge[] }) {
+export function GraphWorkspace({
+  graphId,
+  topic,
+  nodes,
+  edges,
+  inferredEdges,
+}: {
+  graphId: string;
+  topic: string;
+  nodes: CurriculumNode[];
+  edges: CurriculumEdge[];
+  inferredEdges?: boolean;
+}) {
   const { t } = useT();
   const placed = useMemo(() => calculateHierarchicalLayout(nodes, edges, LAYOUT) as Placed[], [nodes, edges]);
   const byId = useMemo(() => new Map<string, EnrichedConceptNode>(placed.map((n) => [n.id, n])), [placed]);
@@ -140,6 +152,7 @@ export function GraphWorkspace({ graphId, topic, nodes, edges }: { graphId: stri
           edges={edges}
           graphId={graphId}
           topic={topic}
+          inferredEdges={inferredEdges}
           onClose={close}
           onSelect={select}
         />
@@ -285,7 +298,7 @@ function MapCanvas({
     };
   }), [edges, path, selectedId]);
 
-  const fit = useCallback(() => fitView({ padding: 0.2, maxZoom: 1.25, duration: dur(300) }), [fitView]);
+  const fit = useCallback(() => fitView({ padding: 0.12, maxZoom: 1.1, duration: dur(300) }), [fitView]);
 
   return (
     <div ref={wrapRef} role="group" aria-label={t('graph.canvas.label')} className="relative h-full">
@@ -295,7 +308,7 @@ function MapCanvas({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1.25 }}
+        fitViewOptions={{ padding: 0.12, maxZoom: 1.1 }}
         minZoom={0.15}
         maxZoom={1.6}
         nodesDraggable={true}

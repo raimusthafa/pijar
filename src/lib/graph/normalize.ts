@@ -36,7 +36,24 @@ function inferEdges(nodes: CurriculumNode[]): [string, string][] {
   const keys = [...layers.keys()].sort((a, b) => a - b);
   const out: [string, string][] = [];
   if (keys.length < 2) {
-    for (let i = 1; i < ordered.length; i++) out.push([ordered[i - 1].n.id, ordered[i].n.id]);
+    const numCols = ordered.length <= 3 ? ordered.length : ordered.length <= 8 ? 3 : Math.min(Math.ceil(ordered.length / 3), 5);
+    const cols: string[][] = [];
+    const base = Math.floor(ordered.length / numCols);
+    const rem = ordered.length % numCols;
+    let start = 0;
+    for (let c = 0; c < numCols; c++) {
+      const take = base + (c < rem ? 1 : 0);
+      if (take > 0) {
+        cols.push(ordered.slice(start, start + take).map((o) => o.n.id));
+        start += take;
+      }
+    }
+    for (let c = 1; c < cols.length; c++) {
+      const prev = cols[c - 1];
+      const cur = cols[c];
+      cur.forEach((id, i) => out.push([prev[i % prev.length], id]));
+      prev.forEach((id, i) => { if (i >= cur.length) out.push([id, cur[i % cur.length]]); });
+    }
     return out;
   }
   for (let k = 1; k < keys.length; k++) {
@@ -52,7 +69,7 @@ function inferEdges(nodes: CurriculumNode[]): [string, string][] {
 export function normalizeGraph(
   rawNodes: unknown,
   rawEdges: unknown,
-): { nodes: LeveledNode[]; edges: CurriculumEdge[] } {
+): { nodes: LeveledNode[]; edges: CurriculumEdge[]; inferredEdges?: boolean } {
   // 1. Nodes: keep the first of each (case-insensitive) id.
   const nodes: CurriculumNode[] = [];
   const used = new Set<string>();
@@ -130,8 +147,12 @@ export function normalizeGraph(
     children.get(s)!.push(t);
     edges.push({ id: `e${edges.length + 1}`, source: s, target: t, ...(label ? { label } : {}) });
   };
+  let inferred = false;
   for (const [s, t, l] of pairs) accept(s, t, l);
-  if (edges.length === 0 && nodes.length > 1) for (const [s, t] of inferEdges(nodes)) accept(s, t);
+  if (edges.length === 0 && nodes.length > 1) {
+    inferred = true;
+    for (const [s, t] of inferEdges(nodes)) accept(s, t);
+  }
 
   // 4. Levels by longest path from a root.
   const parents = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
@@ -143,5 +164,12 @@ export function normalizeGraph(
     level.set(id, d);
     return d;
   };
-  return { nodes: nodes.map((n) => ({ ...n, level: depth(n.id) })), edges };
+  const result: { nodes: LeveledNode[]; edges: CurriculumEdge[]; inferredEdges?: boolean } = {
+    nodes: nodes.map((n) => ({ ...n, level: depth(n.id) })),
+    edges,
+  };
+  if (inferred) {
+    result.inferredEdges = true;
+  }
+  return result;
 }
