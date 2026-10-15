@@ -3,17 +3,16 @@
 // Caches, validates, and dynamically generates concept lessons.
 // ================================================================
 
-import { generateStructuredJSON } from '@/lib/ai/provider';
-import { CURATED_MATERIALS } from './curated-materials';
-import type { DetailedLearningMaterial, VideoScriptPlan, CheckpointQuizQuestion, VisualSceneType } from './types';
-import { sanitizeScenesMath } from './math-spec';
-import { sanitizeVideoScript } from './scene-normalize';
-import { buildFallbackVideo } from './scene-fallback';
-import { SCENE_PROMPT_GUIDE } from './scene-prompt';
-import { sanitizeMaterialBoard } from './board-spec';
-import { MATH_FORMAT_NOTE } from './math-text';
-import { createClient } from '@/lib/supabase/server';
-import { materialCacheKeys, type LessonLanguage } from './cache-key';
+import { generateStructuredJSON } from '../ai/provider.ts';
+import { CURATED_MATERIALS } from './curated-materials.ts';
+import type { DetailedLearningMaterial, VisualSceneType } from './types.ts';
+import { sanitizeScenesMath } from './math-spec.ts';
+import { sanitizeVideoScript } from './scene-normalize.ts';
+import { buildFallbackVideo } from './scene-fallback.ts';
+import { SCENE_PROMPT_GUIDE } from './scene-prompt.ts';
+import { sanitizeMaterialBoard } from './board-spec.ts';
+import { MATH_FORMAT_NOTE } from './math-text.ts';
+import { materialCacheKeys, type LessonLanguage } from './cache-key.ts';
 
 // In-memory cache for ultra-fast, zero-cost reads during runtime
 const MEMORY_CACHE = new Map<string, DetailedLearningMaterial>();
@@ -63,13 +62,19 @@ function validateMaterialContract(data: DetailedLearningMaterial): data is Detai
   return true;
 }
 
-const MATH_WORDS = /kalkulus|calculus|vektor|vector|fungsi|function|turunan|derivative|integral|limit|rasio|ratio|perbandingan|eksponen|exponen|aljabar|algebra|matematika|math|gradien|slope/i;
+const NON_MATH_DOMAINS = /\b(sql|database|db|query|relational|postgres|mysql|sqlite|nosql|table|column|schema|backend|frontend|web|javascript|typescript|python|golang|react|dsa|rekursi|stack|queue|tree|graph)\b/i;
 
-/** True when the lesson is about functions, vectors, derivatives, integrals, limits, ratios or exponents. */
+const MATH_WORDS = /\b(?:kalkulus|calculus|vektor|vector|turunan|derivative|integral|limit|rasio|ratio|perbandingan|eksponen|exponen|aljabar|algebra|matematika|\bmath\b|gradien|slope|trigonometri|trigonometry|sinus|cosinus|persamaan\s+kuadrat|parabola)\b/i;
+
+/** True when the lesson is about mathematical concepts (calculus, linear algebra, vectors, derivatives, trigonometry). */
 function isMathTopic(params: { topic: string; nodeId: string; nodeLabel?: string; nodeDescription?: string }): boolean {
-  const { lang, visualType } = getTopicLanguage(params.topic, params.nodeId);
-  void lang;
-  return visualType === 'math-visualization' || MATH_WORDS.test(`${params.topic} ${params.nodeId} ${params.nodeLabel ?? ''} ${params.nodeDescription ?? ''}`);
+  const combined = `${params.topic} ${params.nodeId} ${params.nodeLabel ?? ''} ${params.nodeDescription ?? ''}`;
+  // Strictly prevent database/programming domains from false-positive math categorization
+  if (NON_MATH_DOMAINS.test(params.topic) && !/\b(kalkulus|calculus|aljabar|algebra|trigonometri|vektor|vector|matematika)\b/i.test(params.topic)) {
+    return false;
+  }
+  const { visualType } = getTopicLanguage(params.topic, params.nodeId);
+  return visualType === 'math-visualization' || MATH_WORDS.test(combined);
 }
 
 function pickMathRecipe(text: string): string {
@@ -79,7 +84,8 @@ function pickMathRecipe(text: string): string {
   if (/limit/i.test(text)) return 'limit-approach';
   if (/matriks|matrix/i.test(text)) return 'matrix-transform';
   if (/sin|cos|trigon|lingkaran|circle/i.test(text)) return 'unit-circle';
-  return 'derivative-tangent';
+  if (/turunan|derivative|gradien|slope|singgung|tangent/i.test(text)) return 'derivative-tangent';
+  return 'function-plot';
 }
 
 // --- interactive board prompt (board-spec.ts is the contract) ---
@@ -102,10 +108,10 @@ function getTopicLanguage(topic: string, nodeId: string): { lang: string; visual
   if (t.includes('machine') || t.includes('ml') || t.includes('ai')) {
     return { lang: 'python', visualType: n.includes('grad') || n.includes('loss') ? 'loss-landscape' : 'concept-illustration' };
   }
-  if (t.includes('data') && t.includes('base') || t.includes('db') || t.includes('sql')) {
-    return { lang: 'sql', visualType: n.includes('tree') || n.includes('index') ? 'tree-structure' : 'data-flow' };
+  if ((t.includes('data') && t.includes('base')) || t.includes('db') || t.includes('sql') || t.includes('query')) {
+    return { lang: 'sql', visualType: n.includes('tree') || n.includes('index') || n.includes('btree') ? 'tree-structure' : 'data-flow' };
   }
-  if (t.includes('math') || t.includes('diskrit') || t.includes('matematika')) {
+  if (t.includes('math') || t.includes('diskrit') || t.includes('matematika') || t.includes('kalkulus') || t.includes('aljabar')) {
     return { lang: 'latex', visualType: 'math-visualization' };
   }
   if (t.includes('web') || t.includes('react') || t.includes('frontend')) {
@@ -115,14 +121,16 @@ function getTopicLanguage(topic: string, nodeId: string): { lang: string; visual
     return { lang: 'python', visualType: 'math-visualization' };
   }
   // A maths concept whose topic text has no 'math' word (e.g. "Aljabar dasar") must not default to TypeScript examples.
-  if (MATH_WORDS.test(`${topic} ${nodeId}`)) return { lang: 'latex', visualType: 'math-visualization' };
+  if (MATH_WORDS.test(`${topic} ${nodeId}`) && !NON_MATH_DOMAINS.test(topic)) {
+    return { lang: 'latex', visualType: 'math-visualization' };
+  }
   return { lang: 'typescript', visualType: n.includes('stack') || n.includes('rekursi') ? 'call-stack' : 'code-execution' };
 }
 
 /**
  * Creates an intelligent topic-aware fallback if AI provider is offline.
  */
-function buildTopicAwareFallback(params: MaterialGenerationParams): DetailedLearningMaterial {
+export function buildTopicAwareFallback(params: MaterialGenerationParams): DetailedLearningMaterial {
   const { topic, nodeId, nodeLabel, nodeCategory, nodeDescription, prerequisites } = params;
   const label = nodeLabel || nodeId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   const category = nodeCategory || 'Konsep Kurikulum';
@@ -130,49 +138,81 @@ function buildTopicAwareFallback(params: MaterialGenerationParams): DetailedLear
   const { lang, visualType: baseVisual } = getTopicLanguage(topic, nodeId);
   const mathy = isMathTopic(params);
 
+  const isSql = lang === 'sql' || /sql|database|query/i.test(`${topic} ${nodeId}`);
+
   return {
     nodeId,
     topic,
     title: label,
-    learningObjective: `Memahami prinsip dasar, arsitektur logika, dan implementasi dari ${label}.`,
+    learningObjective: `Menguasai konsep esensial, arsitektur logika, eksekusi nyata, dan pertimbangan performa dari ${label}.`,
     targetLevel: 'intermediate',
     prerequisiteConcepts: prerequisites || [],
-    summary: `${label} adalah bagian penting dari domain ${category}. ${desc}`,
-    conceptExplanation: `Konsep **${label}** memegang peranan krusial dalam domain ${topic}.
-Ketika merancang arsitektur sistem atau menyelesaikan persoalan komputasi, ${label} menyediakan kerangka kerja terstruktur untuk memastikan efisiensi, reliabilitas, dan konsistensi.
+    summary: `${label} adalah bagian penting dalam domain ${category}. ${desc}`,
+    conceptExplanation: `Konsep **${label}** memegang peranan krusial dalam domain **${topic}**.
+Ketika merancang arsitektur perangkat lunak atau memproses data berskala besar, ${label} menyediakan kerangka kerja terstruktur untuk memastikan efisiensi, integritas, dan keandalan sistem.
 
-### Prinsip Utama:
-1. **Definisi Formal:** ${desc}
-2. **Keterkaitan Logis:** Konsep ini dibangun di atas fondasi materi sebelumnya dan menjadi prasyarat untuk materi lanjutan.
-3. **Penerapan Praktis:** Diterapkan langsung dalam optimasi proses dan penulisan algoritma nyata.`,
+### 1. Latar Belakang & Masalah yang Diselesaikan
+Sebelum adanya ${label}, pengembang dan arsitek data menghadapi tantangan signifikan dalam mengelola kompleksitas komputasi dan memori. Penerapan konsep ini mencegah inefisiensi, mengurangi potensi kesalahan logika runtime, dan memastikan operasi sistem berjalan secara deterministik.
+
+### 2. Prinsip Kerja & Arsitektur Logika
+${label} beroperasi dengan aturan terdefinisi:
+- **Validasi Input:** Memastikan setiap argumen atau parameter memenuhi kontrak tipe dan kondisi batas.
+- **Eksekusi Terisolasi:** Proses komputasi berlangsung tanpa efek samping tak terkontrol (side-effects) terhadap state eksternal.
+- **Deterministik:** Untuk masukan yang identik, sistem menjamin keluaran yang konsisten dan dapat diprediksi.
+
+### 3. Skenario Eksekusi Langkah demi Langkah
+1. Sistem menginisialisasi parameter atau membaca query/statement awal.
+2. Mesin mengevaluasi kondisi batas dan alokasi sumber daya.
+3. Operasi inti dieksekusi secara efisien sesuai indeks dan struktur data yang relevan.
+4. Hasil akhir dikembalikan dalam format yang siap dikonsumsi oleh lapisan presentasi atau layer pemanggil.
+
+### 4. Best Practice & Rekomendasi Performa
+- **Optimasi Kompleksitas:** Perhatikan efisiensi waktu eksekusi (Time Complexity) dan penggunaan memori (Space Complexity).
+- **Penanganan Edge Case:** Selalu uji skenario ekstrim (nilai kosong, data batas, konkurensi).
+- **Clean Architecture:** Pisahkan logika bisnis inti dari manipulasi infrastruktur langsung.`,
     analogy: `Ibaratkan ${label} seperti pondasi tiang utama pada sebuah jembatan: memastikan seluruh komponen di atasnya bekerja secara kokoh tanpa kegagalan struktural.`,
     keyDefinitions: [
       { term: label, definition: desc },
       { term: category, definition: `Kelompok bidang kajian dalam domain ${topic}.` },
+      { term: 'Eksekusi Deterministik', definition: 'Karakteristik komputasi yang selalu menghasilkan output identik untuk input yang sama.' },
     ],
     examples: [
       {
-        title: `Implementasi Konseptual ${label}`,
+        title: `Implementasi Fundamental ${label}`,
         language: lang,
-        code: lang === 'python'
-          ? `# Implementasi terstruktur untuk ${label}\ndef demonstrate_${nodeId.replace(/-/g, '_')}():\n    \"\"\"Menjalankan alur logika untuk ${label}\"\"\"\n    print("Menginisialisasi parameter...")\n    is_valid = True\n    return is_valid\n\nresult = demonstrate_${nodeId.replace(/-/g, '_')}()\nprint(f"Hasil eksekusi: {result}")`
-          : lang === 'sql'
-          ? `-- Query optimasi untuk ${label}\nSELECT id, nama_record, status_validasi\nFROM entitas_${nodeId.replace(/-/g, '_')}\nWHERE status_validasi = 'AKTIF'\nORDER BY created_at DESC\nLIMIT 10;`
-          : `// Implementasi tipe data dan alur kerja untuk ${label}\nexport function execute${nodeId.replace(/-/g, '')}(params: Record<string, unknown>): boolean {\n  console.log("Memproses logika ${label}...");\n  return Boolean(params);\n}`,
-        explanation: `Contoh kode di atas mendemonstrasikan pola implementasi idiomatik ${label} dalam bahasa ${lang.toUpperCase()}.`,
+        code: isSql
+          ? `-- 1. Query dasar untuk ${label}\nSELECT id, nama_item, status_aktif\nFROM entitas_${nodeId.replace(/-/g, '_')}\nWHERE status_aktif = TRUE\nORDER BY created_at DESC\nLIMIT 10;`
+          : lang === 'python'
+          ? `# 1. Implementasi dasar untuk ${label}\ndef execute_${nodeId.replace(/-/g, '_')}(data: list[int]) -> dict[str, int]:\n    \"\"\"Menjalankan pemrosesan dasar ${label}\"\"\"\n    total = sum(data)\n    return {"count": len(data), "total": total}\n\nres = execute_${nodeId.replace(/-/g, '_')}([10, 20, 30])\nprint(res)`
+          : `// 1. Implementasi dasar untuk ${label}\nexport function execute${nodeId.replace(/-/g, '')}(items: string[]): { count: number; valid: boolean } {\n  console.log("Memproses ${label}...");\n  return { count: items.length, valid: items.length > 0 };\n}`,
+        explanation: `Contoh di atas mendemonstrasikan pola penulisan paling fundamental untuk ${label} dengan penanganan parameter yang bersih.`,
+      },
+      {
+        title: `Penerapan Tingkat Lanjut & Produksi`,
+        language: lang,
+        code: isSql
+          ? `-- 2. Query analitik produksi dengan agregasi dan filter optimal\nSELECT\n  kategori,\n  COUNT(*) AS total_transaksi,\n  AVG(nilai_nominal) AS rata_rata_nominal\nFROM transaksi_${nodeId.replace(/-/g, '_')}\nWHERE created_at >= NOW() - INTERVAL '30 days'\nGROUP BY kategori\nHAVING COUNT(*) >= 5\nORDER BY total_transaksi DESC;`
+          : lang === 'python'
+          ? `# 2. Pemrosesan produksi dengan penanganan error dan efisiensi memori\nfrom typing import Generator\n\ndef stream_${nodeId.replace(/-/g, '_')}(batch_size: int = 100) -> Generator[list[int], None, None]:\n    \"\"\"Generator untuk memproses data berukuran besar tanpa memory spike\"\"\"\n    for start in range(0, 1000, batch_size):\n        yield list(range(start, start + batch_size))\n\nfor chunk in stream_${nodeId.replace(/-/g, '_')}():\n    pass # Eksekusi pipeline produksi`
+          : `// 2. Pola produksi asinkron dengan validasi ketat\nexport async function process${nodeId.replace(/-/g, '')}Production<T>(\n  records: T[],\n  validator: (record: T) => boolean\n): Promise<{ successful: number; failed: number }> {\n  const validRecords = records.filter(validator);\n  return { successful: validRecords.length, failed: records.length - validRecords.length };\n}`,
+        explanation: `Contoh lanjutan ini mengilustrasikan standar produksi dengan pertimbangan skalabilitas, filter data, dan pencegahan lonjakan konsumsi memori.`,
       },
     ],
-    realWorldApplication: `Digunakan secara luas di industri teknologi modern untuk skalabilitas dan kestabilan sistem ${topic}.`,
+    realWorldApplication: `Digunakan secara luas di industri teknologi modern untuk skalabilitas, integritas data, dan stabilitas performa sistem ${topic}.`,
     commonMisconceptions: [
       {
-        misconception: `Menganggap ${label} hanya teori tanpa relevansi langsung dalam implementasi nyata.`,
-        correction: `Di lingkungan produksi, penguasaan ${label} mencegah bug arsitektural dan kebocoran sumber daya komputasi.`,
+        misconception: `Menganggap ${label} hanya konsep teoritis tanpa dampak langsung di lingkungan produksi.`,
+        correction: `Di lingkungan riil, pemahaman yang keliru terhadap ${label} menyebabkan bug arsitektural, inefisiensi query/komputasi, dan kebocoran sumber daya sistem.`,
+      },
+      {
+        misconception: `Mengabaikan kondisi batas (edge cases) karena menganggap input data selalu valid.`,
+        correction: `Produksi selalu menghadapi data anomali atau nilai null; validasi defensif mutlak diperlukan.`,
       },
     ],
     keyTakeaways: [
-      `Kuasai alur berpikir konseptual sebelum menulis sintaks kode.`,
-      `Perhatikan batasan kompleksitas dan prasyarat dasar materi.`,
-      `Validasi pemahamanmu melalui checkpoint quiz berikut.`,
+      `Kuasai alur berpikir konseptual dan arsitektur logika sebelum menulis baris kode.`,
+      `Perhatikan batasan kompleksitas algoritma dan integritas data di setiap langkah eksekusi.`,
+      `Validasi pemahamanmu melalui checkpoint quiz berbobot berikut.`,
     ],
     checkpointQuestions: [
       {
@@ -241,6 +281,7 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
   // 2. Supabase DB Cache Lookup (non-blocking if table not yet migrated)
   if (!forceRegenerate) {
     try {
+      const { createClient } = await import('../supabase/server.ts');
       const supabase = await createClient();
       const { data: cachedRow } = await supabase
         .from('concept_materials')
@@ -253,7 +294,7 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
         MEMORY_CACHE.set(cacheKey, cachedRow.material_json);
         return cachedRow.material_json;
       }
-    } catch (dbErr) {
+    } catch {
       // Table might not exist yet; safe fallback
     }
   }
@@ -262,22 +303,47 @@ export async function getOrGenerateMaterial(params: MaterialGenerationParams): P
   const { lang, visualType } = getTopicLanguage(topic, nodeId);
   const nodeLabel = params.nodeLabel || nodeId.replace(/-/g, ' ');
   const nodeDesc = params.nodeDescription || 'Konsep kurikulum';
-  const mathGuide = SCENE_PROMPT_GUIDE + (isMathTopic(params) ? BOARD_PROMPT_GUIDE : '');
+  const mathTopic = isMathTopic(params);
+  const mathGuide = SCENE_PROMPT_GUIDE + (mathTopic ? BOARD_PROMPT_GUIDE : '');
 
   const systemInstruction = `Kamu adalah Principal Curriculum Architect dan Senior Learning Experience Designer di Pijar.
-Tugasmu adalah menghasilkan materi edukasi berbobot ilmiah tinggi, intuitif, ramah pembelajar, dan skrip video visual interaktif untuk konsep teknologi.
+Tugasmu adalah menghasilkan materi edukasi berbobot ilmiah tinggi, intuitif, ramah pembelajar, komprehensif (mendalam, bukan ringkasan pendek), dan skrip video visual interaktif untuk konsep teknologi.
 ${language === 'en'
     ? 'Write ALL learner-facing text (titles, explanations, analogy, definitions, code comments, quiz, narration, captions) in clear, natural English. Keep the JSON keys exactly as in the schema.'
-    : 'Semua teks harus dalam Bahasa Indonesia edukatif yang profesional, jelas, dan kaya contoh nyata.'}
+    : 'Semua teks harus dalam Bahasa Indonesia edukatif yang profesional, jelas, bernas, dan kaya contoh nyata.'}
 KEMBALIKAN HANYA JSON VALID SESUAI FORMAT SCHEMA.`;
 
-  const prompt = `Buatkan materi pembelajaran komprehensif dan skrip video interaktif untuk konsep berikut:
+  const prompt = `Buatkan materi pembelajaran komprehensif, mendalam, dan skrip video interaktif untuk konsep berikut:
 - Topik Kurikulum: "${topic}"
 - ID Konsep (nodeId): "${nodeId}"
 - Nama Konsep: "${nodeLabel}"
 - Deskripsi: "${nodeDesc}"
 - Bahasa Kode Relevan: "${lang}"
-- Petunjuk jenis visual (boleh diabaikan bila ada yang lebih cocok): "${visualType}"
+- Petunjuk jenis visual: "${visualType}"
+
+ATURAN MATERI TEKS:
+1. "conceptExplanation" HARUS mendalam dan terstruktur rapi menggunakan Markdown (minimal 400 - 800 kata). Wajib mencakup:
+   - ### 1. Latar Belakang & Masalah (Kenapa konsep ini diciptakan)
+   - ### 2. Prinsip Kerja & Mekanisme Internal (Under the hood)
+   - ### 3. Aturan Sintaksis & Alur Eksekusi
+   - ### 4. Skenario Eksekusi Langkah demi Langkah (Step-by-step trace)
+   - ### 5. Best Practice & Optimasi Performa
+2. "examples" HARUS berisi 2 sampai 3 contoh kode progresif:
+   - Contoh 1: Sintaks fundamental / kanonikal dasar.
+   - Contoh 2: Kasus penggunaan di lingkungan produksi nyata.
+   - Contoh 3 (opsional): Edge case, penanganan error, atau optimasi performa.
+3. "keyDefinitions" minimal 3 istilah kunci yang jelas.
+4. "commonMisconceptions" minimal 2 miskonsepsi umum beserta pelurusan logikanya.
+
+ATURAN SKRIP VIDEO:
+1. Total durasi video sekitar 80 sampai 120 detik, terdiri dari 4 sampai 5 scene pedagogis:
+   - Scene 1: Pengantar & Motivasi Masalah (18-24 detik).
+   - Scene 2: Anatomi Logika & Struktur Inti (20-28 detik).
+   - Scene 3: Simulasi Alur / Pipeline / Eksekusi (20-28 detik).
+   - Scene 4: Studi Kasus Riil / Code-walk / Best Practice (20-28 detik).
+   - Scene 5 (opsional): Rangkuman Kunci & Persiapan Kuis (16-22 detik).
+2. Teks "narration" per scene sekitar 45 sampai 75 kata. Narasi harus mengalir tenang, edukatif, dan to-the-point.
+3. PENTING: JANGAN PERNAH menyertakan instruksi pembacaan atau kata pengantar meta (seperti "baca dengan nada...", "tempo sedang:", "narasi:", dsb) di dalam teks narration maupun caption. Teks narration adalah kalimat yang langsung diucapkan oleh narator.
 
 FORMAT JSON YANG WAJIB DIHASILKAN:
 {
@@ -292,21 +358,32 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
   "analogy": "Analogi dunia nyata yang sangat mudah dipahami...",
   "keyDefinitions": [
     { "term": "Istilah 1", "definition": "Definisi jelas..." },
-    { "term": "Istilah 2", "definition": "Definisi jelas..." }
+    { "term": "Istilah 2", "definition": "Definisi jelas..." },
+    { "term": "Istilah 3", "definition": "Definisi jelas..." }
   ],
   "examples": [
     {
-      "title": "Judul Contoh Implementasi",
+      "title": "Judul Contoh 1 (Fundamental)",
       "language": "${lang}",
       "code": "Kode program yang valid, rapi, dan memiliki komentar penjelas...",
       "explanation": "Penjelasan alur eksekusi baris demi baris..."
+    },
+    {
+      "title": "Judul Contoh 2 (Kasus Produksi Nyata)",
+      "language": "${lang}",
+      "code": "Kode produksi nyata...",
+      "explanation": "Penjelasan skenario riil..."
     }
   ],
-  "realWorldApplication": "Penerapan di industri nyata...",
+  "realWorldApplication": "Penerapan di industri teknologi modern...",
   "commonMisconceptions": [
     {
       "misconception": "Miskonsepsi umum siswa...",
       "correction": "Pelurusan logika yang benar..."
+    },
+    {
+      "misconception": "Miskonsepsi kedua...",
+      "correction": "Pelurusan logika..."
     }
   ],
   "keyTakeaways": ["Poin 1", "Poin 2", "Poin 3"],
@@ -321,7 +398,7 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
     },
     {
       "id": "${nodeId}-q2",
-      "question": "Pertanyaan kedua...",
+      "question": "Pertanyaan kedua skenario implementasi...",
       "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
       "correctIndex": 2,
       "explanation": "Penjelasan...",
@@ -339,24 +416,23 @@ FORMAT JSON YANG WAJIB DIHASILKAN:
   "videoScript": {
     "conceptId": "${nodeId}",
     "title": "${language === 'en' ? 'Visualization' : 'Visualisasi'}: ${nodeLabel}",
-    "totalDurationSeconds": 45,
+    "totalDurationSeconds": 90,
     "scenes": [
       {
         "id": "sc1",
         "sceneNumber": 1,
         "title": "Pengantar & Motivasi Masalah",
-        "durationSeconds": 14,
-        "narration": "Narasi pengantar dalam bahasa pengguna, ramah dan jelas...",
+        "durationSeconds": 22,
+        "narration": "Narasi pengantar dalam bahasa pengguna, ramah, jelas, tanpa instruksi pembacaan...",
         "recipe": { "name": "<salah satu resep>", "params": {} },
         "captions": [
-          { "startSeconds": 0, "endSeconds": 7, "text": "Kalimat subtitle 1..." },
-          { "startSeconds": 7, "endSeconds": 14, "text": "Kalimat subtitle 2..." }
+          { "startSeconds": 0, "endSeconds": 11, "text": "Kalimat subtitle 1..." },
+          { "startSeconds": 11, "endSeconds": 22, "text": "Kalimat subtitle 2..." }
         ]
       }
     ]
   }
 }
-Isi "scenes" dengan 3 sampai 5 scene sesuai aturan VIDEO PENJELASAN di bawah (resep atau stage kustom pada tiap scene).
 Pastikan correctIndex bervariasi (tidak selalu 0), kode bahasa ${lang} valid, dan caption tiap scene berurutan dalam waktu relatif scene. ${MATH_FORMAT_NOTE}${mathGuide}
 ${language === 'en' ? 'LANGUAGE: the instructions above are in Indonesian, but EVERY learner-facing string in the JSON (title, summary, explanation, analogy, definitions, examples, misconceptions, quiz, scene titles, narration, captions, board instruction and labels) MUST be written in English. Do not leave any Indonesian text.' : ''}`;
 
@@ -369,6 +445,7 @@ ${language === 'en' ? 'LANGUAGE: the instructions above are in Indonesian, but E
 
       // Async persist to Supabase if table exists
       try {
+        const { createClient } = await import('../supabase/server.ts');
         const supabase = await createClient();
         await supabase
           .from('concept_materials')
@@ -379,7 +456,7 @@ ${language === 'en' ? 'LANGUAGE: the instructions above are in Indonesian, but E
             video_scene_json: aiOutput.videoScript,
             created_at: new Date().toISOString(),
           }, { onConflict: 'topic,node_id' });
-      } catch (saveErr) {
+      } catch {
         // non-blocking
       }
 

@@ -93,7 +93,6 @@ export default function StageView({ scene, runtime, time, onStatus, onCompact, c
     const engine = engineRef.current;
     if (!engine || !engineReady) return;
     let live = true;
-    engine.seek(timeRef.current);
     engine
       .load(scene.stage, runtime / scene.durationSeconds, compact)
       .then(() => live && update('ready'))

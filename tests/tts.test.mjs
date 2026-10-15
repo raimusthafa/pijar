@@ -1,7 +1,32 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { pcmToWav, synthesize, hashNarration, TTS_MODELS, TtsUnavailable } from '../src/lib/ai/tts.ts';
+import { pcmToWav, synthesize, hashNarration, sanitizeSpokenText, TTS_MODELS, TtsUnavailable } from '../src/lib/ai/tts.ts';
 import { distributeCaptions } from '../src/lib/learn/captions.ts';
+
+describe('Gemini TTS: Prompt leak & spoken text sanitizer', () => {
+  it('strips leading prompt instructions and voiceover prefixes', () => {
+    assert.equal(
+      sanitizeSpokenText('Bacakan sebagai guru yang ramah: Selamat datang di materi SQL.'),
+      'Selamat datang di materi SQL.'
+    );
+    assert.equal(
+      sanitizeSpokenText('Baca dengan nada santai dan tempo sedang: Perhatikan query berikut.'),
+      'Perhatikan query berikut.'
+    );
+    assert.equal(
+      sanitizeSpokenText('Read as a friendly teacher: Let us explore recursion.'),
+      'Let us explore recursion.'
+    );
+    assert.equal(
+      sanitizeSpokenText('[Narasi]: Konsep join pada relasi database.'),
+      'Konsep join pada relasi database.'
+    );
+    assert.equal(
+      sanitizeSpokenText('Teks biasa tanpa prefix instruksi.'),
+      'Teks biasa tanpa prefix instruksi.'
+    );
+  });
+});
 
 describe('Gemini TTS: PCM to WAV converter', () => {
   it('generates a valid 44-byte WAV header matching PCM length and format specifications', () => {

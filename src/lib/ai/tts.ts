@@ -101,6 +101,18 @@ export interface TtsResult {
 }
 
 /**
+ * Strips accidental prompt meta-instructions, labels, or narration artifacts
+ * that may have leaked into generated narration text.
+ */
+export function sanitizeSpokenText(text: string): string {
+  return text
+    .replace(/^(\s*\[?(?:narasi|narration|voiceover|audio|instruksi|instruction)\]?\s*[:\-\u2013\u2014]\s*)/i, '')
+    .replace(/^(\s*(?:bacakan|baca)\s+(?:sebagai|dengan|secara)[^:.\n]+[:.\n]\s*)/i, '')
+    .replace(/^(\s*read\s+(?:as|with)[^:.\n]+[:.\n]\s*)/i, '')
+    .trim();
+}
+
+/**
  * Synthesizes audio using Gemini TTS with automatic model failover and PCM-to-WAV wrapping.
  */
 export async function synthesize(
@@ -118,18 +130,11 @@ export async function synthesize(
     throw new TtsUnavailable('GEMINI_API_KEY is not configured');
   }
 
-  // 1. Pre-process text: convert formulas to natural words and strip markup
-  const cleanSpoken = speakable(text, language).replace(/<[^>]*>/g, '').trim();
+  // 1. Pre-process text: convert formulas to natural words, strip markup, and clean prompt artifacts
+  const cleanSpoken = sanitizeSpokenText(speakable(text, language).replace(/<[^>]*>/g, '').trim());
   if (!cleanSpoken) {
     throw new Error('Narration text is empty after preprocessing');
   }
-
-  const prefix =
-    language === 'en'
-      ? 'Read as a friendly, patient teacher, medium pace, natural pauses at punctuation: '
-      : 'Bacakan sebagai guru yang ramah dan sabar, tempo sedang, jeda natural di tanda baca: ';
-
-  const promptText = `${prefix}${cleanSpoken}`;
 
   let lastError: unknown = new TtsUnavailable('All Gemini TTS models are currently exhausted');
 
@@ -142,7 +147,7 @@ export async function synthesize(
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
       const payload = {
-        contents: [{ parts: [{ text: promptText }] }],
+        contents: [{ parts: [{ text: cleanSpoken }] }],
         generationConfig: {
           responseModalities: ['AUDIO'],
           speechConfig: {

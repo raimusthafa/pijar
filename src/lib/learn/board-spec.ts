@@ -232,6 +232,15 @@ function normalize(raw: Record<string, unknown>, recipe?: BoardRecipe): BoardSpe
 /** Sanitizes the board inside an AI-produced material in place; a bad board is deleted, never fatal. */
 export function sanitizeMaterialBoard(material: unknown, language: 'id' | 'en' = 'id'): void {
   if (!isObj(material) || !('interactiveBoard' in material)) return;
+  const topic = String(material.topic ?? '').toLowerCase();
+  const nodeId = String(material.nodeId ?? '').toLowerCase();
+  const title = String(material.title ?? '').toLowerCase();
+  // Strip math boards on database/SQL/programming topics (e.g. SQL aggregate functions)
+  if (/sql|data\s*base|\bdb\b|query|relational|table|nosql|frontend|backend|dsa/i.test(`${topic} ${nodeId} ${title}`) && !/kalkulus|calculus|aljabar|algebra|trigonometri|vektor/i.test(`${topic} ${nodeId}`)) {
+    delete material.interactiveBoard;
+    return;
+  }
+
   let input: Record<string, unknown> | null = isObj(material.interactiveBoard) ? { ...material.interactiveBoard, lang: language } : null;
   // A recipe reference without a curve would silently study x^2: borrow the curve the video plots.
   const hint = exprFromScript(material.videoScript);
@@ -247,10 +256,15 @@ const squash = (s?: string) => (s ?? '').replace(/\s/g, '');
 
 /** The board a lesson shows: its own, unless it is the baked-in x^2 default while the video plots another curve (older cached lessons). */
 export function boardForLesson(
-  material: { interactiveBoard?: BoardSpec; videoScript?: unknown },
+  material: { topic?: string; nodeId?: string; title?: string; interactiveBoard?: BoardSpec; videoScript?: unknown },
   text: string,
   lang: 'id' | 'en' = 'id',
 ): BoardSpec | null {
+  const context = `${material.topic ?? ''} ${material.nodeId ?? ''} ${material.title ?? ''} ${text}`.toLowerCase();
+  if (/sql|data\s*base|\bdb\b|query|relational|table|nosql/i.test(context) && !/kalkulus|calculus|aljabar|algebra|trigonometri|vektor/i.test(context)) {
+    return null;
+  }
+
   const hint = exprFromScript(material.videoScript);
   const own = material.interactiveBoard;
   const stale = !!own && !!hint && squash(own.curves?.[0]?.expr) === 'x^2' && squash(hint) !== 'x^2';

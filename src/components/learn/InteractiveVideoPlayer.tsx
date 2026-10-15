@@ -82,6 +82,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
   const scenes = playable.scenes;
 
   const [ttsMap, setTtsMap] = useState<Record<string, TtsCacheEntry>>({});
+  const loadingTtsRef = useRef<Set<string>>(new Set());
 
   // Each scene runs as long as its narration audio needs (+0.4s pause), or the fallback estimate
   const runtimes = useMemo(() => {
@@ -101,12 +102,15 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [scrubbingTime, setScrubbingTime] = useState<number | null>(null);
   const [speed, setSpeed] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [showCaptions, setShowCaptions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioCap, setAudioCap] = useState<ReturnType<typeof probeAudioCapability> | null>(null);
   const [seekTick, setSeekTick] = useState(0);
+
+  const displayTime = scrubbingTime ?? currentTime;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const narrationRef = useRef<VideoNarrationController | null>(null);
@@ -205,36 +209,41 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     narrationRef.current?.stop();
   }, []);
 
-  // Prefetch active and next scene narration only after playback begins
+  // Prefetch scene narrations in background so audio is ready before scene transitions
   useEffect(() => {
-    if (!isPlaying) return;
     let cancelled = false;
+    const lang = locale === 'en' ? 'en' : 'id';
 
-    const load = async () => {
-      const curr = scenes[activeIndex];
-      const lang = locale === 'en' ? 'en' : 'id';
-      if (curr && !ttsMap[curr.id]) {
-        const est = runtimeSeconds(curr, lang);
-        const entry = await fetchNarrationApi(curr.narration, lang, est);
-        if (!cancelled) {
-          setTtsMap((prev) => ({ ...prev, [curr.id]: entry }));
-        }
-      }
-      const next = scenes[activeIndex + 1];
-      if (next && !ttsMap[next.id]) {
-        const est = runtimeSeconds(next, lang);
-        const entry = await fetchNarrationApi(next.narration, lang, est);
-        if (!cancelled) {
-          setTtsMap((prev) => ({ ...prev, [next.id]: entry }));
-        }
+    const prefetchScene = async (s: (typeof scenes)[number]) => {
+      if (!s || !s.narration || loadingTtsRef.current.has(s.id) || ttsMap[s.id]) return;
+      loadingTtsRef.current.add(s.id);
+      const est = runtimeSeconds(s, lang);
+      const entry = await fetchNarrationApi(s.narration, lang, est);
+      if (!cancelled) {
+        setTtsMap((prev) => (prev[s.id] ? prev : { ...prev, [s.id]: entry }));
       }
     };
 
-    void load();
+    // Prioritize active and next scene, then remaining scenes
+    const prioritized = [
+      scenes[activeIndex],
+      scenes[activeIndex + 1],
+      ...scenes,
+    ].filter(Boolean);
+
+    const seen = new Set<string>();
+    for (const sc of prioritized) {
+      if (sc && !seen.has(sc.id)) {
+        seen.add(sc.id);
+        void prefetchScene(sc);
+      }
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [isPlaying, activeIndex, scenes, locale, ttsMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, scenes, locale]);
 
   // Audio synchronization with active scene
   useEffect(() => {
@@ -244,9 +253,25 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
 
     if (cached?.isAi && cached.url && audio) {
       narrationRef.current?.stop();
+      const targetLocal = current ? Math.max(0, timeRef.current - current.start) : 0;
+      const bounded = Math.max(0, Math.min(targetLocal, cached.duration));
+
       if (audio.src !== cached.url) {
         audio.src = cached.url;
-        audio.currentTime = Math.max(0, Math.min(rawLocal, cached.duration));
+        const applyTime = () => {
+          try {
+            audio.currentTime = bounded;
+          } catch {}
+        };
+        if (audio.readyState >= 1) {
+          applyTime();
+        } else {
+          audio.addEventListener('loadedmetadata', applyTime, { once: true });
+        }
+      } else if (Math.abs(audio.currentTime - bounded) > 0.35) {
+        try {
+          audio.currentTime = bounded;
+        } catch {}
       }
       audio.playbackRate = speed;
       audio.preservesPitch = true;
@@ -263,7 +288,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
         }
       }
     }
-  }, [isPlaying, activeIndex, seekTick, activeScene, rawLocal, speed, isMuted, ttsMap]);
+  }, [isPlaying, activeIndex, current, seekTick, activeScene, speed, isMuted, ttsMap]);
 
   // Playback clock: follows audio.currentTime when AI audio plays, else requestAnimationFrame delta
   useEffect(() => {
@@ -288,6 +313,26 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
       }
       last = now;
 
+      // Handle scene completion / auto-advance to next scene
+      if (current && next >= current.end) {
+        if (activeIndex + 1 < scenes.length) {
+          const nextOffset = sceneOffsets[activeIndex + 1];
+          if (nextOffset) {
+            next = nextOffset.start;
+            if (audio) audio.pause();
+            lastSpokenRef.current = null;
+          }
+        } else {
+          // Reached end of all scenes
+          setTime(totalDuration);
+          setIsPlaying(false);
+          if (audio) audio.pause();
+          narrationRef.current?.stop();
+          onFinishedRef.current?.();
+          return;
+        }
+      }
+
       if (next >= totalDuration) {
         setTime(totalDuration);
         setIsPlaying(false);
@@ -303,7 +348,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isPlaying, totalDuration, setTime, activeScene, current, ttsMap]);
+  }, [isPlaying, totalDuration, setTime, activeScene, activeIndex, current, sceneOffsets, scenes.length, ttsMap]);
 
   const togglePlay = () => {
     if (isPlaying) {
@@ -319,22 +364,40 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
 
   const seek = (v: number, commit = true) => {
     const clamped = Math.max(0, Math.min(v, totalDuration));
+    if (!commit) {
+      setScrubbingTime(clamped);
+      return;
+    }
+    setScrubbingTime(null);
     setTime(clamped);
-    if (commit) {
-      stopSpeech();
-      lastSpokenRef.current = null;
-      if (audioRef.current && current) {
-        const targetLocal = Math.max(0, clamped - current.start);
-        const cached = activeScene ? ttsMap[activeScene.id] : null;
-        if (cached?.isAi) {
-          audioRef.current.currentTime = Math.max(0, Math.min(targetLocal, cached.duration));
+    stopSpeech();
+    lastSpokenRef.current = null;
+
+    const targetOffset = sceneOffsets.find((so) => clamped >= so.start && clamped < so.end) ?? sceneOffsets[sceneOffsets.length - 1];
+    if (audioRef.current && targetOffset) {
+      const targetLocal = Math.max(0, clamped - targetOffset.start);
+      const cached = ttsMap[targetOffset.id];
+      if (cached?.isAi && cached.url) {
+        if (audioRef.current.src !== cached.url) {
+          audioRef.current.src = cached.url;
+        }
+        const boundedTime = Math.max(0, Math.min(targetLocal, cached.duration));
+        const applyTime = () => {
+          try {
+            if (audioRef.current) audioRef.current.currentTime = boundedTime;
+          } catch {}
+        };
+        if (audioRef.current.readyState >= 1) {
+          applyTime();
+        } else {
+          audioRef.current.addEventListener('loadedmetadata', applyTime, { once: true });
         }
       }
-      setSeekTick((n) => n + 1);
     }
+    setSeekTick((n) => n + 1);
   };
 
-  const jumpScene = (i: number) => sceneOffsets[i] && seek(sceneOffsets[i].start);
+  const jumpScene = (i: number) => sceneOffsets[i] && seek(sceneOffsets[i].start, true);
 
   const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>, commit: boolean) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -418,15 +481,23 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
           aria-label={t('learn.player.timeline')}
           aria-valuemin={0}
           aria-valuemax={Math.round(totalDuration)}
-          aria-valuenow={Math.round(currentTime)}
-          aria-valuetext={`${formatTime(currentTime)} / ${formatTime(totalDuration)}`}
+          aria-valuenow={Math.round(displayTime)}
+          aria-valuetext={`${formatTime(displayTime)} / ${formatTime(totalDuration)}`}
           className="group relative flex h-6 cursor-pointer touch-none items-center"
           onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {}
             seekFromPointer(e, false);
           }}
           onPointerMove={(e) => e.buttons && seekFromPointer(e, false)}
-          onPointerUp={(e) => seekFromPointer(e, true)}
+          onPointerUp={(e) => {
+            try {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            } catch {}
+            seekFromPointer(e, true);
+          }}
+          onPointerCancel={() => setScrubbingTime(null)}
           onKeyDown={(e) => {
             const step = e.key === 'ArrowRight' ? 5 : e.key === 'ArrowLeft' ? -5 : 0;
             if (step) {
@@ -437,7 +508,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
           }}
         >
           <div className="relative h-1.5 w-full overflow-hidden rounded-pill bg-surface-strong">
-            <div className="h-full bg-amber" style={{ width: `${(currentTime / totalDuration) * 100}%` }} />
+            <div className="h-full bg-amber" style={{ width: `${(displayTime / totalDuration) * 100}%` }} />
             {sceneOffsets.slice(1).map((so) => (
               <span
                 key={so.id}
@@ -450,7 +521,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
           <span
             aria-hidden
             className="absolute size-3.5 -translate-x-1/2 rounded-pill border-2 border-raised bg-foreground"
-            style={{ left: `${(currentTime / totalDuration) * 100}%` }}
+            style={{ left: `${(displayTime / totalDuration) * 100}%` }}
           />
         </div>
 
@@ -469,7 +540,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
               <ChevronRight {...ICON} />
             </Button>
             <span className="ml-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-              {formatTime(currentTime)} / {formatTime(totalDuration)}
+              {formatTime(displayTime)} / {formatTime(totalDuration)}
             </span>
           </div>
 

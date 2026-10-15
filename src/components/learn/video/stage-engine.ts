@@ -77,6 +77,7 @@ export class StageEngine {
   private lastT = -1;
   private wantT = 0;
   private loading = false;
+  private rebuilding = false;
   private epoch = 0;
   private disposed = false;
 
@@ -693,11 +694,15 @@ export class StageEngine {
     if (this.disposed) return;
     this.wantT = t;
     if (!this.stage) return;
-    if (this.loading) return; // load() applies wantT when the build is done
+    if (this.loading || this.rebuilding) return; // in-flight rebuild will advance to wantT on completion
     if (t + 1e-6 < this.lastT) {
       // Backward: rebuild, then catch up to the latest requested time.
+      this.rebuilding = true;
       void this.rebuild().then(() => {
+        this.rebuilding = false;
         if (!this.disposed) this.advance(this.wantT);
+      }).catch(() => {
+        this.rebuilding = false;
       });
       return;
     }

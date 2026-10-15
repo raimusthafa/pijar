@@ -225,3 +225,66 @@ it('node-check: unknown node and non-stored graph ids', () => {
   assert.equal(isStoredGraphId('demo-graph'), false);
   assert.equal(isStoredGraphId(undefined), false);
 });
+
+describe('Pedagogical Video & Text Overhaul: Domain isolation & comprehensive depth', () => {
+  it('SQL and Database topics strictly reject interactive math boards', async () => {
+    const { pickBoardRecipe, fallbackBoardSpec, boardForLesson, sanitizeMaterialBoard } = await import('../src/lib/learn/board-spec.ts');
+    const sqlTopics = [
+      'SQL Aggregate Functions',
+      'Database Group By and Having',
+      'PostgreSQL Window Functions',
+      'MySQL Index Optimization',
+      'Relational Database Schema Design',
+    ];
+
+    for (const title of sqlTopics) {
+      assert.equal(pickBoardRecipe(title), null, `pickBoardRecipe should be null for ${title}`);
+      assert.equal(fallbackBoardSpec(title), null, `fallbackBoardSpec should be null for ${title}`);
+
+      const mat = {
+        title,
+        interactiveBoard: { recipe: 'derivative-tangent' },
+        videoScript: { scenes: [] },
+      };
+      sanitizeMaterialBoard(mat, 'id');
+      assert.equal(mat.interactiveBoard, undefined, `sanitizeMaterialBoard should purge board for ${title}`);
+      assert.equal(boardForLesson(mat, title, 'id'), null, `boardForLesson should return null for ${title}`);
+    }
+  });
+
+  it('Fallback video generates 4 scenes spanning at least 80 seconds with topic-relevant recipes', async () => {
+    const { buildFallbackVideo } = await import('../src/lib/learn/scene-fallback.ts');
+    const video = buildFallbackVideo({
+      nodeId: 'sql-agg',
+      label: 'Aggregate Functions',
+      topic: 'sql-databases',
+      category: 'SQL Querying',
+      desc: 'COUNT, SUM, AVG aggregate operations in relational queries',
+      mathy: false,
+      visual: 'data-flow',
+      language: 'id',
+    });
+
+    assert.equal(video.scenes.length, 4, 'Video must contain 4 pedagogical scenes');
+    assert.ok(video.totalDurationSeconds >= 80, `Total duration must be at least 80s, got ${video.totalDurationSeconds}`);
+
+    const recipeNames = video.scenes.map((s) => s.recipe?.name);
+    assert.ok(!recipeNames.includes('derivative-tangent'), 'SQL fallback video must not include calculus derivative tangent');
+    assert.ok(recipeNames.includes('concept-map'), 'Must include concept-map scene');
+    assert.ok(recipeNames.includes('pipeline'), 'Must include pipeline execution scene');
+  });
+
+  it('Topic-aware material fallback produces comprehensive depth with multiple sections and examples', async () => {
+    const { buildTopicAwareFallback } = await import('../src/lib/learn/generator.ts');
+    const fallback = buildTopicAwareFallback({ nodeId: 'sql-group-by', nodeLabel: 'SQL Group By', topic: 'sql-databases', language: 'id' });
+
+    assert.ok(fallback.conceptExplanation.length >= 400, 'Concept explanation must have sufficient text depth');
+    assert.ok(fallback.conceptExplanation.includes('### 1.'), 'Must include section 1');
+    assert.ok(fallback.conceptExplanation.includes('### 2.'), 'Must include section 2');
+    assert.ok(fallback.conceptExplanation.includes('### 3.'), 'Must include section 3');
+    assert.ok(fallback.conceptExplanation.includes('### 4.'), 'Must include section 4');
+    assert.ok(fallback.examples.length >= 2, 'Must provide at least 2 progressive code examples');
+    assert.ok(fallback.checkpointQuestions.length >= 3, 'Must provide at least 3 checkpoint questions');
+  });
+});
+
