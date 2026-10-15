@@ -148,6 +148,7 @@ export function Workspace({ graphId, nodeId, concept, user }: { graphId: string;
   const [composeErr, setComposeErr] = useState('');
   const [advancing, setAdvancing] = useState(false);
   const [advanceErr, setAdvanceErr] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const abort = useRef<AbortController | null>(null);
@@ -176,7 +177,7 @@ export function Workspace({ graphId, nodeId, concept, user }: { graphId: string;
         setStatus(code === 'migration_missing' ? 'blocked' : 'error');
       });
     return () => { live = false; };
-  }, [graphId, nodeId, fail]);
+  }, [graphId, nodeId, fail, attempt]);
 
   // Follow the tail only while the reader is already near it.
   useEffect(() => {
@@ -279,7 +280,7 @@ export function Workspace({ graphId, nodeId, concept, user }: { graphId: string;
         icon={PencilRuler}
         title={t(status === 'blocked' ? 'workspace.blocked.title' : 'workspace.err.load')}
         description={status === 'blocked' ? t('workspace.blocked.desc') : undefined}
-        action={status === 'error' ? <Button variant="secondary" onClick={() => router.refresh()}>{t('common.action.retry')}</Button> : undefined}
+        action={status === 'error' ? <Button variant="secondary" onClick={() => { setStatus('loading'); setAttempt(a => a + 1); }}>{t('common.action.retry')}</Button> : undefined}
       />
     );
   } else {

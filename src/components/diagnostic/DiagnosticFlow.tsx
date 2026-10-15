@@ -59,6 +59,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
   const [mapDone, setMapDone] = useState(false);
   const prepStages = useStages('diagnostic', ['read', 'map', 'first']);
   const saveStages = useStages('save', ['score', 'mark', 'store']);
+  const nextStages = useStages('diagnostic', ['next']);
 
   const [graph, setGraph] = useState<Graph | null>(null);
   const [fixedList, setFixedList] = useState<Q[] | null>(null); // fixed-length fallback
@@ -341,7 +342,7 @@ export function DiagnosticFlow({ topicParam }: { topicParam?: string }) {
 
   if (stage === 'quiz' && current) {
     if (waiting) {
-      return <div className="mx-auto w-full max-w-2xl"><QuestionSkeleton title={t('diagnostic.waiting.title')} /></div>;
+      return <GeneratingScreen title={t('diagnostic.waiting.title')} stages={nextStages} className="min-h-[calc(100dvh-16rem)]" />;
     }
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-4">

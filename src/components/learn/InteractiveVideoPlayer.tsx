@@ -10,7 +10,6 @@ import { distributeCaptions } from '@/lib/learn/captions';
 import { MathText } from '@/components/ui/math-text';
 import { VideoNarrationController, probeAudioCapability } from '@/lib/learn/audio';
 import type { StageStatus } from './video/StageView';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
@@ -211,7 +210,6 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
 
   // Prefetch scene narrations in background so audio is ready before scene transitions
   useEffect(() => {
-    let cancelled = false;
     const lang = locale === 'en' ? 'en' : 'id';
 
     const prefetchScene = async (s: (typeof scenes)[number]) => {
@@ -219,9 +217,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
       loadingTtsRef.current.add(s.id);
       const est = runtimeSeconds(s, lang);
       const entry = await fetchNarrationApi(s.narration, lang, est);
-      if (!cancelled) {
-        setTtsMap((prev) => (prev[s.id] ? prev : { ...prev, [s.id]: entry }));
-      }
+      setTtsMap((prev) => (prev[s.id] ? prev : { ...prev, [s.id]: entry }));
     };
 
     // Prioritize active and next scene, then remaining scenes
@@ -239,9 +235,6 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
       }
     }
 
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, scenes, locale]);
 
@@ -277,7 +270,7 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
       audio.preservesPitch = true;
       audio.muted = isMuted;
       audio.play().catch(() => {});
-    } else {
+    } else if (cached) {
       if (audio && !audio.paused) {
         audio.pause();
       }
@@ -409,13 +402,6 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     else containerRef.current?.requestFullscreen().catch(() => {});
   };
 
-  const isAiVoice = Boolean(activeScene && ttsMap[activeScene.id]?.isAi);
-  const voiceLabel = isAiVoice
-    ? t('learn.player.voice.ai')
-    : audioCap?.hasSpeechSynthesis
-      ? t('learn.player.voice.device')
-      : t('learn.player.voice.none');
-
   const iconBtn = 'text-foreground';
 
   return (
@@ -428,7 +414,6 @@ export function InteractiveVideoPlayer({ script, onFinished }: InteractiveVideoP
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-hairline bg-raised px-5 py-3">
         <p className="min-w-0 flex-1 basis-48 text-sm font-medium">{playable.title}</p>
-        {voiceLabel && <Badge variant="outline">{voiceLabel}</Badge>}
       </div>
 
       <div className="bg-action">

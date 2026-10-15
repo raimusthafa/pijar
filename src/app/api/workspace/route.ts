@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ workspace, events });
   } catch (e) {
     if (e instanceof MigrationMissing) return NextResponse.json({ code: 'migration_missing' }, { status: 503 });
+    console.error('workspace open failed:', e instanceof Error ? e.message : e);
     return NextResponse.json({ code: 'error' }, { status: 500 });
   }
 }

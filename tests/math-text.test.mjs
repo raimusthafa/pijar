@@ -73,3 +73,13 @@ describe('math-text: bare TeX answer options', () => {
     assert.equal(joined('ab + ac'), 'ab + ac');
   });
 });
+
+describe('latex example blocks', () => {
+  it('a $$-wrapped limit example is one display formula, as CodeBlock renders it', () => {
+    const src = r`$$\lim_{x \to 1} \frac{x^2 - 1}{x - 1} = 2$$`;
+    const segs = splitMath(src);
+    assert.equal(segs.length, 1);
+    assert.deepEqual([segs[0].t, segs[0].display], ['math', true]);
+    assert.ok(segs[0].v.startsWith(r`\lim_{x \to 1}`));
+  });
+});

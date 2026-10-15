@@ -47,6 +47,13 @@ export function RichText({ text }: { text: string }) {
 
 /** Plain bordered code block: a calm reading surface, not a terminal. */
 export function CodeBlock({ code, language }: { code: string; language?: string }) {
+  if (language && /^(la)?tex$/i.test(language)) {
+    return (
+      <div className="overflow-x-auto rounded-inner border border-hairline bg-raised p-4 text-foreground">
+        <MathText text={`$$${code.trim().replace(/^\$+|\$+$/g, '')}$$`} />
+      </div>
+    );
+  }
   return (
     <figure className="overflow-hidden rounded-inner border border-hairline bg-raised">
       {language && (

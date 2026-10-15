@@ -8,6 +8,7 @@ import { AppShell } from '@/components/shell/AppShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GeneratingScreen, useStages } from '@/components/ui/generating-screen';
+import { ReaderPrefs, useReaderPrefs } from '@/components/learn/ReaderPrefs';
 import { InteractiveVideoPlayer } from '@/components/learn/InteractiveVideoPlayer';
 import { InteractiveBoard } from '@/components/learn/board/InteractiveBoard';
 import { PostTest } from '@/components/learn/PostTest';
@@ -84,6 +85,7 @@ function LearnContent({ params }: LearnPageProps) {
 
   const [fetched, setFetched] = useState<{ key: string; material?: DetailedLearningMaterial; topic?: string; failed?: boolean; notFound?: boolean }>();
   const [attempt, setAttempt] = useState(0);
+  const [reader, setReader] = useReaderPrefs();
   const [passedKey, setPassedKey] = useState('');
 
   // The stored topic is client-only; the server snapshot (null) keeps `ready` false until it resolves.
@@ -246,7 +248,7 @@ function LearnContent({ params }: LearnPageProps) {
         )}
 
         {/* Content Body */}
-        <div className="mx-auto max-w-2xl space-y-12">
+        <div className="mx-auto max-w-2xl space-y-12" data-reader-theme={reader.theme} style={{ zoom: reader.size / 100 }}>
           {/* Objective Callout Card */}
           <div className="relative overflow-hidden rounded-card border border-hairline bg-surface p-6">
             <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-amber" aria-hidden />
@@ -394,6 +396,7 @@ function LearnContent({ params }: LearnPageProps) {
         </div>
       </article>
 
+      <ReaderPrefs prefs={reader} onChange={setReader} />
       <TutorChat nodeId={nodeId} title={material.title} topic={topic} />
     </Shell>
   );

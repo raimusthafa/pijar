@@ -94,10 +94,20 @@
   --pj-z-sticky: 20;
   --pj-z-nav: 40;
   --pj-z-overlay: 50;
+
+  /* reader theme swatches (ReaderPrefs preview chips) */
+  --pj-reader-light-bg: #fbfaf7;
+  --pj-reader-light-fg: #1b222c;
+  --pj-reader-sepia-bg: #f4ecd8;
+  --pj-reader-sepia-fg: #2f2a22;
+  --pj-reader-dark-bg: #151a21;
+  --pj-reader-dark-fg: #ece8de;
 }
 
 /* ── 2. shadcn variable names mapped onto the tokens ───────── */
-:root {
+/* [data-reader-theme] repeats the mapping so a themed block re-resolves it against its own --pj-* tokens. */
+:root,
+[data-reader-theme] {
   --background: var(--pj-ground);
   --foreground: var(--pj-text);
   --card: var(--pj-surface);
@@ -474,4 +484,45 @@
     animation: none;
     box-shadow: 0 0 0 2px var(--pj-amber);
   }
+}
+
+/* ── 5. Reader themes (lesson text block only, set by ReaderPrefs) ── */
+[data-reader-theme='sepia'] {
+  --pj-ground: #f4ecd8;
+  --pj-surface: #ebe1c9;
+  --pj-surface-strong: #e0d4b8;
+  --pj-raised: #f9f3e3;
+  --pj-hairline: rgba(60, 45, 20, 0.14);
+  --pj-hairline-strong: rgba(60, 45, 20, 0.24);
+  --pj-text: #2f2a22;
+  --pj-text-muted: #5f574a;
+  --pj-text-faint: #82796a;
+}
+
+[data-reader-theme='dark'] {
+  --pj-ground: #151a21;
+  --pj-surface: #1d242d;
+  --pj-surface-strong: #28313c;
+  --pj-raised: #222a34;
+  --pj-hairline: rgba(236, 232, 222, 0.12);
+  --pj-hairline-strong: rgba(236, 232, 222, 0.22);
+  --pj-field-border: rgba(236, 232, 222, 0.5);
+  --pj-hover: rgba(236, 232, 222, 0.08);
+  --pj-text: #ece8de;
+  --pj-text-muted: #a9b1bd;
+  --pj-text-faint: #7f8a98;
+  --pj-action-bg: var(--pj-amber);
+  --pj-action-bg-hover: #e3b45a;
+  --pj-action-fg: var(--pj-amber-fg);
+  --pj-focus: var(--pj-amber);
+  --pj-disabled-bg: #28313c;
+  --pj-disabled-fg: #7f8a98;
+}
+
+[data-reader-theme='sepia'],
+[data-reader-theme='dark'] {
+  background: var(--pj-ground);
+  color: var(--pj-text);
+  border-radius: var(--pj-r-card);
+  padding: 1.5rem;
 }

@@ -288,3 +288,19 @@ describe('Pedagogical Video & Text Overhaul: Domain isolation & comprehensive de
   });
 });
 
+
+const { parseReaderPrefs, DEFAULT_READER_PREFS } = await import('../src/lib/learn/reader-prefs.ts');
+
+describe('reader prefs', () => {
+  it('defaults to the normal reading size', () => {
+    assert.deepEqual(parseReaderPrefs(null), DEFAULT_READER_PREFS);
+    assert.equal(DEFAULT_READER_PREFS.size, 100);
+  });
+
+  it('keeps valid stored prefs and repairs each bad field alone', () => {
+    assert.deepEqual(parseReaderPrefs('{"size":150,"theme":"dark"}'), { size: 150, theme: 'dark' });
+    assert.deepEqual(parseReaderPrefs('{"size":9999,"theme":"dark"}'), { size: 100, theme: 'dark' });
+    assert.deepEqual(parseReaderPrefs('{"size":100,"theme":"neon"}'), { size: 100, theme: 'light' });
+    assert.deepEqual(parseReaderPrefs('not json'), DEFAULT_READER_PREFS);
+  });
+});

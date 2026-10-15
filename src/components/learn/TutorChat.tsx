@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, X } from 'lucide-react';
+import { Bot, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/lib/i18n/client';
@@ -57,8 +57,11 @@ export function TutorChat({ nodeId, title, topic }: { nodeId: string; title: str
 
   if (!open) {
     return (
-      <Button className="fixed right-5 bottom-5 z-40" variant="secondary" onClick={() => setOpen(true)}>
-        <MessageCircle strokeWidth={1.75} aria-hidden />
+      <Button
+        className="fixed right-5 bottom-5 z-40 h-12 bg-amber pr-5 pl-4 text-amber-foreground hover:bg-amber hover:brightness-95"
+        onClick={() => setOpen(true)}
+      >
+        <Bot className="size-5 text-action-foreground" strokeWidth={1.75} aria-hidden />
         {t('learn.chat.open')}
       </Button>
     );
