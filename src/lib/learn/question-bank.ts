@@ -156,13 +156,16 @@ export function fallbackQuestions(p: GetQuestionsParams): BankQuestion[] {
   return [...mock, ...generic].slice(0, n);
 }
 
-function buildPrompt(p: GetQuestionsParams, per: number): { prompt: string; system: string } {
+/** `allLevels` fills the whole bank in one call (post-test); a single question only asks for its own level so the call stays inside the model timeout. */
+function buildPrompt(p: GetQuestionsParams, per: number, allLevels: boolean): { prompt: string; system: string } {
   const lang = p.language === 'en' ? 'English' : 'Bahasa Indonesia';
   const label = p.label || p.nodeId;
   return {
     system: `You write multiple-choice questions for a tutoring app. Output only valid JSON. Write in ${lang}. ${MATH_FORMAT_NOTE}`,
     prompt: `Topic: "${p.topic}". Concept: "${label}".
-Write ${per} easy, ${per} medium and ${per} hard multiple-choice questions about this concept, in ${lang}.
+${allLevels
+  ? `Write ${per} easy, ${per} medium and ${per} hard multiple-choice questions about this concept, in ${lang}.`
+  : `Write ${per} ${p.difficulty} multiple-choice questions about this concept, in ${lang}.`}
 easy = recall or recognize; medium = apply to a small case; hard = analyze, compare or find the flaw.
 Rules: each question has 4 options with exactly ONE correct answer, and the correct position varies. Distractors must be plausible and distinct (never the same value written twice). Solve each question yourself first and key the option you actually computed; the explanation must show that working and quote the correct option's text. No two questions may test the same item with reworded or reordered numbers. Stay on this concept only. Math goes in LaTeX inside $...$ with exponents written as ^{} (for example $3x^{5}$, never 3x5).
 JSON: {"questions":[{"difficulty":"easy|medium|hard","question":"...","options":["..","..","..",".."],"correctIndex":0,"explanation":"why the answer is right","conceptTested":"..."}]}`,
@@ -175,10 +178,18 @@ const memo = new Map<string, BankQuestion[]>();
 /** The post-test is served by one request and graded by another, so both must pick the same questions: sort by id, never by arrival order. */
 const pick = (list: BankQuestion[], count: number) => [...list].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, count);
 
+// A short set padded with fallback questions is served once and graded later; without this the grading call
+// would hit the AI again, get different questions, and mark the padded ones wrong.
+// ponytail: per process; a multi-instance deploy needs these rows persisted in question_bank.
+const padded = new Map<string, BankQuestion[]>();
+
 export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[]> {
   const count = p.count ?? 3;
   const { nodeId } = p;
   const topic = bankTopic(p.topic, p.language);
+  const paddedKey = `${topic}|${nodeId}|${p.difficulty}|${count}`;
+  const settled = padded.get(paddedKey);
+  if (settled) return settled;
   let supabase: any = null;
   try {
     const { createClient } = await import('@/lib/supabase/server');
@@ -206,13 +217,13 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
   try {
     const { generateStructuredJSON } = await import('@/lib/ai/provider');
     for (let round = 0; round < 2 && have.length < count; round++) {
-      const { prompt, system } = buildPrompt(p, Math.max(3, count));
+      const { prompt, system } = buildPrompt(p, Math.max(3, count), count >= 3);
       const raw = await generateStructuredJSON<{ questions: any[] } | any[]>(prompt, system);
       // Some models return the bare array instead of {questions: [...]}.
       const list: any[] = (Array.isArray(raw) ? raw : raw?.questions) ?? [];
       const stamp = `${Date.now().toString(36)}${round}`;
       const good = acceptQuestions(list.map((q, i) => {
-        const difficulty: Difficulty = DIFFICULTIES.includes(q?.difficulty) ? q.difficulty : 'medium';
+        const difficulty: Difficulty = DIFFICULTIES.includes(q?.difficulty) ? q.difficulty : p.difficulty;
         return { ...q, id: `${nodeId}-${difficulty}-${stamp}${i}`, difficulty } as BankQuestion;
       }), have);
       if (!good.length) continue;
@@ -225,11 +236,16 @@ export async function getQuestions(p: GetQuestionsParams): Promise<BankQuestion[
       }
       have = [...have, ...good.filter(q => q.difficulty === p.difficulty)];
     }
-    if (have.length > cached.length) return [...pick(have, count), ...fallbackQuestions({ ...p, count })].slice(0, count);
+    if (have.length > cached.length) return settle(paddedKey, [...pick(have, count), ...fallbackQuestions({ ...p, count })].slice(0, count), have.length, count);
   } catch (e) {
     console.warn('question-bank: AI unavailable, using fallback', e);
   }
-  return [...have, ...fallbackQuestions({ ...p, count })].slice(0, count);
+  return settle(paddedKey, [...have, ...fallbackQuestions({ ...p, count })].slice(0, count), have.length, count);
+}
+
+function settle(key: string, list: BankQuestion[], real: number, count: number): BankQuestion[] {
+  if (real < count) padded.set(key, list);
+  return list;
 }
 
 /** Post-test: up to 10 items (3 easy, 4 medium, 3 hard). One AI call fills all levels. */

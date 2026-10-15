@@ -56,9 +56,9 @@ export function MarketingNav({
     >
       <nav
         aria-label={t('shell.nav.primary')}
-        className="pj-glass pointer-events-auto flex h-14 w-full max-w-5xl items-center justify-between gap-2 rounded-pill border border-hairline pr-2 pl-5"
+        className="pj-glass pointer-events-auto flex h-14 w-full max-w-5xl items-center justify-between gap-2 rounded-pill border border-hairline pr-2 pl-5 md:grid md:grid-cols-[1fr_auto_1fr]"
       >
-        <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill">
+        <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill md:justify-self-start">
           <Logo size={26} wordmark />
         </Link>
 
@@ -75,7 +75,7 @@ export function MarketingNav({
           ))}
         </ul>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-1 md:flex md:justify-self-end">
           <LocaleSwitch />
           {signedIn ? (
             <Button size="sm" render={<Link href="/dashboard" />} nativeButton={false}>

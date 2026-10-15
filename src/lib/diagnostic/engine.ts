@@ -118,6 +118,18 @@ export function evaluateDiagnosticAnswers(
   };
 }
 
+/** "Saya ingin memahami turunan fungsi" -> "Turunan fungsi": drop the intent phrase, keep the subject, cap at 60 chars on a word. */
+export function topicFromSentence(text: string): string {
+  const first = text.trim().split(/[\n:.!?]/)[0];
+  const subject = first
+    .replace(/^(?:(?:saya|aku|gue|kami)\s+)?(?:(?:sangat|ingin sekali)\s+)?(?:ingin|mau|pengen|pengin|hendak|butuh|perlu)\s+(?:untuk\s+)?(?:belajar|memahami|mempelajari|mengerti|menguasai|paham|bisa)\s+/i, '')
+    .replace(/^(?:belajar|memahami|mempelajari|mengerti|menguasai)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim() || first.trim();
+  const cut = subject.length > 60 ? subject.slice(0, 60).replace(/\s+\S*$/, '') : subject;
+  return cut.charAt(0).toUpperCase() + cut.slice(1);
+}
+
 /**
  * Procedural Cognitive Intake Fallback: parses text, pain points, and practitioner ambitions.
  */
@@ -146,7 +158,7 @@ export function buildProceduralIntakeFallback(text: string): CognitiveIntakeResu
     domain_category = 'Arsitektur Data & Basis Data';
   } else if (text.trim().length > 0) {
     // No known keyword: keep the learner's own words instead of a wrong tech label.
-    canonical_topic = text.trim().split(/[\n:]/)[0].slice(0, 60).trim() || text.trim().slice(0, 60);
+    canonical_topic = topicFromSentence(text);
     domain_category = 'Umum';
   }
 
@@ -185,6 +197,8 @@ export function buildProceduralIntakeFallback(text: string): CognitiveIntakeResu
 
   const empathy_mentor_note = isPractitioner
     ? `Ambisi yang luar biasa! Untuk menjadi praktisi yang mahir di bidang ${canonical_topic}, kamu membutuhkan lebih dari sekadar teori dasar. Pijar telah mengkalibrasi kurikulum dan studi kasus arsitektural yang menantang standar industri.`
+    : !isBeginnerConfused
+    ? `Pijar menyusun alur belajar ${canonical_topic} langkah demi langkah, mulai dari fondasi yang kamu perlukan lalu naik ke yang lebih lanjut.`
     : `Sangat wajar merasa bingung ketika memulai ${canonical_topic} karena materinya sering kali berserakan tanpa peta jalan yang jelas. Di Pijar, kamu tidak perlu mencari-cari sumber luar lagi. Kami telah mengurasi alur belajar langkah demi langkah dari fondasi paling awal.`;
 
   return {

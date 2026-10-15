@@ -50,8 +50,8 @@ export default async function LandingPage() {
         <section id="hero" className="p-3">
           <div className={`relative isolate overflow-hidden rounded-card-lg ${AMBER_PANEL}`}>
             <Particles className="absolute inset-0 -z-10 size-full" />
-            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-5 pt-3 md:px-9">
-              <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill">
+            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-5 pt-3 md:grid md:grid-cols-[1fr_auto_1fr] md:px-9">
+              <Link href="/" aria-label={t('common.brand.name')} className="rounded-pill md:justify-self-start">
                 <Logo size={30} wordmark />
               </Link>
               <div className="hidden items-center gap-1 md:flex">
@@ -62,7 +62,7 @@ export default async function LandingPage() {
                   {t('shell.nav.features')}
                 </Link>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 md:justify-self-end">
                 <LocaleSwitch className="hidden md:inline-flex" />
                 <Button variant="ghost" size="sm" render={<Link href="/auth/login" />} nativeButton={false}>
                   {t('common.action.signIn')}

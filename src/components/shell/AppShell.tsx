@@ -38,7 +38,7 @@ function NavList({ onNavigate }: { onNavigate?: boolean }) {
           href,
           'aria-current': active ? ('page' as const) : undefined,
           className: cn(
-            'pj-press flex h-12 items-center gap-3.5 rounded-pill px-4 text-base transition-colors duration-150',
+            'pj-press flex h-11 items-center gap-3 rounded-pill px-4 text-sm transition-colors duration-150',
             active
               ? 'bg-action text-action-foreground font-medium'
               : 'text-muted-foreground hover:bg-hover hover:text-foreground',
@@ -46,7 +46,7 @@ function NavList({ onNavigate }: { onNavigate?: boolean }) {
         };
         const content = (
           <>
-            <Icon className="size-6 shrink-0" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-5 shrink-0" strokeWidth={1.75} aria-hidden />
             {t(labelKey)}
           </>
         );

@@ -4,8 +4,8 @@ import { defineMessages } from '../define';
 // Sample concept names, the sample question and the status labels are illustrations of the product, not data about users.
 export default defineMessages({
   id: {
-    'hero.title.a': 'Susah kalkulus?',
-    'hero.title.b': 'Mungkin masalahnya di aljabar.',
+    'hero.title.a': 'Belajar terasa sulit?',
+    'hero.title.b': 'Mungkin ada konsep yang belum kamu pahami.',
     'hero.sub':
       'Pijar mencari konsep dasar yang belum kuat dari jawabanmu, lalu menyusun jalur belajar mulai dari titik itu.',
     'cta.primary': 'Mulai diagnostik',
@@ -88,8 +88,8 @@ export default defineMessages({
     'close.title.b': 'kamu benar-benar berada',
   },
   en: {
-    'hero.title.a': 'Struggling with calculus?',
-    'hero.title.b': 'The problem may be in algebra.',
+    'hero.title.a': 'Learning feels hard?',
+    'hero.title.b': 'There may be a concept you have not understood yet.',
     'hero.sub':
       'Pijar finds the foundation concept you have not mastered yet, then builds a learning path from that point.',
     'cta.primary': 'Start the diagnostic',

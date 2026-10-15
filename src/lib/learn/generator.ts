@@ -64,6 +64,29 @@ function validateMaterialContract(data: DetailedLearningMaterial): data is Detai
 
 const NON_MATH_DOMAINS = /\b(sql|database|db|query|relational|postgres|mysql|sqlite|nosql|table|column|schema|backend|frontend|web|javascript|typescript|python|golang|react|dsa|rekursi|stack|queue|tree|graph)\b/i;
 
+// Section plan and example rules for the lesson text. The code plan talks about syntax and execution, which is wrong for a math lesson.
+const CODE_TEXT_RULES = `   - ### 1. Latar Belakang & Masalah (Kenapa konsep ini diciptakan)
+   - ### 2. Prinsip Kerja & Mekanisme Internal (Under the hood)
+   - ### 3. Aturan Sintaksis & Alur Eksekusi
+   - ### 4. Skenario Eksekusi Langkah demi Langkah (Step-by-step trace)
+   - ### 5. Best Practice & Optimasi Performa
+2. "examples" HARUS berisi 2 sampai 3 contoh kode progresif:
+   - Contoh 1: Sintaks fundamental / kanonikal dasar.
+   - Contoh 2: Kasus penggunaan di lingkungan produksi nyata.
+   - Contoh 3 (opsional): Edge case, penanganan error, atau optimasi performa.`;
+
+const MATH_TEXT_RULES = `   - ### 1. Latar Belakang & Masalah (Kenapa konsep ini penting)
+   - ### 2. Gagasan Inti & Intuisi
+   - ### 3. Definisi & Aturan Utama
+   - ### 4. Contoh Pengerjaan Langkah demi Langkah
+   - ### 5. Kesalahan Umum & Tips Mengerjakan Soal
+   Ini pelajaran matematika: jangan memakai istilah pemrograman (sintaks, eksekusi, compiler, performa).
+2. "examples" HARUS berisi 2 sampai 3 contoh soal progresif beserta penyelesaiannya:
+   - Contoh 1: Soal dasar yang langsung menerapkan definisi atau aturan.
+   - Contoh 2: Soal penerapan di situasi nyata.
+   - Contoh 3 (opsional): Soal dengan jebakan atau kasus khusus.
+   Isi "code" dengan langkah pengerjaan dalam LaTeX (tanpa tanda $), dan isi "language" dengan "latex".`;
+
 const MATH_WORDS = /\b(?:kalkulus|calculus|vektor|vector|turunan|derivative|integral|limit|rasio|ratio|perbandingan|eksponen|exponen|aljabar|algebra|matematika|\bmath\b|gradien|slope|trigonometri|trigonometry|sinus|cosinus|persamaan\s+kuadrat|parabola)\b/i;
 
 /** True when the lesson is about mathematical concepts (calculus, linear algebra, vectors, derivatives, trigonometry). */
@@ -323,15 +346,7 @@ KEMBALIKAN HANYA JSON VALID SESUAI FORMAT SCHEMA.`;
 
 ATURAN MATERI TEKS:
 1. "conceptExplanation" HARUS mendalam dan terstruktur rapi menggunakan Markdown (minimal 400 - 800 kata). Wajib mencakup:
-   - ### 1. Latar Belakang & Masalah (Kenapa konsep ini diciptakan)
-   - ### 2. Prinsip Kerja & Mekanisme Internal (Under the hood)
-   - ### 3. Aturan Sintaksis & Alur Eksekusi
-   - ### 4. Skenario Eksekusi Langkah demi Langkah (Step-by-step trace)
-   - ### 5. Best Practice & Optimasi Performa
-2. "examples" HARUS berisi 2 sampai 3 contoh kode progresif:
-   - Contoh 1: Sintaks fundamental / kanonikal dasar.
-   - Contoh 2: Kasus penggunaan di lingkungan produksi nyata.
-   - Contoh 3 (opsional): Edge case, penanganan error, atau optimasi performa.
+${mathTopic ? MATH_TEXT_RULES : CODE_TEXT_RULES}
 3. "keyDefinitions" minimal 3 istilah kunci yang jelas.
 4. "commonMisconceptions" minimal 2 miskonsepsi umum beserta pelurusan logikanya.
 

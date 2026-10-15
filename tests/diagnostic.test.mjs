@@ -223,3 +223,19 @@ describe('PIJAR Zero-Mock Diagnostic & Dynamic DAG Curriculum Test Suite', () =>
     assert.equal(hasPractitionerNode, true, 'Kurikulum harus memuat topik praktisi seperti Threat Model / Hardening');
   });
 });
+
+const { topicFromSentence, buildProceduralIntakeFallback: fallback } = await import('../src/lib/diagnostic/engine.ts');
+
+describe('offline intake keeps a short topic', () => {
+  test('drops the intent phrase instead of echoing the whole sentence', () => {
+    assert.equal(topicFromSentence('Saya ingin memahami turunan fungsi aljabar dan arti garis singgung'), 'Turunan fungsi aljabar dan arti garis singgung');
+    assert.equal(topicFromSentence('mau belajar integral tak tentu.'), 'Integral tak tentu');
+    assert.ok(topicFromSentence('Saya ingin memahami '.concat('kalkulus '.repeat(20))).length <= 60);
+  });
+
+  test('does not tell a confident learner that they feel lost', () => {
+    const r = fallback('Saya ingin memahami turunan fungsi aljabar');
+    assert.equal(r.canonical_topic, 'Turunan fungsi aljabar');
+    assert.ok(!/bingung/.test(r.empathy_mentor_note));
+  });
+});

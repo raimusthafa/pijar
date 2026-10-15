@@ -65,7 +65,7 @@ export function Select({
       </BaseSelect.Trigger>
 
       <BaseSelect.Portal>
-        <BaseSelect.Positioner sideOffset={6} align="start" className="z-50 outline-none">
+        <BaseSelect.Positioner alignItemWithTrigger={false} side="bottom" sideOffset={6} align="start" collisionPadding={8} className="z-50 outline-none">
           <BaseSelect.Popup
             style={{ transformOrigin: 'var(--transform-origin)' }}
             className={cn(

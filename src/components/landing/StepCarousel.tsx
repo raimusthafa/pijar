@@ -81,7 +81,7 @@ function Snippet({ n }: { n: number }) {
   );
 }
 
-/** Horizontal scroll-snap carousel of the five steps. The card most in view gets the amber tone. */
+/** Horizontal scroll-snap carousel of the five steps. The leftmost card in view gets the amber tone. */
 export function StepCarousel() {
   const { t } = useT();
   const track = useRef<HTMLDivElement>(null);
@@ -91,9 +91,15 @@ export function StepCarousel() {
     const el = track.current;
     if (!el) return;
     const cards = Array.from(el.children) as HTMLElement[];
+    const seen = new Set<number>();
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) if (e.isIntersecting) setActive(cards.indexOf(e.target as HTMLElement));
+        for (const e of entries) {
+          const i = cards.indexOf(e.target as HTMLElement);
+          if (e.isIntersecting) seen.add(i);
+          else seen.delete(i);
+        }
+        if (seen.size) setActive(Math.min(...seen));
       },
       { root: el, threshold: 0.6 },
     );
