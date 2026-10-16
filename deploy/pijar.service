@@ -1,0 +1,15 @@
+[Unit]
+Description=Pijar (Next.js standalone)
+After=network.target
+
+[Service]
+User=deploy
+WorkingDirectory=/var/www/pijar/current
+EnvironmentFile=/etc/pijar.env
+Environment=NODE_ENV=production PORT=3200 HOSTNAME=127.0.0.1
+ExecStart=/opt/node22/bin/node server.js
+Restart=always
+MemoryMax=900M
+
+[Install]
+WantedBy=multi-user.target

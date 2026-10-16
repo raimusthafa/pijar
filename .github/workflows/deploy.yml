@@ -1,0 +1,86 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Nilai publik: URL dan publishable key Supabase memang tertanam di bundle klien.
+  NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://dkqzxivvsfvhyqglbvzb.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_CcLSIjxLNvCKu_e3Mrzxig_jpsn1DiR' }}
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_CcLSIjxLNvCKu_e3Mrzxig_jpsn1DiR' }}
+  NEXT_PUBLIC_DEMO_MODE: "false"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  test:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Package standalone build
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          cp -r public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+          tar -czf pijar-standalone.tar.gz -C .next/standalone .
+          ls -lh pijar-standalone.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: pijar-standalone
+          path: pijar-standalone.tar.gz
+          retention-days: 7
+
+  release:
+    # Server mengambil rilis terbaru lewat pijar-updater.timer (tanpa secret SSH).
+    name: Publish build for VPS
+    needs: test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pijar-standalone
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: build-${{ github.run_number }}-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" pijar-standalone.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Build ${{ github.run_number }} (${GITHUB_SHA::7})" \
+            --notes "Deploy otomatis ke pijar.syahranfd.site"
+      - name: Prune old releases (keep 5)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' \
+            | while read -r t; do gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag; done

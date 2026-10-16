@@ -1,0 +1,7 @@
+[Unit]
+Description=Pull latest Pijar build from GitHub Releases
+
+[Service]
+Type=oneshot
+User=deploy
+ExecStart=/usr/local/bin/pijar-update
