@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { publicOrigin } from '@/lib/auth/origin';
 
 // ================================================================
 // PIJAR - Server-Side Logout Route Handler
@@ -8,7 +9,6 @@ import { NextResponse } from 'next/server';
 // ================================================================
 
 async function handleSignOut(request: Request) {
-  const url = new URL(request.url);
   const cookieStore = await cookies();
 
   try {
@@ -26,7 +26,7 @@ async function handleSignOut(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL('/auth/login', url.origin), {
+  return NextResponse.redirect(new URL('/auth/login', publicOrigin(request)), {
     status: 303,
   });
 }
