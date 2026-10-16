@@ -1,6 +1,7 @@
 [Unit]
 Description=Pijar (Next.js standalone)
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 User=deploy
@@ -9,6 +10,7 @@ EnvironmentFile=/etc/pijar.env
 Environment=NODE_ENV=production PORT=3200 HOSTNAME=127.0.0.1
 ExecStart=/opt/node22/bin/node server.js
 Restart=always
+RestartSec=3
 MemoryMax=900M
 
 [Install]
